@@ -1,0 +1,8 @@
+front/node_modules/
+front/dist/
+front/.vite/
+backend/node_modules/
+backend/.env
+backend/serviceAccountKey.json
+front/.env
+*.log
