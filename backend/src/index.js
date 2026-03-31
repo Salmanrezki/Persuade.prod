@@ -13,7 +13,7 @@ const jsonLimit = process.env.JSON_LIMIT || '6mb'
 const isProduction = process.env.NODE_ENV === 'production'
 
 if (isProduction && !process.env.CORS_ORIGIN) {
-  throw new Error('CORS_ORIGIN must be defined in production.')
+  throw new Error('CORS_ORIGIN must be defined in production')
 }
 
 const defaultAllowedOrigins = [
