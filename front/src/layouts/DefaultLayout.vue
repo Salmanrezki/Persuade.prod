@@ -11,11 +11,13 @@
       </div>
       <router-view v-else />
     </v-main>
+    <AppDevelopmentNotice v-if="!showAppLoader" />
   </v-app>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import AppDevelopmentNotice from '@/components/AppDevelopmentNotice.vue'
 import AppNavbar from '@/components/AppNavbar.vue'
 import { useAuthStore } from '@/stores/auth'
 
