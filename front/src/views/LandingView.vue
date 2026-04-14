@@ -122,10 +122,6 @@ const teamHighlights = [
     <main id="hero" class="landing-hero">
       <div class="landing-frame landing-hero__grid">
         <section class="landing-hero__content">
-          <div class="landing-logo-card">
-            <img :src="logoUrl" alt="Logo Persuade" width="132" height="132" />
-          </div>
-
           <div class="landing-copy">
             <p class="landing-kicker">Persuade</p>
             <h1 class="landing-title">Réinventez votre manière de négocier.</h1>
@@ -537,18 +533,6 @@ const teamHighlights = [
   display: grid;
   gap: 1rem;
   align-content: center;
-}
-
-.landing-logo-card {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: fit-content;
-  padding: 1rem;
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(42, 36, 29, 0.08);
-  box-shadow: 0 20px 50px rgba(75, 56, 34, 0.08);
 }
 
 .landing-copy {
@@ -1066,16 +1050,6 @@ const teamHighlights = [
 
   .landing-hero__content {
     gap: 0.8rem;
-  }
-
-  .landing-logo-card {
-    padding: 0.8rem;
-    border-radius: 22px;
-  }
-
-  .landing-logo-card img {
-    width: 96px;
-    height: 96px;
   }
 
   .landing-kicker {
