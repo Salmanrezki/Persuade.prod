@@ -4,6 +4,7 @@ import api from '@/services/api'
 import logoUrl from '@/assets/logo.png'
 import { useAuthStore } from '@/stores/auth'
 import { getUserProfile } from '@/services/userService'
+import { getCourses, invalidateContent } from '@/services/contentService'
 
 const LIBRARY_IMAGE_MAX_SIZE = 1024 * 1024 * 1.5
 const auth = useAuthStore()
@@ -115,7 +116,31 @@ const categoryOptions = computed(() => [
   ...Array.from(new Set(libraryCourses.value.map((course) => course.category).filter(Boolean))),
 ])
 
-const matchesLibraryCourseFilters = (course) => {
+const levelPathDefinitions = [
+  {
+    id: 'debutant',
+    title: 'Parcours débutant',
+    subtitle: 'Poser les bases, le vocabulaire et les bons réflexes.',
+    tone: 'teal',
+    levels: ['Débutant', 'Tous niveaux'],
+  },
+  {
+    id: 'intermediaire',
+    title: 'Parcours intermédiaire',
+    subtitle: 'Structurer vos échanges et mieux traiter les objections.',
+    tone: 'gold',
+    levels: ['Intermédiaire'],
+  },
+  {
+    id: 'avance',
+    title: 'Parcours avancé',
+    subtitle: 'Gérer les cas complexes, la tension et les accords sensibles.',
+    tone: 'coral',
+    levels: ['Avancé'],
+  },
+]
+
+const matchesLibraryBaseFilters = (course) => {
   const queryValue = searchQuery.value.trim().toLowerCase()
   const matchesQuery =
     !queryValue ||
@@ -123,20 +148,38 @@ const matchesLibraryCourseFilters = (course) => {
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(queryValue))
 
-  const matchesLevel = filterLevel.value === 'all' || course.level === filterLevel.value
   const matchesMode = filterMode.value === 'all' || course.coachingMode === filterMode.value
   const matchesCategory = filterCategory.value === 'all' || course.category === filterCategory.value
 
-  return matchesQuery && matchesLevel && matchesMode && matchesCategory
+  return matchesQuery && matchesMode && matchesCategory
 }
 
+const matchesLibraryCourseFilters = (course) => {
+  const matchesLevel = filterLevel.value === 'all' || course.level === filterLevel.value
+  return matchesLibraryBaseFilters(course) && matchesLevel
+}
+
+const baseFilteredLibraryCourses = computed(() => libraryCourses.value.filter(matchesLibraryBaseFilters))
 const filteredLibraryCourses = computed(() => libraryCourses.value.filter(matchesLibraryCourseFilters))
 const featuredLibraryCourses = computed(() => filteredLibraryCourses.value.filter((course) => course.featured))
 const hasVideo = computed(() => !!activeCourse.value?.videoUrl)
+const toMillis = (value) => {
+  if (!value) return 0
+  if (typeof value === 'number') return value
+  if (typeof value?.toMillis === 'function') return value.toMillis()
+  if (value?.seconds) return value.seconds * 1000
+  if (value?._seconds) return value._seconds * 1000
+  if (typeof value === 'string') {
+    const parsed = new Date(value).getTime()
+    return Number.isNaN(parsed) ? 0 : parsed
+  }
+  return 0
+}
 const isVideoFile = computed(() => {
   const url = activeCourse.value?.videoUrl || ''
   return ['.mp4', '.webm', '.ogg'].some((ext) => url.toLowerCase().includes(ext))
 })
+const embeddedVideoUrl = computed(() => normalizeVideoUrl(activeCourse.value?.videoUrl || ''))
 const coverPreview = computed(() => newLibraryCourse.value.coverImage || '')
 
 const openCourse = (course) => {
@@ -155,6 +198,53 @@ const courseModeLabel = (value) => {
   if (value === 'one_to_one') return '1:1'
   if (value === 'group') return 'Groupe'
   return 'Vidéo'
+}
+
+const normalizeVideoUrl = (rawUrl) => {
+  if (!rawUrl) return ''
+
+  const trimmed = String(rawUrl).trim()
+  if (!trimmed) return ''
+
+  if (['.mp4', '.webm', '.ogg'].some((ext) => trimmed.toLowerCase().includes(ext))) {
+    return trimmed
+  }
+
+  try {
+    const parsed = new URL(trimmed)
+    const host = parsed.hostname.replace(/^www\./, '')
+
+    if (host === 'youtu.be') {
+      const videoId = parsed.pathname.split('/').filter(Boolean)[0]
+      return videoId ? `https://www.youtube-nocookie.com/embed/${videoId}` : trimmed
+    }
+
+    if (host === 'youtube.com' || host === 'm.youtube.com') {
+      if (parsed.pathname.startsWith('/embed/')) return trimmed
+
+      const segments = parsed.pathname.split('/').filter(Boolean)
+      const videoId =
+        parsed.searchParams.get('v') ||
+        (segments[0] === 'shorts' ? segments[1] : '') ||
+        (segments[0] === 'watch' ? '' : segments[0])
+
+      return videoId ? `https://www.youtube-nocookie.com/embed/${videoId}` : trimmed
+    }
+
+    if (host === 'vimeo.com' || host === 'player.vimeo.com') {
+      const videoId = parsed.pathname.split('/').filter(Boolean).pop()
+      return videoId ? `https://player.vimeo.com/video/${videoId}` : trimmed
+    }
+
+    if (host === 'loom.com') {
+      const videoId = parsed.pathname.split('/').filter(Boolean).pop()
+      return videoId ? `https://www.loom.com/embed/${videoId}` : trimmed
+    }
+  } catch (error) {
+    return trimmed
+  }
+
+  return trimmed
 }
 
 const filterLevelLabel = (value) => (value === 'all' ? 'Tous niveaux' : value)
@@ -180,8 +270,8 @@ const compareCourses = (left, right) => {
   }
 
   if (sortOption.value === 'recent') {
-    const leftTime = left.createdAt?.toMillis ? left.createdAt.toMillis() : 0
-    const rightTime = right.createdAt?.toMillis ? right.createdAt.toMillis() : 0
+    const leftTime = toMillis(left.createdAt)
+    const rightTime = toMillis(right.createdAt)
     return rightTime - leftTime
   }
 
@@ -200,6 +290,21 @@ const paginateItems = (items, page) => {
 
 const sortedFeaturedLibraryCourses = computed(() => sortItems(featuredLibraryCourses.value))
 const sortedLibraryCourses = computed(() => sortItems(filteredLibraryCourses.value))
+const learningPaths = computed(() =>
+  levelPathDefinitions
+    .map((path) => {
+      const pathCourses = sortItems(
+        baseFilteredLibraryCourses.value.filter((course) => path.levels.includes(course.level || 'Tous niveaux'))
+      )
+
+      return {
+        ...path,
+        total: pathCourses.length,
+        courses: pathCourses.slice(0, 3),
+      }
+    })
+    .filter((path) => path.total > 0)
+)
 const paginatedLibraryCourses = computed(() => paginateItems(sortedLibraryCourses.value, libraryPage.value))
 const libraryPageCount = computed(() => Math.max(1, Math.ceil(sortedLibraryCourses.value.length / pageSize.value)))
 const ownedFeaturedLibraryCourses = computed(() =>
@@ -240,12 +345,18 @@ const handleFeaturedDrop = (id) => {
   draggedFeaturedId.value = ''
 }
 
+const activateLevelPath = (path) => {
+  const preferredLevel = path.levels.find((level) => level !== 'Tous niveaux') || 'all'
+  filterLevel.value = preferredLevel
+}
+
 const saveFeaturedOrder = async () => {
   if (!featuredOrderIds.value.length) return
 
   reorderLoading.value = true
   try {
     await api.post('/courses/reorder', { ids: featuredOrderIds.value })
+    invalidateContent('courses')
     await loadCourses()
     syncFeaturedOrder()
   } catch (error) {
@@ -261,8 +372,7 @@ const loadProfile = async () => {
 }
 
 const loadCourses = async () => {
-  const res = await api.get('/courses')
-  courses.value = res.data
+  courses.value = await getCourses()
 }
 
 const resetLibraryCourseForm = () => {
@@ -337,6 +447,7 @@ const handleSubmitLibraryCourse = async () => {
     }
 
     resetLibraryCourseForm()
+    invalidateContent('courses')
     await loadCourses()
   } catch (error) {
     libraryFormError.value = isEditingLibraryCourse.value
@@ -359,6 +470,7 @@ const deleteLibraryCourse = async (course) => {
     if (editingLibraryCourseId.value === course.id) {
       resetLibraryCourseForm()
     }
+    invalidateContent('courses')
     await loadCourses()
   } catch (error) {
     libraryFormError.value = 'Impossible de supprimer le cours.'
@@ -379,6 +491,7 @@ const duplicateLibraryCourse = async (course) => {
       featured: false,
       type: 'library',
     })
+    invalidateContent('courses')
     await loadCourses()
   } catch (error) {
     libraryFormError.value = 'Impossible de dupliquer le cours.'
@@ -410,14 +523,18 @@ onMounted(async () => {
   loading.value = true
   errorMessage.value = ''
 
-  try {
-    await Promise.all([loadProfile(), loadCourses()])
-  } catch (error) {
-    errorMessage.value = 'Impossible de charger les cours.'
-    console.error(error)
-  } finally {
-    loading.value = false
+  const [profileResult, coursesResult] = await Promise.allSettled([loadProfile(), loadCourses()])
+
+  if (profileResult.status === 'rejected') {
+    console.error(profileResult.reason)
   }
+
+  if (coursesResult.status === 'rejected') {
+    errorMessage.value = 'Impossible de charger les cours.'
+    console.error(coursesResult.reason)
+  }
+
+  loading.value = false
 })
 </script>
 
@@ -436,7 +553,7 @@ onMounted(async () => {
               </div>
               <div class="courses-hero-title">Cours pré-enregistrés</div>
               <div class="courses-hero-subtitle">
-                Explorez une bibliothèque vidéo plus riche, avec visuels, objectifs et fiches détaillées.
+                Explorez une bibliothèque vidéo dédiée à la négociation, avec méthodes, cas concrets et visionnage intégré.
               </div>
             </div>
 
@@ -612,9 +729,52 @@ onMounted(async () => {
           </v-col>
         </v-row>
 
+        <div v-if="!loading && learningPaths.length" class="courses-section">
+          <div class="courses-section-title">Parcours par niveau</div>
+          <div class="courses-section-subtitle">
+            Une lecture plus simple pour progresser du bon cours au bon moment.
+          </div>
+        </div>
+
+        <v-row v-if="!loading && learningPaths.length" class="courses-paths">
+          <v-col cols="12" md="4" v-for="path in learningPaths" :key="path.id">
+            <v-card class="courses-path-card" :class="`courses-path-card--${path.tone}`" elevation="4">
+              <div class="courses-path-card__header">
+                <div>
+                  <div class="courses-path-card__title">{{ path.title }}</div>
+                  <div class="courses-path-card__subtitle">{{ path.subtitle }}</div>
+                </div>
+                <div class="courses-path-card__count">{{ path.total }}</div>
+              </div>
+
+              <div class="courses-path-card__list">
+                <button
+                  v-for="course in path.courses"
+                  :key="`${path.id}-${course.id}`"
+                  type="button"
+                  class="courses-path-card__item"
+                  @click="openCourse(course)"
+                >
+                  <div class="courses-path-card__item-main">
+                    <span class="courses-path-card__item-title">{{ course.title }}</span>
+                    <span class="courses-path-card__item-meta">
+                      {{ course.level || 'Tous niveaux' }} · {{ course.duration || '—' }}
+                    </span>
+                  </div>
+                  <v-icon size="18">mdi-play-circle-outline</v-icon>
+                </button>
+              </div>
+
+              <v-btn class="course-action-btn-outline" size="small" @click="activateLevelPath(path)">
+                Voir ce niveau
+              </v-btn>
+            </v-card>
+          </v-col>
+        </v-row>
+
         <div v-if="!loading" class="courses-section">
           <div class="courses-section-title">Cours pré-enregistrés</div>
-          <div class="courses-section-subtitle">Disponibles immédiatement, sans validation.</div>
+          <div class="courses-section-subtitle">Des contenus de négociation disponibles immédiatement, directement sur la plateforme.</div>
         </div>
 
         <v-row v-if="!loading" class="courses-list">
@@ -977,10 +1137,11 @@ onMounted(async () => {
               <video v-if="isVideoFile" controls :src="activeCourse.videoUrl" />
               <iframe
                 v-else
-                :src="activeCourse.videoUrl"
+                :src="embeddedVideoUrl"
                 title="Cours vidéo"
                 frameborder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                referrerpolicy="strict-origin-when-cross-origin"
                 allowfullscreen
               ></iframe>
             </template>
@@ -1133,6 +1294,108 @@ onMounted(async () => {
 
 .courses-list {
   row-gap: 24px;
+}
+
+.courses-paths {
+  row-gap: 20px;
+  margin-bottom: 12px;
+}
+
+.courses-path-card {
+  height: 100%;
+  padding: 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(19, 58, 59, 0.08);
+  background: #fff;
+  box-shadow: 0 18px 35px rgba(12, 31, 32, 0.1);
+  display: grid;
+  gap: 16px;
+}
+
+.courses-path-card--teal {
+  background: linear-gradient(180deg, rgba(227, 245, 243, 0.92), rgba(255, 255, 255, 0.98));
+}
+
+.courses-path-card--gold {
+  background: linear-gradient(180deg, rgba(255, 244, 220, 0.92), rgba(255, 255, 255, 0.98));
+}
+
+.courses-path-card--coral {
+  background: linear-gradient(180deg, rgba(255, 235, 227, 0.92), rgba(255, 255, 255, 0.98));
+}
+
+.courses-path-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.courses-path-card__title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #133a3b;
+}
+
+.courses-path-card__subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: rgba(19, 58, 59, 0.68);
+}
+
+.courses-path-card__count {
+  min-width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: rgba(19, 58, 59, 0.08);
+  color: #133a3b;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.courses-path-card__list {
+  display: grid;
+  gap: 10px;
+}
+
+.courses-path-card__item {
+  width: 100%;
+  border: 0;
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #133a3b;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.courses-path-card__item:hover {
+  transform: translateY(-1px);
+  background: #fff;
+}
+
+.courses-path-card__item-main {
+  display: grid;
+  gap: 4px;
+}
+
+.courses-path-card__item-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.courses-path-card__item-meta {
+  font-size: 12px;
+  color: rgba(19, 58, 59, 0.66);
 }
 
 .course-card {

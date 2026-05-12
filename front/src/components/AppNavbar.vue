@@ -6,7 +6,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 import api from '@/services/api'
 import { collection, getDocs, query, where } from 'firebase/firestore'
-import AppNewsCarousel from '@/components/AppNewsCarousel.vue'
 import logoUrl from '@/assets/logo.png'
 import navDashboardUrl from '@/assets/nav-dashboard.svg'
 import navLibraryUrl from '@/assets/nav-library.svg'
@@ -50,13 +49,14 @@ const navItems = computed(() => [
     tone: 'teal',
   },
   {
-    title: 'Cours pré-enregistrés',
-    subtitle: 'A votre rythme',
-    path: ROUTE_PATHS.courses,
-    icon: 'mdi-play-circle-outline',
-    image: navLibraryUrl,
-    showNotification: shouldShowNotification('courses'),
-    tone: 'gold',
+    title: 'Chat',
+    subtitle: 'Messages et suivi',
+    path: ROUTE_PATHS.chat,
+    icon: 'mdi-message-processing-outline',
+    image: navChatUrl,
+    badge: auth.chatUnreadCount || 0,
+    showNotification: shouldShowNotification('chat'),
+    tone: 'coral',
   },
   {
     title: 'Cours avec coach',
@@ -77,6 +77,15 @@ const navItems = computed(() => [
     tone: 'coral',
   },
   {
+    title: 'Cours pré-enregistrés',
+    subtitle: 'A votre rythme',
+    path: ROUTE_PATHS.courses,
+    icon: 'mdi-play-circle-outline',
+    image: navLibraryUrl,
+    showNotification: shouldShowNotification('courses'),
+    tone: 'gold',
+  },
+  {
     title: 'Exercices pratiques',
     subtitle: 'Mise en pratique',
     path: ROUTE_PATHS.practicalExercises,
@@ -84,16 +93,6 @@ const navItems = computed(() => [
     image: navExercisesUrl,
     showNotification: shouldShowNotification('practicalExercises'),
     tone: 'teal',
-  },
-  {
-    title: 'Chat',
-    subtitle: 'Messages et suivi',
-    path: ROUTE_PATHS.chat,
-    icon: 'mdi-message-processing-outline',
-    image: navChatUrl,
-    badge: auth.chatUnreadCount || 0,
-    showNotification: shouldShowNotification('chat'),
-    tone: 'coral',
   },
 ])
 
@@ -481,7 +480,6 @@ onBeforeUnmount(() => {
               </v-list-item>
             </v-list>
 
-            <AppNewsCarousel class="app-sidebar-featured" variant="sidebar" />
           </div>
         </div>
 
@@ -626,10 +624,6 @@ onBeforeUnmount(() => {
               </v-list-item>
             </v-list>
 
-            <AppNewsCarousel
-              class="app-sidebar-featured"
-              variant="sidebar"
-            />
           </div>
         </div>
 
@@ -820,6 +814,7 @@ onBeforeUnmount(() => {
   padding: 20px 18px 18px;
   overflow: hidden;
   transform-origin: left center;
+  backdrop-filter: blur(20px);
 }
 
 .app-sidebar-shell--mobile {
@@ -837,6 +832,12 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 14px;
   align-content: start;
+  padding: 14px;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    rgba(255, 255, 255, 0.02);
 }
 
 .app-sidebar-nav-wrap::-webkit-scrollbar {
@@ -852,10 +853,6 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 14px;
   flex-shrink: 0;
-}
-
-.app-sidebar-featured {
-  margin-top: 4px;
 }
 
 .app-sidebar-top {
@@ -889,6 +886,7 @@ onBeforeUnmount(() => {
   background:
     linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
     rgba(255, 255, 255, 0.02);
+  box-shadow: 0 18px 32px rgba(5, 16, 20, 0.18);
 }
 
 .app-sidebar-hero--mobile {
@@ -1018,13 +1016,14 @@ onBeforeUnmount(() => {
 }
 
 .app-sidebar-section-label {
-  margin-top: 4px;
-  padding: 0 12px;
+  margin-top: 2px;
+  padding: 0 12px 10px;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: rgba(245, 239, 230, 0.46);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .app-sidebar-nav {
@@ -1341,12 +1340,15 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 22px;
   color: rgba(245, 239, 230, 0.74);
-  background: rgba(255, 255, 255, 0.02);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015)),
+    rgba(255, 255, 255, 0.02);
   transition:
     background-color 0.2s ease,
     border-color 0.2s ease,
     color 0.2s ease,
-    transform 0.2s ease;
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .app-sidebar-item--gold {
@@ -1360,10 +1362,13 @@ onBeforeUnmount(() => {
 }
 
 .app-sidebar-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.12);
   color: #ffffff;
   transform: translateX(3px);
+  box-shadow: 0 14px 24px rgba(6, 18, 22, 0.18);
 }
 
 .app-sidebar-item--active {
@@ -1372,7 +1377,7 @@ onBeforeUnmount(() => {
     rgba(255, 255, 255, 0.06);
   border-color: var(--nav-accent);
   color: #fffaf3;
-  box-shadow: none;
+  box-shadow: 0 16px 28px rgba(6, 18, 22, 0.2);
 }
 
 .app-sidebar-item__icon-wrap {
@@ -1385,6 +1390,7 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.06);
   color: var(--nav-accent-strong);
   border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .app-sidebar-item__icon-illustration {
@@ -1500,10 +1506,12 @@ onBeforeUnmount(() => {
     background-color 0.2s ease,
     border-color 0.2s ease,
     box-shadow 0.2s ease;
+  box-shadow: 0 12px 22px rgba(6, 18, 22, 0.12);
 }
 
 .app-sidebar-utility-card--active {
   border-color: rgba(245, 191, 71, 0.32);
+  box-shadow: 0 14px 26px rgba(6, 18, 22, 0.18);
 }
 
 .app-sidebar-utility-card--mobile {
@@ -1520,6 +1528,7 @@ onBeforeUnmount(() => {
 
 .app-sidebar-utility-card:hover {
   transform: translateX(2px);
+  box-shadow: 0 16px 28px rgba(6, 18, 22, 0.18);
 }
 
 .app-sidebar-utility-card--preferences:hover {

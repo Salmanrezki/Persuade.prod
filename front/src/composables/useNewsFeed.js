@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import api from '@/services/api'
+import { getCourses, getMasterclasses } from '@/services/contentService'
 import { ROUTE_PATHS } from '@/router/paths'
 
 const items = ref([])
@@ -48,6 +48,8 @@ const buildMasterclassItems = (entries) =>
       meta: item.scheduleAt ? `Le ${formatShortDate(item.scheduleAt)}` : 'Programmation en cours',
       route: ROUTE_PATHS.masterclass,
       label: 'Masterclass',
+      cta: 'Voir la session',
+      image: item.coverImage || '',
       icon: 'mdi-presentation-play',
       tone: 'gold',
       sortValue: item.scheduleAt ? toMillis(item.scheduleAt) : Number.MAX_SAFE_INTEGER,
@@ -66,6 +68,8 @@ const buildCourseItems = (entries, options) =>
       meta: `Ajoute le ${formatShortDate(item.createdAt || item.updatedAt)}`,
       route: options.route,
       label: options.label,
+      cta: options.cta,
+      image: item.coverImage || '',
       icon: options.icon,
       tone: options.tone,
       sortValue: toMillis(item.createdAt || item.updatedAt),
@@ -104,36 +108,38 @@ const fetchNewsFeed = async ({ force = false } = {}) => {
 
     try {
       const [coursesRes, masterclassesRes] = await Promise.allSettled([
-        api.get('/courses'),
-        api.get('/masterclasses'),
+        getCourses(),
+        getMasterclasses(),
       ])
 
       const courseEntries =
-        coursesRes.status === 'fulfilled' && Array.isArray(coursesRes.value.data) ? coursesRes.value.data : []
+        coursesRes.status === 'fulfilled' && Array.isArray(coursesRes.value) ? coursesRes.value : []
       const masterclassEntries =
-        masterclassesRes.status === 'fulfilled' && Array.isArray(masterclassesRes.value.data)
-          ? masterclassesRes.value.data
+        masterclassesRes.status === 'fulfilled' && Array.isArray(masterclassesRes.value)
+          ? masterclassesRes.value
           : []
 
       const masterclassItems = buildMasterclassItems(masterclassEntries).slice(0, 4)
       const libraryItems = buildCourseItems(courseEntries, {
         prefix: 'library-course',
         route: ROUTE_PATHS.courses,
-        label: 'Cours',
+        label: 'Cours pre-enregistre',
+        cta: 'Voir le cours',
         icon: 'mdi-play-circle-outline',
         tone: 'teal',
         filter: (item) => item?.type === 'library' || !item?.coachId,
-      }).slice(0, 3)
+      }).slice(0, 4)
       const coachItems = buildCourseItems(courseEntries, {
         prefix: 'coach-course',
         route: ROUTE_PATHS.coachCourses,
-        label: 'Coaching',
+        label: 'Cours avec coach',
+        cta: 'Voir le parcours',
         icon: 'mdi-account-tie-outline',
         tone: 'coral',
         filter: (item) => !!item?.coachId,
       }).slice(0, 3)
 
-      const nextItems = interleaveItems([masterclassItems, libraryItems, coachItems], 6)
+      const nextItems = interleaveItems([libraryItems, coachItems, masterclassItems], 6)
       items.value = nextItems
       lastFetchedAt = Date.now()
       return items.value

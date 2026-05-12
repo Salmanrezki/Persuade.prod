@@ -1,6 +1,7 @@
 import express from 'express'
 import admin from '../firebaseAdmin.js'
 import { verifyToken } from '../middleware/authMiddleware.js'
+import { librarySeedCourses } from '../data/librarySeedCourses.js'
 
 const router = express.Router()
 
@@ -13,6 +14,8 @@ const DEFAULT_DURATION = '—'
 const DEFAULT_CATEGORY = 'Coaching'
 const DEFAULT_LANGUAGE = 'Français'
 const DEFAULT_COACHING_MODE = 'one_to_one'
+const PUBLIC_READ_TIMEOUT_MS = 2500
+const PUBLIC_CACHE_TTL_MS = 30 * 1000
 
 const getUserProfile = async (uid) => {
   const doc = await usersCollection().doc(uid).get()
@@ -37,6 +40,79 @@ const normalizeCourseType = (value) => (value === 'library' ? 'library' : 'coach
 const normalizeCoachingMode = (value) => {
   const allowed = ['video', 'one_to_one', 'group', 'hybrid']
   return allowed.includes(value) ? value : DEFAULT_COACHING_MODE
+}
+
+const toMillis = (value) => {
+  if (!value) return 0
+  if (typeof value === 'number') return value
+  if (typeof value?.toMillis === 'function') return value.toMillis()
+  if (value?.seconds) return value.seconds * 1000
+  if (value?._seconds) return value._seconds * 1000
+  if (typeof value === 'string') {
+    const parsed = new Date(value).getTime()
+    return Number.isNaN(parsed) ? 0 : parsed
+  }
+  return 0
+}
+
+const sortCourses = (items) =>
+  [...items].sort((a, b) => {
+    const orderA = typeof a.order === 'number' ? a.order : null
+    const orderB = typeof b.order === 'number' ? b.order : null
+
+    if (orderA !== null && orderB !== null) return orderA - orderB
+    if (orderA !== null) return -1
+    if (orderB !== null) return 1
+
+    return toMillis(b.createdAt) - toMillis(a.createdAt)
+  })
+
+const withTimeout = (promise, timeoutMs, label) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
+    }),
+  ])
+
+let publicCoursesCache = sortCourses(librarySeedCourses)
+let publicCoursesLastSyncAt = 0
+let publicCoursesRefreshPromise = null
+
+const refreshPublicCoursesCache = async () => {
+  if (publicCoursesRefreshPromise) return publicCoursesRefreshPromise
+
+  publicCoursesRefreshPromise = (async () => {
+    const snapshot = await withTimeout(collection().get(), PUBLIC_READ_TIMEOUT_MS, 'courses fetch')
+    const storedCourses = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }))
+
+    publicCoursesCache = sortCourses([...librarySeedCourses, ...storedCourses])
+    publicCoursesLastSyncAt = Date.now()
+    return publicCoursesCache
+  })()
+
+  try {
+    return await publicCoursesRefreshPromise
+  } finally {
+    publicCoursesRefreshPromise = null
+  }
+}
+
+const upsertPublicCourseCache = (course) => {
+  if (!course?.id) return
+
+  const nextItems = publicCoursesCache.filter((item) => item.id !== course.id)
+  nextItems.push(course)
+  publicCoursesCache = sortCourses(nextItems)
+  publicCoursesLastSyncAt = Date.now()
+}
+
+const removeFromPublicCourseCache = (courseId) => {
+  publicCoursesCache = publicCoursesCache.filter((item) => item.id !== courseId)
+  publicCoursesLastSyncAt = Date.now()
 }
 
 const buildCoursePayload = (body, user, profile, options = {}) => {
@@ -77,32 +153,16 @@ const buildCoursePayload = (body, user, profile, options = {}) => {
 
 const collection = () => routerCollection()
 
-router.get('/', verifyToken, async (req, res) => {
-  try {
-    const snapshot = await collection().get()
-    const courses = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }))
+router.get('/', async (_req, res) => {
+  const cacheIsStale = Date.now() - publicCoursesLastSyncAt > PUBLIC_CACHE_TTL_MS
 
-    courses.sort((a, b) => {
-      const orderA = typeof a.order === 'number' ? a.order : null
-      const orderB = typeof b.order === 'number' ? b.order : null
-
-      if (orderA !== null && orderB !== null) return orderA - orderB
-      if (orderA !== null) return -1
-      if (orderB !== null) return 1
-
-      const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0
-      const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0
-      return timeB - timeA
+  if (cacheIsStale) {
+    refreshPublicCoursesCache().catch((error) => {
+      console.error('GET /api/courses refresh failed:', error)
     })
-
-    res.json(courses)
-  } catch (error) {
-    console.error('GET /api/courses failed:', error)
-    res.json([])
   }
+
+  res.json(publicCoursesCache)
 })
 
 router.get('/coach', verifyToken, async (req, res) => {
@@ -154,6 +214,12 @@ router.post('/reorder', verifyToken, async (req, res) => {
         order: index + 1,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       })
+      upsertPublicCourseCache({
+        id: doc.id,
+        ...doc.data(),
+        order: index + 1,
+        updatedAt: new Date().toISOString(),
+      })
     })
     await batch.commit()
 
@@ -179,7 +245,13 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     const ref = await collection().add(courseData)
-    res.status(201).json({ id: ref.id, ...courseData })
+    const createdCourse = {
+      id: ref.id,
+      ...courseData,
+      createdAt: new Date().toISOString(),
+    }
+    upsertPublicCourseCache(createdCourse)
+    res.status(201).json(createdCourse)
   } catch (error) {
     res.status(500).json({ message: 'Failed to create course' })
   }
@@ -217,7 +289,14 @@ router.patch('/:id', verifyToken, async (req, res) => {
       { merge: true }
     )
 
-    res.json({ id: doc.id, ...current, ...courseData })
+    const updatedCourse = {
+      id: doc.id,
+      ...current,
+      ...courseData,
+      updatedAt: new Date().toISOString(),
+    }
+    upsertPublicCourseCache(updatedCourse)
+    res.json(updatedCourse)
   } catch (error) {
     res.status(500).json({ message: 'Failed to update course' })
   }
@@ -248,15 +327,20 @@ router.delete('/:id', verifyToken, async (req, res) => {
       batch.delete(requestDoc.ref)
     })
     await batch.commit()
-
+    removeFromPublicCourseCache(doc.id)
     res.json({ id: doc.id, deleted: true })
   } catch (error) {
     res.status(500).json({ message: 'Failed to delete course' })
   }
 })
 
-router.get('/:id', verifyToken, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
+    const seededCourse = librarySeedCourses.find((course) => course.id === req.params.id)
+    if (seededCourse) {
+      return res.json(seededCourse)
+    }
+
     const doc = await collection().doc(req.params.id).get()
     if (doc.exists) {
       return res.json({ id: doc.id, ...doc.data() })

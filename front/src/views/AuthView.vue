@@ -70,7 +70,7 @@
         <v-card class="auth-card">
           <v-card-item>
             <div class="auth-card-title">Inscription</div>
-            <div class="auth-card-subtitle">Rejoignez la communauté en 1 minute</div>
+            <div class="auth-card-subtitle">Inscrivez-vous comme apprenant ou coach</div>
           </v-card-item>
 
           <v-card-text class="auth-card-body">
@@ -133,6 +133,16 @@
               required
             />
 
+            <v-alert
+              v-if="registerRole === 'coach'"
+              type="info"
+              variant="tonal"
+              density="comfortable"
+              class="auth-alert"
+            >
+              Les comptes coach sont relus après inscription afin de garantir des profils de qualité sur la plateforme.
+            </v-alert>
+
           </v-card-text>
 
           <v-card-actions class="auth-card-actions">
@@ -171,7 +181,7 @@ const registerError = ref('')
 
 const roleOptions = [
   { title: 'Apprenant', value: 'apprenant' },
-  { title: 'Coach', value: 'coach', props: { disabled: true } },
+  { title: 'Coach', value: 'coach' },
 ]
 
 const authErrorMessages = {

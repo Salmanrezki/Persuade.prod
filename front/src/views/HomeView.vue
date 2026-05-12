@@ -3,10 +3,10 @@ import { computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { ROUTE_PATHS } from '@/router/paths'
 import AppNewsCarousel from '@/components/AppNewsCarousel.vue'
-import logoUrl from '@/assets/logo.png'
 import api from '@/services/api'
 import { db } from '@/services/firebase'
 import { getUserProfile } from '@/services/userService'
+import { getCourses, getMasterclasses } from '@/services/contentService'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 
 const auth = useAuthStore()
@@ -19,28 +19,25 @@ const conversations = ref([])
 const courseRequests = ref([])
 const masterclassRegistrations = ref([])
 
-const displayName = computed(() => {
-  if (profile.value?.firstname) return profile.value.firstname
-  if (auth.user?.displayName) return auth.user.displayName
-  if (auth.user?.email) return auth.user.email.split('@')[0]
-  return 'Utilisateur'
-})
-
-const email = computed(() => profile.value?.email || auth.user?.email || '—')
-const birthdate = computed(() => profile.value?.birthdate || '—')
 const role = computed(() => profile.value?.role || '—')
 const roleLabel = computed(() => {
   if (role.value === 'coach') return 'Coach'
   if (role.value === 'apprenant') return 'Apprenant'
   return role.value
 })
-const profilePhoto = computed(() => profile.value?.profilePhoto || auth.profile?.profilePhoto || '')
+const coachApplicationStatus = computed(() => profile.value?.coachApplicationStatus || auth.profile?.coachApplicationStatus || '')
 const isCoach = computed(() => role.value === 'coach')
-const heroSubtitle = computed(() =>
-  isCoach.value ? 'Suivez vos apprenants et vos sessions en temps réel.' : 'Suivez votre progression et vos objectifs.'
+const isCoachPendingReview = computed(() => isCoach.value && coachApplicationStatus.value === 'pending_review')
+const accountStatusLabel = computed(() => (isCoachPendingReview.value ? 'En évaluation' : 'Actif'))
+const dashboardSummary = computed(() =>
+  isCoach.value
+    ? 'Suivez vos demandes, vos sessions et vos contenus en un coup d’œil.'
+    : 'Retrouvez rapidement vos cours, réservations et échanges essentiels.'
 )
-const uid = computed(() => auth.user?.uid || '—')
-const uidShort = computed(() => (uid.value && uid.value !== '—' ? `${uid.value.slice(0, 6)}…${uid.value.slice(-4)}` : '—'))
+const heroMeta = computed(() => [
+  { label: 'Rôle', value: roleLabel.value !== '—' ? roleLabel.value : 'Compte' },
+  { label: 'Statut', value: accountStatusLabel.value },
+])
 
 const toMillis = (value) => {
   if (!value) return 0
@@ -134,6 +131,70 @@ const latestDemand = computed(() =>
     .sort((a, b) => toMillis(b?.updatedAt || b?.createdAt) - toMillis(a?.updatedAt || a?.createdAt))[0] || null
 )
 
+const levelPriority = {
+  Débutant: 1,
+  'Tous niveaux': 2,
+  Intermédiaire: 3,
+  Avancé: 4,
+}
+
+const sortedLibraryCourses = computed(() =>
+  [...libraryCourses.value].sort((left, right) => {
+    const featuredDelta = Number(Boolean(right?.featured)) - Number(Boolean(left?.featured))
+    if (featuredDelta !== 0) return featuredDelta
+
+    const levelDelta = (levelPriority[left?.level] || 99) - (levelPriority[right?.level] || 99)
+    if (levelDelta !== 0) return levelDelta
+
+    return toMillis(right?.createdAt || right?.updatedAt) - toMillis(left?.createdAt || left?.updatedAt)
+  })
+)
+
+const learnerGuidedPaths = computed(() => {
+  if (isCoach.value) return []
+
+  const buildPath = ({ id, title, subtitle, tone, levels }) => {
+    const matches = sortedLibraryCourses.value.filter((course) => levels.includes(course?.level || 'Tous niveaux'))
+    const spotlight = matches[0] || null
+
+    if (!spotlight) return null
+
+    return {
+      id,
+      title,
+      subtitle,
+      tone,
+      spotlight,
+      total: matches.length,
+      items: matches.slice(0, 3),
+    }
+  }
+
+  return [
+    buildPath({
+      id: 'commencer',
+      title: 'Commencer',
+      subtitle: 'Les bases pour poser un cadre clair et progresser rapidement.',
+      tone: 'teal',
+      levels: ['Débutant', 'Tous niveaux'],
+    }),
+    buildPath({
+      id: 'continuer',
+      title: 'Continuer',
+      subtitle: 'Des méthodes plus structurées pour mieux conduire vos échanges.',
+      tone: 'gold',
+      levels: ['Intermédiaire'],
+    }),
+    buildPath({
+      id: 'approfondir',
+      title: 'Approfondir',
+      subtitle: 'Les situations complexes, les arbitrages sensibles et les accords à fort enjeu.',
+      tone: 'coral',
+      levels: ['Avancé'],
+    }),
+  ].filter(Boolean)
+})
+
 const statCards = computed(() => {
   if (isCoach.value) {
     const publishedOffers = ownedCoachCourses.value.length + ownedMasterclasses.value.length
@@ -221,18 +282,21 @@ const heroSignals = computed(() => {
   ]
 })
 
-const heroTimeline = computed(() => {
+const focusItems = computed(() => {
   if (isCoach.value) {
     return [
       {
+        icon: 'mdi-book-open-page-variant-outline',
         label: 'Dernier cours',
         state: latestOwnedCourse.value?.title || 'Aucun cours créé',
       },
       {
+        icon: 'mdi-calendar-clock-outline',
         label: 'Prochaine session',
         state: nextOwnedMasterclass.value ? `${nextOwnedMasterclass.value.title} · ${formatFutureDate(nextOwnedMasterclass.value.scheduleAt)}` : 'Aucune masterclass planifiée',
       },
       {
+        icon: 'mdi-account-clock-outline',
         label: 'Dernière demande',
         state: latestDemand.value ? formatRelativeDate(latestDemand.value.updatedAt || latestDemand.value.createdAt) : 'Aucune demande récente',
       },
@@ -241,19 +305,45 @@ const heroTimeline = computed(() => {
 
   return [
     {
+      icon: 'mdi-book-open-page-variant-outline',
       label: 'Dernier cours',
       state: latestLibraryCourse.value?.title || 'Aucun cours récent',
     },
     {
+      icon: 'mdi-calendar-star',
       label: 'Prochaine masterclass',
       state: nextRegisteredMasterclass.value
         ? `${nextRegisteredMasterclass.value.masterclassTitle} · ${formatFutureDate(nextRegisteredMasterclass.value.scheduleAt)}`
         : 'Aucune inscription planifiée',
     },
     {
+      icon: 'mdi-message-text-outline',
       label: 'Dernier message',
       state: latestConversation.value ? formatRelativeDate(latestConversation.value.updatedAt || latestConversation.value.createdAt) : 'Aucun échange récent',
     },
+  ]
+})
+
+const heroPanelTitle = computed(() => (isCoach.value ? 'Vos priorités du moment' : 'Votre espace du jour'))
+const heroPanelSubtitle = computed(() =>
+  isCoach.value
+    ? 'Repérez en un coup d’œil les demandes, sessions et actions importantes.'
+    : 'Gardez vos apprentissages, réservations et conversations à portée de main.'
+)
+
+const dashboardActions = computed(() => {
+  if (isCoach.value) {
+    return [
+      { label: 'Gérer mes offres', path: ROUTE_PATHS.coachCourses, tone: 'teal' },
+      { label: 'Voir mes masterclass', path: ROUTE_PATHS.masterclass, tone: 'gold' },
+      { label: 'Ouvrir le chat', path: ROUTE_PATHS.chat, tone: 'coral' },
+    ]
+  }
+
+  return [
+    { label: 'Explorer les cours', path: ROUTE_PATHS.courses, tone: 'teal' },
+    { label: 'Voir les masterclass', path: ROUTE_PATHS.masterclass, tone: 'gold' },
+    { label: 'Ouvrir le chat', path: ROUTE_PATHS.chat, tone: 'coral' },
   ]
 })
 
@@ -341,34 +431,53 @@ const activities = computed(() => {
 const loadDashboardData = async () => {
   if (!auth.user?.uid) return
 
-  const [coursesRes, masterclassesRes, conversationsSnapshot] = await Promise.all([
-    api.get('/courses'),
-    api.get('/masterclasses'),
+  const [coursesRes, masterclassesRes, conversationsRes] = await Promise.allSettled([
+    getCourses(),
+    getMasterclasses(),
     getDocs(query(collection(db, 'conversations'), where('participants', 'array-contains', auth.user.uid))),
   ])
 
-  courses.value = Array.isArray(coursesRes.data) ? coursesRes.data : []
-  masterclasses.value = Array.isArray(masterclassesRes.data) ? masterclassesRes.data : []
-  conversations.value = conversationsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
+  courses.value =
+    coursesRes.status === 'fulfilled' && Array.isArray(coursesRes.value) ? coursesRes.value : []
+  masterclasses.value =
+    masterclassesRes.status === 'fulfilled' && Array.isArray(masterclassesRes.value)
+      ? masterclassesRes.value
+      : []
+  conversations.value =
+    conversationsRes.status === 'fulfilled'
+      ? conversationsRes.value.docs.map((item) => ({ id: item.id, ...item.data() }))
+      : []
 
   if (role.value === 'coach') {
-    const [requestsSnapshot, registrationsSnapshot] = await Promise.all([
-      getDocs(query(collection(db, 'courseRequests'), where('coachId', '==', auth.user.uid))),
-      getDocs(query(collection(db, 'masterclassRegistrations'), where('coachId', '==', auth.user.uid))),
+    const [requestsRes, registrationsRes] = await Promise.allSettled([
+      api.get('/requests/coach'),
+      api.get('/masterclasses/registrations/coach'),
     ])
 
-    courseRequests.value = requestsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
-    masterclassRegistrations.value = registrationsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
+    courseRequests.value =
+      requestsRes.status === 'fulfilled' && Array.isArray(requestsRes.value.data)
+        ? requestsRes.value.data
+        : []
+    masterclassRegistrations.value =
+      registrationsRes.status === 'fulfilled' && Array.isArray(registrationsRes.value.data)
+        ? registrationsRes.value.data
+        : []
     return
   }
 
-  const [requestsSnapshot, registrationsSnapshot] = await Promise.all([
-    getDocs(query(collection(db, 'courseRequests'), where('studentId', '==', auth.user.uid))),
-    getDocs(query(collection(db, 'masterclassRegistrations'), where('studentId', '==', auth.user.uid))),
+  const [requestsRes, registrationsRes] = await Promise.allSettled([
+    api.get('/requests/me'),
+    api.get('/masterclasses/registrations/me'),
   ])
 
-  courseRequests.value = requestsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
-  masterclassRegistrations.value = registrationsSnapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
+  courseRequests.value =
+    requestsRes.status === 'fulfilled' && Array.isArray(requestsRes.value.data)
+      ? requestsRes.value.data
+      : []
+  masterclassRegistrations.value =
+    registrationsRes.status === 'fulfilled' && Array.isArray(registrationsRes.value.data)
+      ? registrationsRes.value.data
+      : []
 }
 
 onMounted(async () => {
@@ -377,13 +486,18 @@ onMounted(async () => {
 
   try {
     profile.value = auth.profile || (await getUserProfile(auth.user?.uid))
+  } catch (error) {
+    console.error(error)
+  }
+
+  try {
     await loadDashboardData()
   } catch (error) {
-    profileError.value = 'Impossible de charger le profil.'
+    profileError.value = 'Impossible de charger une partie du tableau de bord.'
     console.error(error)
-  } finally {
-    loadingProfile.value = false
   }
+
+  loadingProfile.value = false
 })
 </script>
 
@@ -391,92 +505,87 @@ onMounted(async () => {
   <v-container class="home-container" fluid>
     <div class="home-backdrop" aria-hidden="true"></div>
 
-    <v-row class="home-hero" align="center" justify="center">
-      <v-col cols="12" md="10">
-        <v-card class="home-hero-card" elevation="8">
-          <div class="home-hero-content">
-            <div class="home-hero-left">
-              <div class="home-brand">
-                <v-img
-                  :src="logoUrl"
-                  alt="Logo Persuade"
-                  width="72"
-                  height="72"
-                  class="home-logo"
-                />
-                <div class="home-brand-text">Persuade</div>
-              </div>
-              <div class="home-hero-title">Bonjour, {{ displayName }}</div>
-              <div class="home-hero-subtitle">{{ heroSubtitle }}</div>
+    <v-row class="home-top-grid" align="stretch" justify="center">
+      <v-col cols="12" md="6">
+        <div class="home-top-stack">
+          <div class="home-top-overview">
+            <div class="home-top-overview__eyebrow">Tableau de bord</div>
+            <div class="home-top-overview__subtitle">{{ dashboardSummary }}</div>
 
-              <div class="home-hero-meta">
-                <div class="home-meta-item">
-                  <span class="home-meta-label">Email</span>
-                  <span class="home-meta-value">{{ email }}</span>
-                </div>
-                <div class="home-meta-item">
-                  <span class="home-meta-label">Identifiant</span>
-                  <span class="home-meta-value">{{ uidShort }}</span>
-                </div>
-                <div class="home-meta-item">
-                  <span class="home-meta-label">Rôle</span>
-                  <span class="home-meta-value">{{ roleLabel }}</span>
-                </div>
-              </div>
-
-              <div class="home-hero-timeline">
-                <div class="home-hero-timeline__label">Séquence active</div>
-                <div class="home-hero-timeline__items">
-                  <div class="home-hero-timeline__item" v-for="step in heroTimeline" :key="step.label">
-                    <span class="home-hero-timeline__dot"></span>
-                    <div>
-                      <div class="home-hero-timeline__title">{{ step.label }}</div>
-                      <div class="home-hero-timeline__state">{{ step.state }}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="home-hero-panel">
-              <div class="home-hero-profile">
-                <v-avatar size="72" class="home-avatar">
-                  <v-img v-if="profilePhoto" :src="profilePhoto" alt="Photo de profil" />
-                  <v-icon v-else size="38">mdi-account-circle</v-icon>
-                </v-avatar>
-                <div class="home-profile-info">
-                  <div class="home-profile-name">{{ displayName }}</div>
-                  <div class="home-profile-tag">{{ roleLabel !== '—' ? roleLabel : 'Profil actif' }}</div>
-                  <div class="home-profile-actions">
-                    <v-btn class="home-info-btn" size="small" variant="text" :to="ROUTE_PATHS.profile">
-                      Mes informations
-                    </v-btn>
-                    <v-btn class="home-info-btn home-info-btn--accent" size="small" variant="text" :to="ROUTE_PATHS.preferences">
-                      Préférences
-                    </v-btn>
-                  </div>
-                </div>
-              </div>
-
-              <div class="home-hero-signal-grid">
-                <div
-                  v-for="signal in heroSignals"
-                  :key="signal.label"
-                  class="home-hero-signal"
-                  :class="`home-hero-signal--${signal.tone}`"
-                >
-                  <div class="home-hero-signal__label">{{ signal.label }}</div>
-                  <div class="home-hero-signal__value">{{ signal.value }}</div>
-                  <div class="home-hero-signal__detail">{{ signal.detail }}</div>
-                </div>
+            <div class="home-top-overview__meta">
+              <div v-for="item in heroMeta" :key="item.label" class="home-top-overview__pill">
+                <span class="home-top-overview__pill-label">{{ item.label }}</span>
+                <span class="home-top-overview__pill-value">{{ item.value }}</span>
               </div>
             </div>
           </div>
-        </v-card>
+
+          <div class="home-news-shell">
+            <div class="home-section-heading">
+              <div class="home-section-heading__eyebrow">Actualités</div>
+              <div class="home-section-heading__title">Les nouveautés utiles en ce moment</div>
+            </div>
+            <AppNewsCarousel variant="dashboard" />
+          </div>
+        </div>
+      </v-col>
+
+      <v-col cols="12" md="4">
+        <div class="home-hero-panel home-hero-panel--top">
+          <div class="home-hero-panel__eyebrow">Vue rapide</div>
+          <div class="home-hero-panel__title">{{ heroPanelTitle }}</div>
+          <div class="home-hero-panel__subtitle">{{ heroPanelSubtitle }}</div>
+
+          <div class="home-hero-actions">
+            <v-btn
+              v-for="action in dashboardActions"
+              :key="action.path"
+              class="home-hero-action-btn"
+              :class="`home-hero-action-btn--${action.tone}`"
+              variant="flat"
+              size="small"
+              :to="action.path"
+            >
+              {{ action.label }}
+            </v-btn>
+          </div>
+
+          <div class="home-hero-signal-grid">
+            <div
+              v-for="signal in heroSignals"
+              :key="signal.label"
+              class="home-hero-signal"
+              :class="`home-hero-signal--${signal.tone}`"
+            >
+              <div class="home-hero-signal__label">{{ signal.label }}</div>
+              <div class="home-hero-signal__value">{{ signal.value }}</div>
+              <div class="home-hero-signal__detail">{{ signal.detail }}</div>
+            </div>
+          </div>
+        </div>
       </v-col>
     </v-row>
 
-    <v-row class="home-grid" align="center" justify="center">
+    <v-row v-if="isCoachPendingReview" class="home-grid" align="center" justify="center">
+      <v-col cols="12" md="10">
+        <v-alert
+          class="home-review-alert"
+          type="info"
+          variant="tonal"
+          border="start"
+          density="comfortable"
+          icon="mdi-shield-account-outline"
+        >
+          <div class="home-review-alert__title">Votre compte coach est en cours d’évaluation.</div>
+          <div class="home-review-alert__text">
+            Nous vous contacterons par email pour passer à l’étape de validation de votre compte.
+            Nous tenons à avoir des coachs de qualité sur notre plateforme afin de garantir la meilleure expérience possible.
+          </div>
+        </v-alert>
+      </v-col>
+    </v-row>
+
+    <v-row class="home-grid home-grid--stats" align="center" justify="center">
       <v-col cols="12" md="3" v-for="stat in statCards" :key="stat.label">
         <v-card class="home-stat-card" elevation="6">
           <div class="home-stat-header">
@@ -497,6 +606,55 @@ onMounted(async () => {
 
           <div class="home-stat-value">{{ stat.value }}</div>
           <div class="home-stat-note">{{ stat.note }}</div>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <v-row v-if="learnerGuidedPaths.length" class="home-grid" align="center" justify="center">
+      <v-col cols="12" md="10">
+        <v-card class="home-card home-card--paths" elevation="6">
+          <div class="home-card-header">
+            <div>
+              <div class="home-card-title">Parcours guidés</div>
+              <div class="home-card-subtitle">Commencer, continuer ou approfondir selon votre niveau actuel.</div>
+            </div>
+            <v-chip class="home-chip" size="small" variant="flat">Bibliothèque</v-chip>
+          </div>
+
+          <div class="home-path-grid">
+            <div
+              v-for="path in learnerGuidedPaths"
+              :key="path.id"
+              class="home-path-card"
+              :class="`home-path-card--${path.tone}`"
+            >
+              <div class="home-path-card__header">
+                <div>
+                  <div class="home-path-card__eyebrow">{{ path.title }}</div>
+                  <div class="home-path-card__title">{{ path.spotlight.title }}</div>
+                  <div class="home-path-card__subtitle">{{ path.subtitle }}</div>
+                </div>
+                <div class="home-path-card__count">{{ path.total }}</div>
+              </div>
+
+              <div class="home-path-card__meta">
+                <span>{{ path.spotlight.level || 'Tous niveaux' }}</span>
+                <span>{{ path.spotlight.duration || '—' }}</span>
+                <span>{{ path.spotlight.category || 'Négociation' }}</span>
+              </div>
+
+              <div class="home-path-card__list">
+                <div v-for="course in path.items" :key="`${path.id}-${course.id}`" class="home-path-card__item">
+                  <span class="home-path-card__item-title">{{ course.title }}</span>
+                  <span class="home-path-card__item-level">{{ course.level || 'Tous niveaux' }}</span>
+                </div>
+              </div>
+
+              <v-btn class="home-path-card__cta" variant="flat" :to="ROUTE_PATHS.courses">
+                Voir les cours
+              </v-btn>
+            </div>
+          </div>
         </v-card>
       </v-col>
     </v-row>
@@ -533,49 +691,41 @@ onMounted(async () => {
         <v-card class="home-card" elevation="6">
           <div class="home-card-header">
             <div>
-              <div class="home-card-title">Profil</div>
-              <div class="home-card-subtitle">Informations de votre compte</div>
+              <div class="home-card-title">Focus du moment</div>
+              <div class="home-card-subtitle">L’essentiel à garder sous les yeux</div>
             </div>
-            <v-btn class="home-btn-outline" variant="outlined" size="small" :to="ROUTE_PATHS.profile">
-              Modifier
-            </v-btn>
+            <v-chip class="home-chip" size="small" variant="flat">{{ accountStatusLabel }}</v-chip>
           </div>
 
-          <div class="home-profile-grid">
-            <div class="home-profile-row">
-              <span class="home-profile-label">Nom</span>
-              <span class="home-profile-value">{{ displayName }}</span>
+          <div class="home-focus-list">
+            <div class="home-focus-item" v-for="item in focusItems" :key="item.label">
+              <div class="home-focus-icon">
+                <v-icon size="18">{{ item.icon }}</v-icon>
+              </div>
+              <div class="home-focus-content">
+                <div class="home-focus-title">{{ item.label }}</div>
+                <div class="home-focus-state">{{ item.state }}</div>
+              </div>
             </div>
-            <div class="home-profile-row">
-              <span class="home-profile-label">Email</span>
-              <span class="home-profile-value">{{ email }}</span>
-            </div>
-            <div class="home-profile-row">
-              <span class="home-profile-label">Date de naissance</span>
-              <span class="home-profile-value">{{ birthdate }}</span>
-            </div>
-            <div class="home-profile-row">
-              <span class="home-profile-label">Rôle</span>
-              <span class="home-profile-value">{{ roleLabel }}</span>
-            </div>
-            <div class="home-profile-row">
-              <span class="home-profile-label">Statut</span>
-              <span class="home-profile-value">
-                <v-chip class="home-chip" size="small" variant="flat">Actif</v-chip>
-              </span>
-            </div>
+          </div>
+
+          <div class="home-action-grid">
+            <v-btn
+              v-for="action in dashboardActions"
+              :key="`focus-${action.path}`"
+              class="home-action-btn"
+              :class="`home-action-btn--${action.tone}`"
+              variant="tonal"
+              :to="action.path"
+            >
+              {{ action.label }}
+            </v-btn>
           </div>
 
           <div v-if="profileError" class="home-error">
             {{ profileError }}
           </div>
         </v-card>
-      </v-col>
-    </v-row>
-
-    <v-row class="home-grid home-grid--full" align="center" justify="center">
-      <v-col cols="12" md="10">
-        <AppNewsCarousel variant="dashboard" />
       </v-col>
     </v-row>
   </v-container>
@@ -603,147 +753,69 @@ onMounted(async () => {
   z-index: 0;
 }
 
-.home-hero,
+.home-top-grid,
 .home-grid {
   position: relative;
   z-index: 1;
 }
 
-.home-hero-card {
-  border-radius: 34px;
-  padding: 28px;
-  background:
-    radial-gradient(circle at top right, rgba(245, 191, 71, 0.15), transparent 28%),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(255, 250, 242, 0.94));
-  border: 1px solid rgba(19, 58, 59, 0.08);
-  box-shadow: 0 26px 54px rgba(12, 31, 32, 0.14);
-}
-
-.home-hero-content {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.9fr);
-  gap: 24px;
-  align-items: stretch;
-}
-
-.home-brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 12px;
-}
-
-.home-logo {
-  border-radius: 20px;
-  background: #fff;
-  padding: 8px;
-  box-shadow: 0 14px 26px rgba(12, 31, 32, 0.18);
-}
-
-.home-brand-text {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 18px;
-  font-weight: 600;
-  color: #133a3b;
-  letter-spacing: 0.02em;
-}
-
-.home-hero-title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 32px;
-  font-weight: 700;
-  color: #133a3b;
-  line-height: 1.05;
-}
-
-.home-hero-subtitle {
-  margin-top: 10px;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 15px;
-  max-width: 620px;
-  color: rgba(19, 58, 59, 0.7);
-  line-height: 1.6;
-}
-
-.home-hero-meta {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  margin-top: 20px;
-}
-
-.home-meta-item {
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: rgba(19, 58, 59, 0.05);
-  border: 1px solid rgba(19, 58, 59, 0.06);
-}
-
-.home-meta-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(19, 58, 59, 0.6);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.home-meta-value {
-  display: block;
+.home-top-grid {
   margin-top: 4px;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 14px;
-  color: #133a3b;
 }
 
-.home-hero-timeline {
-  margin-top: 20px;
-  padding: 16px 18px;
-  border-radius: 20px;
-  background: rgba(19, 58, 59, 0.04);
-  border: 1px solid rgba(19, 58, 59, 0.06);
+.home-top-stack {
+  display: grid;
+  gap: 20px;
 }
 
-.home-hero-timeline__label {
+.home-top-overview {
+  display: grid;
+  gap: 12px;
+}
+
+.home-top-overview__eyebrow {
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(19, 58, 59, 0.48);
+}
+
+.home-top-overview__subtitle {
+  max-width: 620px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: rgba(19, 58, 59, 0.72);
+}
+
+.home-top-overview__meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.home-top-overview__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(19, 58, 59, 0.08);
+}
+
+.home-top-overview__pill-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(19, 58, 59, 0.5);
 }
 
-.home-hero-timeline__items {
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.home-hero-timeline__item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-
-.home-hero-timeline__dot {
-  width: 10px;
-  height: 10px;
-  margin-top: 6px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #1c7c7d, #f5bf47);
-  flex-shrink: 0;
-}
-
-.home-hero-timeline__title {
+.home-top-overview__pill-value {
   font-size: 13px;
   font-weight: 700;
   color: #133a3b;
-}
-
-.home-hero-timeline__state {
-  margin-top: 3px;
-  font-size: 12px;
-  color: rgba(19, 58, 59, 0.58);
 }
 
 .home-hero-panel {
@@ -757,51 +829,57 @@ onMounted(async () => {
   gap: 18px;
 }
 
-.home-hero-profile {
-  display: flex;
-  align-items: center;
-  gap: 14px;
+.home-hero-panel--top {
+  height: 100%;
+  min-height: 100%;
 }
 
-.home-avatar {
-  background: linear-gradient(140deg, #1c7c7d, #2d9a7b);
-  color: #fff;
-  box-shadow: none;
-}
-
-.home-profile-info {
-  text-align: left;
-}
-
-.home-profile-name {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 18px;
-  font-weight: 600;
-  color: #fffaf2;
-}
-
-.home-profile-tag {
-  margin-top: 4px;
-  font-size: 12px;
+.home-hero-panel__eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: rgba(245, 239, 230, 0.62);
 }
 
-.home-info-btn {
-  margin-top: 6px;
-  text-transform: none;
-  font-weight: 600;
-  color: #f5bf47;
+.home-hero-panel__title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: #fffaf2;
 }
 
-.home-profile-actions {
+.home-hero-panel__subtitle {
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(245, 239, 230, 0.78);
+}
+
+.home-hero-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 4px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
-.home-info-btn--accent {
-  color: #43c4af;
+.home-hero-action-btn {
+  text-transform: none;
+  font-weight: 700;
+  border-radius: 14px;
+}
+
+.home-hero-action-btn--teal {
+  background: rgba(67, 196, 175, 0.18);
+  color: #dbfff8;
+}
+
+.home-hero-action-btn--gold {
+  background: rgba(245, 191, 71, 0.18);
+  color: #fff0c9;
+}
+
+.home-hero-action-btn--coral {
+  background: rgba(240, 90, 40, 0.18);
+  color: #ffe1d5;
 }
 
 .home-hero-signal-grid {
@@ -852,8 +930,37 @@ onMounted(async () => {
   gap: 20px;
 }
 
+.home-grid--stats {
+  margin-top: 24px;
+}
+
 .home-grid--full {
   margin-top: 34px;
+}
+
+.home-section-heading {
+  margin-bottom: 14px;
+}
+
+.home-section-heading__eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(19, 58, 59, 0.52);
+}
+
+.home-section-heading__title {
+  margin-top: 6px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: #133a3b;
+}
+
+.home-news-shell {
+  display: grid;
+  gap: 14px;
 }
 
 .home-stat-card {
@@ -949,6 +1056,11 @@ onMounted(async () => {
   box-shadow: 0 18px 35px rgba(12, 31, 32, 0.12);
 }
 
+.home-card--paths {
+  display: grid;
+  gap: 18px;
+}
+
 .home-card-header {
   display: flex;
   align-items: center;
@@ -973,6 +1085,151 @@ onMounted(async () => {
   background: rgba(28, 124, 125, 0.12);
   color: #1c7c7d;
   font-weight: 600;
+}
+
+.home-path-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.home-path-card {
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(19, 58, 59, 0.08);
+  display: grid;
+  gap: 14px;
+}
+
+.home-path-card--teal {
+  background: linear-gradient(180deg, rgba(228, 245, 243, 0.92), rgba(255, 255, 255, 0.98));
+}
+
+.home-path-card--gold {
+  background: linear-gradient(180deg, rgba(255, 243, 218, 0.94), rgba(255, 255, 255, 0.98));
+}
+
+.home-path-card--coral {
+  background: linear-gradient(180deg, rgba(255, 235, 228, 0.94), rgba(255, 255, 255, 0.98));
+}
+
+.home-path-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.home-path-card__eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(19, 58, 59, 0.56);
+}
+
+.home-path-card__title {
+  margin-top: 6px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #133a3b;
+}
+
+.home-path-card__subtitle {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgba(19, 58, 59, 0.66);
+}
+
+.home-path-card__count {
+  min-width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.74);
+  color: #133a3b;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.home-path-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.home-path-card__meta span {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 600;
+  color: #133a3b;
+}
+
+.home-path-card__list {
+  display: grid;
+  gap: 10px;
+}
+
+.home-path-card__item {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.home-path-card__item-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #133a3b;
+}
+
+.home-path-card__item-level {
+  font-size: 11px;
+  color: rgba(19, 58, 59, 0.58);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.home-path-card__cta {
+  justify-self: flex-start;
+  text-transform: none;
+  font-weight: 700;
+  border-radius: 14px;
+  background: #133a3b;
+  color: #fffaf2;
+}
+
+.home-review-alert {
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(28, 124, 125, 0.12), rgba(245, 191, 71, 0.12));
+  border-color: rgba(28, 124, 125, 0.22);
+  color: #133a3b;
+  box-shadow: 0 18px 35px rgba(12, 31, 32, 0.08);
+}
+
+.home-review-alert__title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.home-review-alert__text {
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(19, 58, 59, 0.82);
 }
 
 .home-activity-list {
@@ -1017,39 +1274,69 @@ onMounted(async () => {
   color: rgba(19, 58, 59, 0.5);
 }
 
-.home-profile-grid {
+.home-focus-list {
   display: grid;
   gap: 12px;
 }
 
-.home-profile-row {
-  display: flex;
+.home-focus-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   padding: 12px 14px;
   border-radius: 14px;
   background: rgba(19, 58, 59, 0.05);
 }
 
-.home-profile-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(19, 58, 59, 0.6);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+.home-focus-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(28, 124, 125, 0.12);
+  color: #1c7c7d;
 }
 
-.home-profile-value {
+.home-focus-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(19, 58, 59, 0.56);
+}
+
+.home-focus-state {
+  margin-top: 4px;
   font-size: 14px;
   color: #133a3b;
 }
 
-.home-btn-outline {
-  border-color: rgba(28, 124, 125, 0.4);
-  color: #1c7c7d;
+.home-action-grid {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.home-action-btn {
   text-transform: none;
-  font-weight: 600;
+  font-weight: 700;
+  border-radius: 14px;
+}
+
+.home-action-btn--teal {
+  color: #1c7c7d;
+}
+
+.home-action-btn--gold {
+  color: #c78812;
+}
+
+.home-action-btn--coral {
+  color: #d45a30;
 }
 
 .home-error {
@@ -1059,26 +1346,18 @@ onMounted(async () => {
 }
 
 @media (max-width: 960px) {
-  .home-hero-content {
+  .home-hero-signal-grid {
     grid-template-columns: 1fr;
   }
 
-  .home-hero-profile {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .home-profile-info {
-    text-align: left;
-  }
-
-  .home-profile-actions {
-    justify-content: flex-start;
-  }
-
-  .home-hero-signal-grid,
-  .home-hero-timeline__items {
+  .home-path-grid {
     grid-template-columns: 1fr;
+  }
+
+  .home-hero-actions,
+  .home-action-grid,
+  .home-top-overview__meta {
+    flex-direction: column;
   }
 }
 </style>

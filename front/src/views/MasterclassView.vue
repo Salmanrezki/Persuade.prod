@@ -2,10 +2,13 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import api from '@/services/api'
 import logoUrl from '@/assets/logo.png'
-import { db } from '@/services/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { getUserProfile } from '@/services/userService'
-import { addDoc, collection, deleteDoc, doc, getDocs, query, serverTimestamp, updateDoc, where } from 'firebase/firestore'
+import {
+  getMasterclasses,
+  getMasterclassRegistrationSummary,
+  invalidateContent,
+} from '@/services/contentService'
 
 const MASTERCLASS_IMAGE_MAX_SIZE = 1024 * 1024 * 1.5
 const auth = useAuthStore()
@@ -465,6 +468,7 @@ const saveFeaturedOrder = async () => {
   reorderLoading.value = true
   try {
     await api.post('/masterclasses/reorder', { ids: featuredReorderIds.value })
+    invalidateContent('masterclasses')
     await loadMasterclasses()
     syncFeaturedReorder()
   } catch (error) {
@@ -480,39 +484,21 @@ const loadProfile = async () => {
 }
 
 const loadMasterclasses = async () => {
-  const res = await api.get('/masterclasses')
-  masterclasses.value = res.data
+  masterclasses.value = await getMasterclasses()
 }
 
 const loadRegistrations = async () => {
-  const summaryRes = await api.get('/masterclasses/registrations/summary')
-  registrationSummary.value =
-    summaryRes.data && typeof summaryRes.data === 'object' ? summaryRes.data : {}
+  const summary = await getMasterclassRegistrationSummary()
+  registrationSummary.value = summary && typeof summary === 'object' ? summary : {}
 
   if (isLearner.value) {
-    const snapshot = await getDocs(
-      query(collection(db, 'masterclassRegistrations'), where('studentId', '==', profile.value.uid))
-    )
-    registrations.value = snapshot.docs
-      .map((item) => ({ id: item.id, ...item.data() }))
-      .sort((a, b) => {
-        const timeA = a.createdAt?.seconds || a.createdAt?._seconds || 0
-        const timeB = b.createdAt?.seconds || b.createdAt?._seconds || 0
-        return timeB - timeA
-      })
+    const res = await api.get('/masterclasses/registrations/me')
+    registrations.value = Array.isArray(res.data) ? res.data : []
   }
 
   if (isCoach.value) {
-    const snapshot = await getDocs(
-      query(collection(db, 'masterclassRegistrations'), where('coachId', '==', profile.value.uid))
-    )
-    coachRegistrations.value = snapshot.docs
-      .map((item) => ({ id: item.id, ...item.data() }))
-      .sort((a, b) => {
-        const timeA = a.createdAt?.seconds || a.createdAt?._seconds || 0
-        const timeB = b.createdAt?.seconds || b.createdAt?._seconds || 0
-        return timeB - timeA
-      })
+    const res = await api.get('/masterclasses/registrations/coach')
+    coachRegistrations.value = Array.isArray(res.data) ? res.data : []
   }
 }
 
@@ -550,17 +536,8 @@ const registerToMasterclass = async (item) => {
       return
     }
 
-    await addDoc(collection(db, 'masterclassRegistrations'), {
-      masterclassId: item.id,
-      masterclassTitle: item.title || 'Masterclass',
-      scheduleAt: item.scheduleAt || '',
-      coachId: item.coachId || null,
-      coachName: item.coachName || 'Coach',
-      studentId: profile.value.uid,
-      studentName: profile.value.firstname || profile.value.email || 'Apprenant',
-      status: 'registered',
-      createdAt: serverTimestamp(),
-    })
+    await api.post(`/masterclasses/${item.id}/register`)
+    invalidateContent('masterclass-registration-summary')
     await loadRegistrations()
   } catch (error) {
     registerError.value = 'Impossible de s’inscrire à la masterclass.'
@@ -575,7 +552,8 @@ const cancelRegistration = async (registration) => {
   cancelLoadingId.value = registration.id
 
   try {
-    await deleteDoc(doc(db, 'masterclassRegistrations', registration.id))
+    await api.delete(`/masterclasses/registrations/${registration.id}`)
+    invalidateContent('masterclass-registration-summary')
     await loadRegistrations()
   } catch (error) {
     registerError.value = 'Impossible d’annuler l’inscription.'
@@ -589,10 +567,7 @@ const updateRegistrationStatus = async (registration, status) => {
   coachDecisionId.value = registration.id
 
   try {
-    await updateDoc(doc(db, 'masterclassRegistrations', registration.id), {
-      status,
-      updatedAt: serverTimestamp(),
-    })
+    await api.patch(`/masterclasses/registrations/${registration.id}`, { status })
     await loadRegistrations()
   } catch (error) {
     console.error(error)
@@ -649,6 +624,7 @@ const deleteMasterclass = async (item) => {
   deleteLoadingId.value = item.id
   try {
     await api.delete(`/masterclasses/${item.id}`)
+    invalidateContent('masterclasses', 'masterclass-registration-summary')
     if (editingMasterclassId.value === item.id) {
       resetMasterclassForm()
     }
@@ -673,6 +649,7 @@ const duplicateMasterclass = async (item) => {
       status: 'draft',
       featured: false,
     })
+    invalidateContent('masterclasses')
     await loadMasterclasses()
   } catch (error) {
     formError.value = 'Impossible de dupliquer la masterclass.'
@@ -716,7 +693,7 @@ const handleSubmitMasterclass = async () => {
     }
 
     resetMasterclassForm()
-
+    invalidateContent('masterclasses')
     await loadMasterclasses()
     await loadRegistrations()
   } catch (error) {
@@ -761,15 +738,27 @@ onMounted(async () => {
   loading.value = true
   errorMessage.value = ''
 
+  const [profileResult, masterclassesResult] = await Promise.allSettled([
+    loadProfile(),
+    loadMasterclasses(),
+  ])
+
+  if (profileResult.status === 'rejected') {
+    console.error(profileResult.reason)
+  }
+
+  if (masterclassesResult.status === 'rejected') {
+    errorMessage.value = 'Impossible de charger les masterclass.'
+    console.error(masterclassesResult.reason)
+  }
+
   try {
-    await Promise.all([loadProfile(), loadMasterclasses()])
     await loadRegistrations()
   } catch (error) {
-    errorMessage.value = 'Impossible de charger les masterclass.'
     console.error(error)
-  } finally {
-    loading.value = false
   }
+
+  loading.value = false
 })
 </script>
 

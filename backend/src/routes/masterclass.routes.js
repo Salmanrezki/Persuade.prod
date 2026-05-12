@@ -1,6 +1,11 @@
 import express from 'express'
 import admin from '../firebaseAdmin.js'
 import { verifyToken } from '../middleware/authMiddleware.js'
+import { masterclassSeedData } from '../data/masterclassSeedData.js'
+import {
+  countSeedRegistrationsByMasterclass,
+  masterclassSeedRegistrations,
+} from '../data/masterclassSeedRegistrations.js'
 
 const router = express.Router()
 
@@ -15,11 +20,21 @@ const DEFAULT_LEVEL = 'Tous niveaux'
 const DEFAULT_FORMAT = 'online'
 const DEFAULT_LANGUAGE = 'Français'
 const DEFAULT_STATUS = 'scheduled'
+const PUBLIC_READ_TIMEOUT_MS = 2500
+const PUBLIC_CACHE_TTL_MS = 30 * 1000
 
 const getUserProfile = async (uid) => {
   const doc = await usersCollection().doc(uid).get()
   return doc.exists ? doc.data() : null
 }
+
+const withTimeout = (promise, timeoutMs, label) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
+    }),
+  ])
 
 const sanitizeString = (value, fallback = '') =>
   typeof value === 'string' && value.trim() ? value.trim() : fallback
@@ -104,37 +119,62 @@ const buildMasterclassPayload = (body, user, profile, options = {}) => {
   return payload
 }
 
-router.get('/', verifyToken, async (req, res) => {
-  try {
-    const snapshot = await masterclassCollection().get()
+const sortMasterclasses = (items) =>
+  [...items].sort((a, b) => {
+    const orderA = typeof a.order === 'number' ? a.order : null
+    const orderB = typeof b.order === 'number' ? b.order : null
+
+    if (orderA !== null && orderB !== null) return orderA - orderB
+    if (orderA !== null) return -1
+    if (orderB !== null) return 1
+
+    const timeA = a.scheduleAt ? new Date(a.scheduleAt).getTime() : 0
+    const timeB = b.scheduleAt ? new Date(b.scheduleAt).getTime() : 0
+    return timeA - timeB
+  })
+
+let publicMasterclassesCache = sortMasterclasses(masterclassSeedData)
+let registrationSummaryCache = countSeedRegistrationsByMasterclass()
+let publicMasterclassesLastSyncAt = 0
+let registrationSummaryLastSyncAt = 0
+let publicMasterclassesRefreshPromise = null
+let registrationSummaryRefreshPromise = null
+
+const refreshPublicMasterclassesCache = async () => {
+  if (publicMasterclassesRefreshPromise) return publicMasterclassesRefreshPromise
+
+  publicMasterclassesRefreshPromise = (async () => {
+    const snapshot = await withTimeout(
+      masterclassCollection().get(),
+      PUBLIC_READ_TIMEOUT_MS,
+      'masterclasses fetch'
+    )
     const items = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }))
 
-    items.sort((a, b) => {
-      const orderA = typeof a.order === 'number' ? a.order : null
-      const orderB = typeof b.order === 'number' ? b.order : null
+    publicMasterclassesCache = sortMasterclasses([...masterclassSeedData, ...items])
+    publicMasterclassesLastSyncAt = Date.now()
+    return publicMasterclassesCache
+  })()
 
-      if (orderA !== null && orderB !== null) return orderA - orderB
-      if (orderA !== null) return -1
-      if (orderB !== null) return 1
-
-      const timeA = a.scheduleAt ? new Date(a.scheduleAt).getTime() : 0
-      const timeB = b.scheduleAt ? new Date(b.scheduleAt).getTime() : 0
-      return timeA - timeB
-    })
-
-    res.json(items)
-  } catch (error) {
-    console.error('GET /api/masterclasses failed:', error)
-    res.json([])
-  }
-})
-
-router.get('/registrations/summary', verifyToken, async (req, res) => {
   try {
-    const snapshot = await registrationsCollection().get()
+    return await publicMasterclassesRefreshPromise
+  } finally {
+    publicMasterclassesRefreshPromise = null
+  }
+}
+
+const refreshRegistrationSummaryCache = async () => {
+  if (registrationSummaryRefreshPromise) return registrationSummaryRefreshPromise
+
+  registrationSummaryRefreshPromise = (async () => {
+    const snapshot = await withTimeout(
+      registrationsCollection().get(),
+      PUBLIC_READ_TIMEOUT_MS,
+      'masterclass registrations summary fetch'
+    )
     const summary = {}
 
     snapshot.docs.forEach((doc) => {
@@ -143,10 +183,66 @@ router.get('/registrations/summary', verifyToken, async (req, res) => {
       summary[data.masterclassId] = (summary[data.masterclassId] || 0) + 1
     })
 
-    res.json(summary)
-  } catch (error) {
-    res.json({})
+    const seedSummary = countSeedRegistrationsByMasterclass()
+    Object.entries(seedSummary).forEach(([masterclassId, count]) => {
+      summary[masterclassId] = (summary[masterclassId] || 0) + count
+    })
+
+    registrationSummaryCache = summary
+    registrationSummaryLastSyncAt = Date.now()
+    return registrationSummaryCache
+  })()
+
+  try {
+    return await registrationSummaryRefreshPromise
+  } finally {
+    registrationSummaryRefreshPromise = null
   }
+}
+
+const upsertPublicMasterclassCache = (item) => {
+  if (!item?.id) return
+
+  const nextItems = publicMasterclassesCache.filter((entry) => entry.id !== item.id)
+  nextItems.push(item)
+  publicMasterclassesCache = sortMasterclasses(nextItems)
+  publicMasterclassesLastSyncAt = Date.now()
+}
+
+const removeFromPublicMasterclassCache = (masterclassId) => {
+  publicMasterclassesCache = publicMasterclassesCache.filter((item) => item.id !== masterclassId)
+  publicMasterclassesLastSyncAt = Date.now()
+}
+
+const incrementSummaryCache = (masterclassId, delta) => {
+  if (!masterclassId) return
+  registrationSummaryCache = {
+    ...registrationSummaryCache,
+    [masterclassId]: Math.max(0, Number(registrationSummaryCache[masterclassId] || 0) + delta),
+  }
+  registrationSummaryLastSyncAt = Date.now()
+}
+
+router.get('/', async (_req, res) => {
+  const cacheIsStale = Date.now() - publicMasterclassesLastSyncAt > PUBLIC_CACHE_TTL_MS
+
+  if (cacheIsStale) {
+    refreshPublicMasterclassesCache().catch((error) => {
+      console.error('GET /api/masterclasses refresh failed:', error)
+    })
+  }
+
+  res.json(publicMasterclassesCache)
+})
+
+router.get('/registrations/summary', async (_req, res) => {
+  const cacheIsStale = Date.now() - registrationSummaryLastSyncAt > PUBLIC_CACHE_TTL_MS
+
+  if (cacheIsStale) {
+    refreshRegistrationSummaryCache().catch(() => {})
+  }
+
+  res.json(registrationSummaryCache)
 })
 
 router.get('/registrations/me', verifyToken, async (req, res) => {
@@ -241,6 +337,12 @@ router.post('/reorder', verifyToken, async (req, res) => {
         order: index + 1,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       })
+      upsertPublicMasterclassCache({
+        id: doc.id,
+        ...doc.data(),
+        order: index + 1,
+        updatedAt: new Date().toISOString(),
+      })
     })
     await batch.commit()
 
@@ -266,7 +368,13 @@ router.post('/', verifyToken, async (req, res) => {
     }
 
     const ref = await masterclassCollection().add(masterclassData)
-    res.status(201).json({ id: ref.id, ...masterclassData })
+    const createdMasterclass = {
+      id: ref.id,
+      ...masterclassData,
+      createdAt: new Date().toISOString(),
+    }
+    upsertPublicMasterclassCache(createdMasterclass)
+    res.status(201).json(createdMasterclass)
   } catch (error) {
     res.status(500).json({ message: 'Failed to create masterclass' })
   }
@@ -304,7 +412,14 @@ router.patch('/:id', verifyToken, async (req, res) => {
       { merge: true }
     )
 
-    res.json({ id: doc.id, ...current, ...masterclassData })
+    const updatedMasterclass = {
+      id: doc.id,
+      ...current,
+      ...masterclassData,
+      updatedAt: new Date().toISOString(),
+    }
+    upsertPublicMasterclassCache(updatedMasterclass)
+    res.json(updatedMasterclass)
   } catch (error) {
     res.status(500).json({ message: 'Failed to update masterclass' })
   }
@@ -338,7 +453,8 @@ router.delete('/:id', verifyToken, async (req, res) => {
       batch.delete(registrationDoc.ref)
     })
     await batch.commit()
-
+    removeFromPublicMasterclassCache(doc.id)
+    refreshRegistrationSummaryCache().catch(() => {})
     res.json({ id: doc.id, deleted: true })
   } catch (error) {
     res.status(500).json({ message: 'Failed to delete masterclass' })
@@ -388,8 +504,11 @@ router.post('/:id/register', verifyToken, async (req, res) => {
       return res.status(409).json({ message: 'Already registered', id: alreadyRegistered.id })
     }
 
+    const seededRegistrationsCount = masterclassSeedRegistrations.filter(
+      (registration) => registration.masterclassId === req.params.id
+    ).length
     const capacity = Number(masterclass.capacity)
-    if (Number.isFinite(capacity) && registrationsSnapshot.size >= capacity) {
+    if (Number.isFinite(capacity) && registrationsSnapshot.size + seededRegistrationsCount >= capacity) {
       return res.status(409).json({ message: 'Masterclass is full' })
     }
 
@@ -406,6 +525,7 @@ router.post('/:id/register', verifyToken, async (req, res) => {
     }
 
     const ref = await registrationsCollection().add(registrationData)
+    incrementSummaryCache(masterclassDoc.id, 1)
     res.status(201).json({ id: ref.id, ...registrationData })
   } catch (error) {
     res.status(500).json({ message: 'Failed to register' })
@@ -431,6 +551,7 @@ router.delete('/registrations/:id', verifyToken, async (req, res) => {
     }
 
     await ref.delete()
+    incrementSummaryCache(data.masterclassId, -1)
     res.json({ id: doc.id, deleted: true })
   } catch (error) {
     res.status(500).json({ message: 'Failed to cancel registration' })

@@ -57,14 +57,14 @@ export const useAuthStore = defineStore('auth', {
 
     async register(email, password, firstname, birthdate, role) {
       const cred = await createUserWithEmailAndPassword(auth, email, password)
-      const safeRole = 'apprenant'
+      const normalizedRole = role === 'coach' ? 'coach' : 'apprenant'
 
-      // 🔥 Création du profil Firestore
       await createUserProfile(cred.user.uid, {
         email,
         firstname,
         birthdate,
-        role: safeRole,
+        role: normalizedRole,
+        coachApplicationStatus: normalizedRole === 'coach' ? 'pending_review' : null,
         hasOnboarded: true,
       })
 

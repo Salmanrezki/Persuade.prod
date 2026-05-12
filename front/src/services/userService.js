@@ -2,11 +2,13 @@ import { db } from './firebase'
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
 
 export const createUserProfile = async (uid, data) => {
-  const safeRole = 'apprenant'
+  const normalizedRole = data?.role === 'coach' ? 'coach' : 'apprenant'
 
   await setDoc(doc(db, 'users', uid), {
     ...data,
-    role: safeRole,
+    role: normalizedRole,
+    coachApplicationStatus:
+      normalizedRole === 'coach' ? data?.coachApplicationStatus || 'pending_review' : null,
     createdAt: serverTimestamp(),
   })
 }

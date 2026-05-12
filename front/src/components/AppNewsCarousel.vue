@@ -16,9 +16,12 @@ const { items, loading, error, refresh } = useNewsFeed()
 const activeIndex = ref(0)
 const compact = computed(() => props.variant === 'sidebar')
 const visibleItems = computed(() => items.value.slice(0, compact.value ? 4 : 6))
-const title = computed(() => (compact.value ? 'A la une' : 'Actualites de votre espace'))
+const mediaAspectRatio = computed(() => (compact.value ? 1.9 : 2.15))
+const title = computed(() => (compact.value ? 'A la une' : 'Nouveautes a explorer'))
 const subtitle = computed(() =>
-  compact.value ? 'Cours, coachings et sessions a surveiller.' : 'Les contenus et rendez-vous a ne pas manquer.'
+  compact.value
+    ? 'Cours pre-enregistres, coachings et sessions a surveiller.'
+    : 'Les nouveaux contenus a voir directement sur la plateforme.'
 )
 
 let autoplayTimer = null
@@ -142,6 +145,27 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
+            <div v-if="item.image" class="news-carousel__media">
+              <v-img
+                :src="item.image"
+                :alt="item.title"
+                :aspect-ratio="mediaAspectRatio"
+                class="news-carousel__image"
+                cover
+                loading="lazy"
+                gradient="to bottom, rgba(8, 23, 23, 0.06), rgba(8, 23, 23, 0.32)"
+              >
+                <template #placeholder>
+                  <div class="news-carousel__media-placeholder"></div>
+                </template>
+                <template #error>
+                  <div class="news-carousel__media-fallback">
+                    <v-icon size="22">mdi-image-off-outline</v-icon>
+                  </div>
+                </template>
+              </v-img>
+            </div>
+
             <div class="news-carousel__slide-body">
               <div class="news-carousel__item-title">{{ item.title }}</div>
               <div class="news-carousel__item-subtitle">{{ item.subtitle }}</div>
@@ -149,7 +173,7 @@ onBeforeUnmount(() => {
 
             <div class="news-carousel__slide-footer">
               <span class="news-carousel__meta">{{ item.meta }}</span>
-              <span class="news-carousel__cta">Voir</span>
+              <span class="news-carousel__cta">{{ item.cta || 'Voir' }}</span>
             </div>
           </button>
         </v-window-item>
@@ -370,7 +394,44 @@ onBeforeUnmount(() => {
 }
 
 .news-carousel__slide-body {
-  margin: 16px 0;
+  margin: 14px 0;
+}
+
+.news-carousel__media {
+  width: 100%;
+  margin-top: 14px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(226, 234, 232, 0.9), rgba(205, 218, 215, 0.92));
+}
+
+.news-carousel--sidebar .news-carousel__media {
+  margin-top: 10px;
+}
+
+.news-carousel__image {
+  display: block;
+}
+
+.news-carousel__media-placeholder,
+.news-carousel__media-fallback {
+  min-height: 78px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.news-carousel__media-placeholder {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.54), rgba(255, 255, 255, 0.18)),
+    linear-gradient(180deg, rgba(16, 52, 53, 0.12), rgba(16, 52, 53, 0.2));
+  background-size: 220% 100%;
+  animation: news-carousel-shimmer 1.4s ease-in-out infinite;
+}
+
+.news-carousel__media-fallback {
+  color: rgba(19, 58, 59, 0.46);
+  background: linear-gradient(180deg, rgba(244, 248, 247, 0.96), rgba(230, 237, 235, 0.96));
 }
 
 .news-carousel__item-title {
@@ -394,6 +455,16 @@ onBeforeUnmount(() => {
 .news-carousel--sidebar .news-carousel__item-subtitle {
   font-size: 11px;
   margin-top: 6px;
+}
+
+@keyframes news-carousel-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
 }
 
 .news-carousel__meta {

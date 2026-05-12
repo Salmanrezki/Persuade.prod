@@ -735,18 +735,32 @@ onMounted(async () => {
   loading.value = true
   errorMessage.value = ''
 
-  try {
-    await Promise.all([loadProfile(), loadCourses()])
-    if (isLearner.value) {
+  const [profileResult, coursesResult] = await Promise.allSettled([loadProfile(), loadCourses()])
+
+  if (profileResult.status === 'rejected') {
+    console.error(profileResult.reason)
+  }
+
+  if (coursesResult.status === 'rejected') {
+    errorMessage.value = 'Impossible de charger les cours.'
+    console.error(coursesResult.reason)
+  }
+
+  if (isLearner.value) {
+    try {
       await loadCoachProfiles()
+    } catch (error) {
+      console.error(error)
     }
+  }
+
+  try {
     await loadRequests()
   } catch (error) {
-    errorMessage.value = 'Impossible de charger les cours.'
     console.error(error)
-  } finally {
-    loading.value = false
   }
+
+  loading.value = false
 })
 </script>
 
