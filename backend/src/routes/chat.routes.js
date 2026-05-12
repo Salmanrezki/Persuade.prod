@@ -1,6 +1,11 @@
 import express from 'express'
 import admin from '../firebaseAdmin.js'
 import { verifyToken } from '../middleware/authMiddleware.js'
+import {
+  isFirestoreUnavailable,
+  logFirestoreWarning,
+  toFirestoreUserMessage,
+} from '../utils/firestoreErrors.js'
 
 const router = express.Router()
 
@@ -14,7 +19,13 @@ const getUserProfile = async (uid) => {
   return doc.exists ? { uid: doc.id, ...doc.data() } : { uid }
 }
 
+const logChatRouteDuration = (label, startedAt, extra = '') => {
+  const duration = Date.now() - startedAt
+  console.info(`${label} completed in ${duration}ms${extra ? ` ${extra}` : ''}`)
+}
+
 router.get('/conversations', verifyToken, async (req, res) => {
+  const startedAt = Date.now()
   try {
     const snapshot = await conversationsCollection()
       .where('participants', 'array-contains', req.user.uid)
@@ -46,18 +57,25 @@ router.get('/conversations', verifyToken, async (req, res) => {
       const otherId = conv.participants?.find((id) => id !== req.user.uid)
       return {
         ...conv,
-        otherUser: otherId ? usersMap[otherId] : null,
+        otherUser: otherId ? usersMap[otherId] || null : null,
       }
     })
 
+    logChatRouteDuration('GET /api/chat/conversations', startedAt, `count=${result.length}`)
     res.json(result)
   } catch (error) {
+    if (isFirestoreUnavailable(error)) {
+      logFirestoreWarning('GET /api/chat/conversations failed', error)
+      return res.status(503).json({ message: toFirestoreUserMessage() })
+    }
+
     console.error('GET /api/chat/conversations failed:', error)
     res.status(500).json({ message: 'Failed to load conversations' })
   }
 })
 
 router.post('/conversations', verifyToken, async (req, res) => {
+  const startedAt = Date.now()
   try {
     const { participantId } = req.body || {}
     if (!participantId) {
@@ -83,13 +101,20 @@ router.post('/conversations', verifyToken, async (req, res) => {
     }
 
     const updated = await ref.get()
+    logChatRouteDuration('POST /api/chat/conversations', startedAt, `conversation=${updated.id}`)
     res.json({ id: updated.id, ...updated.data() })
   } catch (error) {
+    if (isFirestoreUnavailable(error)) {
+      logFirestoreWarning('POST /api/chat/conversations failed', error)
+      return res.status(503).json({ message: toFirestoreUserMessage() })
+    }
+
     res.status(500).json({ message: 'Failed to create conversation' })
   }
 })
 
 router.get('/conversations/:id/messages', verifyToken, async (req, res) => {
+  const startedAt = Date.now()
   try {
     const ref = conversationsCollection().doc(req.params.id)
     const doc = await ref.get()
@@ -105,13 +130,20 @@ router.get('/conversations/:id/messages', verifyToken, async (req, res) => {
     const snapshot = await ref.collection('messages').orderBy('createdAt', 'asc').limit(200).get()
     const messages = snapshot.docs.map((msg) => ({ id: msg.id, ...msg.data() }))
 
+    logChatRouteDuration(`GET /api/chat/conversations/${req.params.id}/messages`, startedAt, `count=${messages.length}`)
     res.json(messages)
   } catch (error) {
+    if (isFirestoreUnavailable(error)) {
+      logFirestoreWarning(`GET /api/chat/conversations/${req.params.id}/messages failed`, error)
+      return res.status(503).json({ message: toFirestoreUserMessage() })
+    }
+
     res.status(500).json({ message: 'Failed to load messages' })
   }
 })
 
 router.post('/conversations/:id/messages', verifyToken, async (req, res) => {
+  const startedAt = Date.now()
   try {
     const { text, attachment } = req.body || {}
     const normalizedText = typeof text === 'string' ? text.trim() : ''
@@ -149,8 +181,14 @@ router.post('/conversations/:id/messages', verifyToken, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     })
 
+    logChatRouteDuration(`POST /api/chat/conversations/${req.params.id}/messages`, startedAt)
     res.status(201).json({ id: msgRef.id, ...messageData })
   } catch (error) {
+    if (isFirestoreUnavailable(error)) {
+      logFirestoreWarning(`POST /api/chat/conversations/${req.params.id}/messages failed`, error)
+      return res.status(503).json({ message: toFirestoreUserMessage() })
+    }
+
     res.status(500).json({ message: 'Failed to send message' })
   }
 })

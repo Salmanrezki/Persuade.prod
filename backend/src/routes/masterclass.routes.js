@@ -2,7 +2,12 @@ import express from 'express'
 import admin from '../firebaseAdmin.js'
 import { verifyToken } from '../middleware/authMiddleware.js'
 import { masterclassSeedData } from '../data/masterclassSeedData.js'
-import { logFirestoreWarning } from '../utils/firestoreErrors.js'
+import {
+  isFirestoreUnavailable,
+  logFirestoreWarning,
+  toFirestoreUserMessage,
+} from '../utils/firestoreErrors.js'
+import { normalizeUserProfileRole } from '../utils/userRole.js'
 import {
   countSeedRegistrationsByMasterclass,
   masterclassSeedRegistrations,
@@ -26,7 +31,7 @@ const PUBLIC_REFRESH_RETRY_MS = 60 * 1000
 
 const getUserProfile = async (uid) => {
   const doc = await usersCollection().doc(uid).get()
-  return doc.exists ? doc.data() : null
+  return doc.exists ? normalizeUserProfileRole(doc.data()) : null
 }
 
 const sanitizeString = (value, fallback = '') =>
@@ -217,6 +222,11 @@ const removeFromPublicMasterclassCache = (masterclassId) => {
   publicMasterclassesLastSyncAt = Date.now()
 }
 
+const findPublicMasterclassById = (masterclassId) =>
+  publicMasterclassesCache.find((item) => item.id === masterclassId) ||
+  masterclassSeedData.find((item) => item.id === masterclassId) ||
+  null
+
 const incrementSummaryCache = (masterclassId, delta) => {
   if (!masterclassId) return
   registrationSummaryCache = {
@@ -265,6 +275,11 @@ router.get('/registrations/me', verifyToken, async (req, res) => {
 
     res.json(registrations)
   } catch (error) {
+    if (isFirestoreUnavailable(error)) {
+      logFirestoreWarning('GET /api/masterclasses/registrations/me failed', error)
+      return res.status(503).json({ message: toFirestoreUserMessage() })
+    }
+
     res.status(500).json({ message: 'Failed to load registrations' })
   }
 })
@@ -288,6 +303,11 @@ router.get('/registrations/coach', verifyToken, async (req, res) => {
 
     res.json(registrations)
   } catch (error) {
+    if (isFirestoreUnavailable(error)) {
+      logFirestoreWarning('GET /api/masterclasses/registrations/coach failed', error)
+      return res.status(503).json({ message: toFirestoreUserMessage() })
+    }
+
     res.status(500).json({ message: 'Failed to load registrations' })
   }
 })
@@ -377,6 +397,11 @@ router.post('/', verifyToken, async (req, res) => {
     upsertPublicMasterclassCache(createdMasterclass)
     res.status(201).json(createdMasterclass)
   } catch (error) {
+    if (isFirestoreUnavailable(error)) {
+      logFirestoreWarning('POST /api/masterclasses failed', error)
+      return res.status(503).json({ message: toFirestoreUserMessage() })
+    }
+
     res.status(500).json({ message: 'Failed to create masterclass' })
   }
 })
@@ -422,6 +447,11 @@ router.patch('/:id', verifyToken, async (req, res) => {
     upsertPublicMasterclassCache(updatedMasterclass)
     res.json(updatedMasterclass)
   } catch (error) {
+    if (isFirestoreUnavailable(error)) {
+      logFirestoreWarning(`PATCH /api/masterclasses/${req.params.id} failed`, error)
+      return res.status(503).json({ message: toFirestoreUserMessage() })
+    }
+
     res.status(500).json({ message: 'Failed to update masterclass' })
   }
 })
@@ -471,11 +501,13 @@ router.post('/:id/register', verifyToken, async (req, res) => {
 
     const masterclassRef = masterclassCollection().doc(req.params.id)
     const masterclassDoc = await masterclassRef.get()
-    if (!masterclassDoc.exists) {
+    const fallbackMasterclass = !masterclassDoc.exists ? findPublicMasterclassById(req.params.id) : null
+    if (!masterclassDoc.exists && !fallbackMasterclass) {
       return res.status(404).json({ message: 'Masterclass not found' })
     }
 
-    const masterclass = masterclassDoc.data()
+    const masterclass = masterclassDoc.exists ? masterclassDoc.data() : fallbackMasterclass
+    const masterclassId = masterclassDoc.exists ? masterclassDoc.id : req.params.id
     if (masterclass.status !== 'scheduled') {
       return res.status(400).json({ message: 'Masterclass is not open' })
     }
@@ -514,7 +546,7 @@ router.post('/:id/register', verifyToken, async (req, res) => {
     }
 
     const registrationData = {
-      masterclassId: masterclassDoc.id,
+      masterclassId,
       masterclassTitle: masterclass.title || 'Masterclass',
       scheduleAt: masterclass.scheduleAt || '',
       coachId: masterclass.coachId || null,
@@ -526,9 +558,18 @@ router.post('/:id/register', verifyToken, async (req, res) => {
     }
 
     const ref = await registrationsCollection().add(registrationData)
-    incrementSummaryCache(masterclassDoc.id, 1)
-    res.status(201).json({ id: ref.id, ...registrationData })
+    incrementSummaryCache(masterclassId, 1)
+    res.status(201).json({
+      id: ref.id,
+      ...registrationData,
+      createdAt: new Date().toISOString(),
+    })
   } catch (error) {
+    if (isFirestoreUnavailable(error)) {
+      logFirestoreWarning(`POST /api/masterclasses/${req.params.id}/register failed`, error)
+      return res.status(503).json({ message: toFirestoreUserMessage() })
+    }
+
     res.status(500).json({ message: 'Failed to register' })
   }
 })
@@ -555,6 +596,11 @@ router.delete('/registrations/:id', verifyToken, async (req, res) => {
     incrementSummaryCache(data.masterclassId, -1)
     res.json({ id: doc.id, deleted: true })
   } catch (error) {
+    if (isFirestoreUnavailable(error)) {
+      logFirestoreWarning(`DELETE /api/masterclasses/registrations/${req.params.id} failed`, error)
+      return res.status(503).json({ message: toFirestoreUserMessage() })
+    }
+
     res.status(500).json({ message: 'Failed to cancel registration' })
   }
 })
@@ -589,6 +635,11 @@ router.patch('/registrations/:id', verifyToken, async (req, res) => {
 
     res.json({ id: doc.id, ...data, status })
   } catch (error) {
+    if (isFirestoreUnavailable(error)) {
+      logFirestoreWarning(`PATCH /api/masterclasses/registrations/${req.params.id} failed`, error)
+      return res.status(503).json({ message: toFirestoreUserMessage() })
+    }
+
     res.status(500).json({ message: 'Failed to update registration' })
   }
 })

@@ -2,6 +2,7 @@ import express from 'express'
 import admin from '../firebaseAdmin.js'
 import { verifyToken } from '../middleware/authMiddleware.js'
 import { listCoachDirectory } from '../utils/coachDirectory.js'
+import { normalizeUserProfileRole, normalizeUserRole } from '../utils/userRole.js'
 
 const router = express.Router()
 
@@ -19,7 +20,7 @@ const estimateDataUrlBytes = (value) => {
 
 const getUserProfile = async (uid) => {
   const doc = await usersCollection().doc(uid).get()
-  return doc.exists ? { uid: doc.id, ...doc.data() } : null
+  return doc.exists ? normalizeUserProfileRole({ uid: doc.id, ...doc.data() }) : null
 }
 
 const canCoachAccessClientProgress = async (coachId, clientId) => {
@@ -33,7 +34,7 @@ const canCoachAccessClientProgress = async (coachId, clientId) => {
 router.get('/me', verifyToken, async (req, res) => {
   try {
     const doc = await usersCollection().doc(req.user.uid).get()
-    const profile = doc.exists ? doc.data() : {}
+    const profile = normalizeUserProfileRole(doc.exists ? doc.data() : {})
 
     res.json({
       uid: req.user.uid,
@@ -60,7 +61,7 @@ router.get('/', verifyToken, async (req, res) => {
     } else {
       const snapshot = await usersCollection().where('role', '==', role).get()
       users = snapshot.docs
-        .map((doc) => ({ uid: doc.id, ...doc.data() }))
+        .map((doc) => normalizeUserProfileRole({ uid: doc.id, ...doc.data() }))
         .filter((user) => user.uid !== req.user.uid)
     }
 
@@ -104,6 +105,10 @@ router.patch('/me', verifyToken, async (req, res) => {
       }
     })
 
+    if (req.body?.role !== undefined) {
+      updates.role = normalizeUserRole(req.body.role)
+    }
+
     if (
       typeof updates.profilePhoto === 'string' &&
       estimateDataUrlBytes(updates.profilePhoto) > MAX_PROFILE_PHOTO_BYTES
@@ -115,7 +120,7 @@ router.patch('/me', verifyToken, async (req, res) => {
 
     await usersCollection().doc(req.user.uid).set(updates, { merge: true })
 
-    res.json({ uid: req.user.uid, ...updates })
+    res.json(normalizeUserProfileRole({ uid: req.user.uid, ...updates }))
   } catch (error) {
     console.error('PATCH /api/users/me failed:', error)
     res.status(500).json({ message: 'Failed to update profile' })

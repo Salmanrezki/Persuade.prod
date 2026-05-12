@@ -135,10 +135,7 @@ const notifyUser = (title, body) => {
 }
 
 const conversationIdFor = (uidA, uidB) => [uidA, uidB].sort().join('__')
-
 const getConversationRef = (conversationId) => doc(db, 'conversations', conversationId)
-
-const getOtherUserId = (conversation) => conversation?.participants?.find((id) => id !== profile.value?.uid) || ''
 
 const loadProfile = async () => {
   if (!authStore.user?.uid) {
@@ -160,6 +157,8 @@ const loadContacts = async () => {
       return nameA.localeCompare(nameB, 'fr')
     })
 }
+
+const getOtherUserId = (conversation) => conversation?.participants?.find((id) => id !== profile.value?.uid) || ''
 
 const loadConversations = async () => {
   if (!profile.value?.uid) {
@@ -208,7 +207,6 @@ const enrichConversations = (items) =>
   })
 
 const presenceLabel = (user) => getUserPresenceLabel(user)
-
 const presenceClass = (user) => `chat-presence--${getUserPresenceState(user)}`
 
 const selectConversation = async (conversation) => {
@@ -267,6 +265,7 @@ const sendMessage = async () => {
     attachment.value = null
     await Promise.all([loadMessages(selectedConversationId.value), loadConversations()])
   } catch (error) {
+    errorMessage.value = 'Impossible d’envoyer le message.'
     console.error(error)
   } finally {
     sending.value = false
@@ -319,7 +318,10 @@ const maybeStartConversationFromRoute = async () => {
   const contactId = typeof route.query.contact === 'string' ? route.query.contact : ''
   if (!contactId || !profile.value?.uid) return
 
-  if (selectedContactId.value === contactId || conversations.value.some((item) => item.id === conversationIdFor(profile.value.uid, contactId))) {
+  if (
+    selectedContactId.value === contactId ||
+    conversations.value.some((item) => item.id === conversationIdFor(profile.value.uid, contactId))
+  ) {
     selectedConversationId.value = conversationIdFor(profile.value.uid, contactId)
     router.replace({ query: { ...route.query, contact: undefined } })
     return

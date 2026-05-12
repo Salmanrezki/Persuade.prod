@@ -104,6 +104,7 @@ router.post('/', verifyToken, async (req, res) => {
     const payload = {
       coachId,
       coachName: coachProfile.firstname || coachProfile.email || 'Coach',
+      coachEmail: coachProfile.email || '',
       clientId: req.user.uid,
       clientName: profile.firstname || profile.email || 'Apprenant',
       clientEmail: req.user.email || profile.email || '',

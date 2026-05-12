@@ -347,6 +347,18 @@ const sortLabel = (value) =>
 
 const pageSizeLabel = (value) => `${value} / page`
 
+const getMasterclassApiMessage = (error, fallbackMessage) => {
+  const status = error?.response?.status
+  const backendMessage = error?.response?.data?.message
+
+  if (status === 503) return 'Connexion Firebase indisponible. Reessayez dans un instant.'
+  if (status === 403) return 'Votre compte ne permet pas cette action pour le moment.'
+  if (status === 409) return backendMessage || 'Cette action a deja ete effectuee.'
+  if (status === 400) return backendMessage || fallbackMessage
+  if (status === 404) return backendMessage || fallbackMessage
+  return backendMessage || fallbackMessage
+}
+
 const registrationStatusClass = (status) => {
   if (status === 'confirmed' || status === 'accepted') return 'status-chip--success'
   if (status === 'declined' || status === 'rejected') return 'status-chip--danger'
@@ -498,17 +510,63 @@ const loadMasterclasses = async () => {
 }
 
 const loadRegistrations = async () => {
-  const summary = await getMasterclassRegistrationSummary()
-  registrationSummary.value = summary && typeof summary === 'object' ? summary : {}
+  const requests = [getMasterclassRegistrationSummary()]
 
   if (isLearner.value) {
-    const res = await api.get('/masterclasses/registrations/me')
-    registrations.value = Array.isArray(res.data) ? res.data : []
+    requests.push(api.get('/masterclasses/registrations/me'))
   }
 
   if (isCoach.value) {
-    const res = await api.get('/masterclasses/registrations/coach')
-    coachRegistrations.value = Array.isArray(res.data) ? res.data : []
+    requests.push(api.get('/masterclasses/registrations/coach'))
+  }
+
+  const results = await Promise.allSettled(requests)
+
+  const summaryResult = results[0]
+  registrationSummary.value =
+    summaryResult?.status === 'fulfilled' && summaryResult.value && typeof summaryResult.value === 'object'
+      ? summaryResult.value
+      : registrationSummary.value
+
+  let resultIndex = 1
+
+  if (isLearner.value) {
+    const learnerResult = results[resultIndex]
+    if (learnerResult?.status === 'fulfilled' && Array.isArray(learnerResult.value.data)) {
+      registrations.value = learnerResult.value.data
+    }
+    resultIndex += 1
+  }
+
+  if (isCoach.value) {
+    const coachResult = results[resultIndex]
+    if (coachResult?.status === 'fulfilled' && Array.isArray(coachResult.value.data)) {
+      coachRegistrations.value = coachResult.value.data
+    }
+  }
+}
+
+const applyRegistrationOptimisticState = (item) => {
+  const existing = registrations.value.find((registration) => registration.masterclassId === item.id)
+  if (existing) return
+
+  registrations.value = [
+    {
+      id: `optimistic-${item.id}`,
+      masterclassId: item.id,
+      masterclassTitle: item.title || 'Masterclass',
+      scheduleAt: item.scheduleAt || '',
+      coachId: item.coachId || null,
+      coachName: item.coachName || 'Coach',
+      status: 'registered',
+      createdAt: new Date().toISOString(),
+    },
+    ...registrations.value,
+  ]
+
+  registrationSummary.value = {
+    ...registrationSummary.value,
+    [item.id]: Number(registrationSummary.value[item.id] || 0) + 1,
   }
 }
 
@@ -546,12 +604,21 @@ const registerToMasterclass = async (item) => {
       return
     }
 
-    await api.post(`/masterclasses/${item.id}/register`)
+    const response = await api.post(`/masterclasses/${item.id}/register`)
+    if (response?.status === 201) {
+      applyRegistrationOptimisticState(item)
+    }
     invalidateContent('masterclass-registration-summary')
-    await loadRegistrations()
+    void loadRegistrations()
   } catch (error) {
-    registerError.value = 'Impossible de s’inscrire à la masterclass.'
-    console.error(error)
+    registerError.value =
+      error?.response?.status === 409
+        ? 'Vous etes deja inscrit a cette masterclass.'
+        : error?.response?.status === 403
+        ? 'Votre compte doit etre apprenant pour s inscrire.'
+        : error?.response?.status === 503
+        ? 'Connexion Firebase indisponible. Reessayez dans un instant.'
+        : getMasterclassApiMessage(error, 'Impossible de s inscrire a la masterclass.')
   } finally {
     registerLoadingId.value = ''
   }
@@ -566,8 +633,7 @@ const cancelRegistration = async (registration) => {
     invalidateContent('masterclass-registration-summary')
     await loadRegistrations()
   } catch (error) {
-    registerError.value = 'Impossible d’annuler l’inscription.'
-    console.error(error)
+    registerError.value = getMasterclassApiMessage(error, 'Impossible d annuler l inscription.')
   } finally {
     cancelLoadingId.value = ''
   }
@@ -580,7 +646,7 @@ const updateRegistrationStatus = async (registration, status) => {
     await api.patch(`/masterclasses/registrations/${registration.id}`, { status })
     await loadRegistrations()
   } catch (error) {
-    console.error(error)
+    registerError.value = getMasterclassApiMessage(error, 'Impossible de mettre a jour l inscription.')
   } finally {
     coachDecisionId.value = ''
   }
@@ -641,8 +707,7 @@ const deleteMasterclass = async (item) => {
     await loadMasterclasses()
     await loadRegistrations()
   } catch (error) {
-    formError.value = 'Impossible de supprimer la masterclass.'
-    console.error(error)
+    formError.value = getMasterclassApiMessage(error, 'Impossible de supprimer la masterclass.')
   } finally {
     deleteLoadingId.value = ''
   }
@@ -662,8 +727,7 @@ const duplicateMasterclass = async (item) => {
     invalidateContent('masterclasses')
     await loadMasterclasses()
   } catch (error) {
-    formError.value = 'Impossible de dupliquer la masterclass.'
-    console.error(error)
+    formError.value = getMasterclassApiMessage(error, 'Impossible de dupliquer la masterclass.')
   } finally {
     duplicateLoadingId.value = ''
   }
@@ -707,10 +771,12 @@ const handleSubmitMasterclass = async () => {
     await loadMasterclasses()
     await loadRegistrations()
   } catch (error) {
-    formError.value = isEditingMasterclass.value
-      ? 'Impossible de mettre à jour la masterclass.'
-      : 'Impossible de créer la masterclass.'
-    console.error(error)
+    formError.value = getMasterclassApiMessage(
+      error,
+      isEditingMasterclass.value
+        ? 'Impossible de mettre a jour la masterclass.'
+        : 'Impossible de creer la masterclass.'
+    )
   } finally {
     formLoading.value = false
   }
@@ -762,13 +828,9 @@ onMounted(async () => {
     console.error(masterclassesResult.reason)
   }
 
-  try {
-    await loadRegistrations()
-  } catch (error) {
-    console.error(error)
-  }
-
   loading.value = false
+
+  void loadRegistrations()
 })
 </script>
 

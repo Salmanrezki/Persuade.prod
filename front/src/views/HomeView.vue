@@ -45,15 +45,6 @@ const coachApplicationStatus = computed(() => profile.value?.coachApplicationSta
 const isCoach = computed(() => role.value === 'coach')
 const isCoachPendingReview = computed(() => isCoach.value && coachApplicationStatus.value === 'pending_review')
 const accountStatusLabel = computed(() => (isCoachPendingReview.value ? 'En évaluation' : 'Actif'))
-const dashboardSummary = computed(() =>
-  isCoach.value
-    ? 'Suivez l’activité de vos clients, vos cours validés et les prochaines sessions depuis un seul espace.'
-    : 'Retrouvez rapidement vos cours, réservations et échanges essentiels.'
-)
-const heroMeta = computed(() => [
-  { label: 'Rôle', value: roleLabel.value !== '—' ? roleLabel.value : 'Compte' },
-  { label: 'Statut', value: accountStatusLabel.value },
-])
 
 const toMillis = (value) => {
   if (!value) return 0
@@ -123,6 +114,9 @@ const pendingRegistrations = computed(() =>
 )
 const confirmedRegistrations = computed(() =>
   masterclassRegistrations.value.filter((item) => item?.status === 'confirmed')
+)
+const acceptedLearnerCourses = computed(() =>
+  courseRequests.value.filter((item) => item?.status === 'accepted')
 )
 const latestConversation = computed(() =>
   [...conversations.value].sort((a, b) => toMillis(b?.updatedAt || b?.createdAt) - toMillis(a?.updatedAt || a?.createdAt))[0] || null
@@ -465,100 +459,73 @@ const learnerGuidedPaths = computed(() => {
   ].filter(Boolean)
 })
 
-const statCards = computed(() => {
+const quickViewStats = computed(() => {
   if (isCoach.value) {
-    const publishedOffers = ownedCoachCourses.value.length + ownedMasterclasses.value.length
-    const incomingDemand = courseRequests.value.length + masterclassRegistrations.value.length
-    const pendingDemand =
-      courseRequests.value.filter((item) => item?.status === 'pending').length +
-      masterclassRegistrations.value.filter((item) => ['registered', 'pending'].includes(item?.status)).length
-
     return [
       {
-        label: 'Offres publiées',
-        value: String(publishedOffers),
-        hint: 'Cours et masterclasses',
-        note: `${ownedCoachCourses.value.length} cours particuliers · ${ownedMasterclasses.value.length} masterclasses`,
+        label: 'Apprenants suivis',
+        value: String(coachClientSummaryStats.value?.totalClients || 0),
+        detail: `${coachClientSummaryStats.value?.activeClients || 0} actifs`,
         tone: 'teal',
-        bars: buildBars([...ownedCoachCourses.value, ...ownedMasterclasses.value], (item) => item?.createdAt || item?.updatedAt),
       },
       {
-        label: 'Demandes reçues',
-        value: String(incomingDemand),
-        hint: 'Cours et inscriptions',
-        note: `${pendingDemand} en attente de traitement`,
-        tone: 'gold',
-        bars: buildBars([...courseRequests.value, ...masterclassRegistrations.value], (item) => item?.createdAt || item?.updatedAt),
-      },
-      {
-        label: 'Sessions à venir',
-        value: String(upcomingOwnedMasterclasses.value.length),
-        hint: 'Masterclasses planifiées',
-        note: `${confirmedRegistrations.value.length} inscriptions confirmées`,
+        label: 'À relancer',
+        value: String(coachClientSummaryStats.value?.clientsNeedingReply || 0),
+        detail: 'Suivis en attente de réponse',
         tone: 'coral',
-        bars: buildBars(upcomingOwnedMasterclasses.value, (item) => item?.createdAt || item?.updatedAt),
+      },
+      {
+        label: 'Sessions prévues',
+        value: String(coachPlanningEntries.value.length),
+        detail: `${upcomingOwnedMasterclasses.value.length} masterclasses à venir`,
+        tone: 'gold',
+      },
+      {
+        label: 'Progressions partagées',
+        value: String(Object.keys(coachProgressMap.value).length),
+        detail: 'Apprenants avec visibilité complète',
+        tone: 'teal',
       },
     ]
   }
 
-  const learnerBookings = activeLearnerRequests.value.length + masterclassRegistrations.value.length
-  const pendingActions = pendingCourseRequests.value.length + pendingRegistrations.value.length
-
   return [
     {
-      label: 'Cours disponibles',
-      value: String(libraryCourses.value.length),
-      hint: 'Bibliothèque ouverte',
-      note: `${coachCourses.value.length} parcours avec coach accessibles`,
+      label: 'Cours assistés',
+      value: String(acceptedLearnerCourses.value.length),
+      detail: `${pendingCourseRequests.value.length} demande(s) encore en attente`,
       tone: 'teal',
-      bars: buildBars(libraryCourses.value, (item) => item?.createdAt || item?.updatedAt),
     },
     {
-      label: 'Réservations actives',
-      value: String(learnerBookings),
-      hint: 'Cours et masterclasses',
-      note: `${pendingActions} en attente de validation`,
+      label: 'Masterclass confirmées',
+      value: String(confirmedRegistrations.value.length),
+      detail: `${pendingRegistrations.value.length} inscription(s) à confirmer`,
       tone: 'gold',
-      bars: buildBars([...courseRequests.value, ...masterclassRegistrations.value], (item) => item?.createdAt || item?.updatedAt),
     },
     {
-      label: 'Conversations',
-      value: String(conversations.value.length),
-      hint: 'Réseau actif',
-      note: `${auth.chatUnreadCount || 0} messages non lus`,
+      label: 'Parcours actifs',
+      value: String(activeLearnerRequests.value.length + masterclassRegistrations.value.length),
+      detail: 'Cours privés et sessions suivies',
       tone: 'coral',
-      bars: buildBars(conversations.value, (item) => item?.updatedAt || item?.createdAt),
+    },
+    {
+      label: 'Messages non lus',
+      value: String(auth.chatUnreadCount || 0),
+      detail: latestConversation.value ? `Dernier échange ${formatRelativeDate(latestConversation.value.updatedAt || latestConversation.value.createdAt)}` : 'Aucun échange récent',
+      tone: 'teal',
     },
   ]
 })
 
-const heroSignals = computed(() => {
-  if (isCoach.value) {
-    const pendingDemand =
-      courseRequests.value.filter((item) => item?.status === 'pending').length +
-      masterclassRegistrations.value.filter((item) => ['registered', 'pending'].includes(item?.status)).length
-
-    return [
-      { label: 'Cours particuliers', value: String(ownedCoachCourses.value.length), detail: 'Offres publiées', tone: 'teal' },
-      { label: 'En attente', value: String(pendingDemand), detail: 'Demandes à traiter', tone: 'coral' },
-      { label: 'À venir', value: String(upcomingOwnedMasterclasses.value.length), detail: 'Sessions planifiées', tone: 'gold' },
-    ]
-  }
-
-  return [
-    { label: 'Bibliothèque', value: String(libraryCourses.value.length), detail: 'Cours disponibles', tone: 'teal' },
-    { label: 'Réservations', value: String(activeLearnerRequests.value.length + masterclassRegistrations.value.length), detail: 'Parcours actifs', tone: 'coral' },
-    { label: 'Messages', value: String(auth.chatUnreadCount || 0), detail: 'Non lus', tone: 'gold' },
-  ]
-})
-
-const focusItems = computed(() => {
+const quickViewItems = computed(() => {
   if (isCoach.value) {
     return [
       {
-        icon: 'mdi-book-open-page-variant-outline',
-        label: 'Dernier cours',
-        state: latestOwnedCourse.value?.title || 'Aucun cours créé',
+        icon: 'mdi-account-group-outline',
+        label: 'Apprenant le plus urgent',
+        state: filteredCoachClientSummaries.value[0]
+          ? `${filteredCoachClientSummaries.value[0].name} · ${coachClientStatus(filteredCoachClientSummaries.value[0])}`
+          : 'Aucun apprenant à suivre',
       },
       {
         icon: 'mdi-calendar-clock-outline',
@@ -566,18 +533,25 @@ const focusItems = computed(() => {
         state: nextOwnedMasterclass.value ? `${nextOwnedMasterclass.value.title} · ${formatFutureDate(nextOwnedMasterclass.value.scheduleAt)}` : 'Aucune masterclass planifiée',
       },
       {
-        icon: 'mdi-account-clock-outline',
-        label: 'Dernière demande',
-        state: latestDemand.value ? formatRelativeDate(latestDemand.value.updatedAt || latestDemand.value.createdAt) : 'Aucune demande récente',
+        icon: 'mdi-book-open-variant',
+        label: 'Dernier cours publié',
+        state: latestOwnedCourse.value?.title || 'Aucun cours créé',
+      },
+      {
+        icon: 'mdi-chart-line',
+        label: 'Progression partagée',
+        state: Object.keys(coachProgressMap.value).length
+          ? `${Object.keys(coachProgressMap.value).length} apprenant(s) avec progression visible`
+          : 'Aucune progression partagée',
       },
     ]
   }
 
   return [
     {
-      icon: 'mdi-book-open-page-variant-outline',
-      label: 'Dernier cours',
-      state: latestLibraryCourse.value?.title || 'Aucun cours récent',
+      icon: 'mdi-account-tie-outline',
+      label: 'Cours assisté le plus récent',
+      state: acceptedLearnerCourses.value[0]?.courseTitle || 'Aucun cours particulier validé',
     },
     {
       icon: 'mdi-calendar-star',
@@ -587,18 +561,113 @@ const focusItems = computed(() => {
         : 'Aucune inscription planifiée',
     },
     {
+      icon: 'mdi-book-open-page-variant-outline',
+      label: 'Cours à reprendre',
+      state: latestLibraryCourse.value?.title || 'Aucun cours consultable récemment',
+    },
+    {
       icon: 'mdi-message-text-outline',
-      label: 'Dernier message',
-      state: latestConversation.value ? formatRelativeDate(latestConversation.value.updatedAt || latestConversation.value.createdAt) : 'Aucun échange récent',
+      label: 'Dernier échange',
+      state: latestConversation.value
+        ? formatRelativeDate(latestConversation.value.updatedAt || latestConversation.value.createdAt)
+        : 'Aucun échange récent',
     },
   ]
 })
 
-const heroPanelTitle = computed(() => (isCoach.value ? 'Vos priorités du moment' : 'Votre espace du jour'))
-const heroPanelSubtitle = computed(() =>
+const quickViewPrimaryItems = computed(() => quickViewItems.value.slice(0, isCoach.value ? 3 : 2))
+
+const learnerQuickViewMode = computed(() => {
+  if (acceptedLearnerCourses.value.length > 0) return 'coaching_active'
+  if (confirmedRegistrations.value.length > 0) return 'masterclass_active'
+  if (activeLearnerRequests.value.length > 0 || pendingRegistrations.value.length > 0) return 'waiting_validation'
+  return 'discovery'
+})
+
+const learnerQuickViewNextStep = computed(() => {
+  if (learnerQuickViewMode.value === 'coaching_active') {
+    return {
+      title: 'Prochaine étape recommandée',
+      detail: nextRegisteredMasterclass.value
+        ? `Préparez votre prochaine session : ${nextRegisteredMasterclass.value.masterclassTitle}.`
+        : 'Reprenez votre dernier cours assisté ou ouvrez le chat pour préparer la suite.',
+    }
+  }
+
+  if (learnerQuickViewMode.value === 'masterclass_active') {
+    return {
+      title: 'Prochaine étape recommandée',
+      detail: 'Préparez vos questions et complétez un exercice pratique avant votre prochaine masterclass.',
+    }
+  }
+
+  if (learnerQuickViewMode.value === 'waiting_validation') {
+    return {
+      title: 'Prochaine étape recommandée',
+      detail: 'Surveillez vos validations en attente et avancez en parallèle sur la bibliothèque.',
+    }
+  }
+
+  return {
+    title: 'Prochaine étape recommandée',
+    detail: 'Commencez par un cours pré-enregistré puis ouvrez une demande de cours particulier ou une masterclass.',
+  }
+})
+
+const learnerQuickViewPriority = computed(() => {
+  if (learnerQuickViewMode.value === 'coaching_active') {
+    return {
+      label: 'Priorité du moment',
+      value: acceptedLearnerCourses.value[0]?.courseTitle || 'Cours particulier actif',
+    }
+  }
+
+  if (learnerQuickViewMode.value === 'masterclass_active') {
+    return {
+      label: 'Session à préparer',
+      value: nextRegisteredMasterclass.value?.masterclassTitle || 'Masterclass confirmée',
+    }
+  }
+
+  if (learnerQuickViewMode.value === 'waiting_validation') {
+    return {
+      label: 'En attente',
+      value: `${pendingCourseRequests.value.length + pendingRegistrations.value.length} validation(s) en cours`,
+    }
+  }
+
+  return {
+    label: 'À lancer',
+    value: latestLibraryCourse.value?.title || 'Votre premier parcours d’apprentissage',
+  }
+})
+
+const coachQuickViewNextStep = computed(() => {
+  if (coachClientSummaries.value.length === 0) {
+    return {
+      title: 'Prochaine étape recommandée',
+      detail: 'Publiez un cours particulier ou une masterclass pour commencer à attirer et suivre vos apprenants.',
+    }
+  }
+
+  if (coachClientSummaryStats.value?.clientsNeedingReply) {
+    return {
+      title: 'Prochaine étape recommandée',
+      detail: 'Traitez en priorité les apprenants à relancer pour ne pas laisser les suivis se refroidir.',
+    }
+  }
+
+  return {
+    title: 'Prochaine étape recommandée',
+    detail: 'Mettez à jour vos prochains créneaux et structurez la progression des apprenants déjà actifs.',
+  }
+})
+
+const quickViewTitle = computed(() => (isCoach.value ? 'Vue rapide coach' : 'Vue rapide apprenant'))
+const quickViewSubtitle = computed(() =>
   isCoach.value
-    ? 'Pilotez vos clients, les validations en attente et les sessions prévues.'
-    : 'Gardez vos apprentissages, réservations et conversations à portée de main.'
+    ? 'Gardez sous les yeux vos apprenants, les priorités de suivi et les prochaines sessions.'
+    : 'Retrouvez vos cours assistés, vos sessions confirmées et les prochains points d’attention.'
 )
 
 const openClientFollowUp = (client) => {
@@ -960,53 +1029,22 @@ watch(
     <div class="home-backdrop" aria-hidden="true"></div>
 
     <v-row class="home-top-grid" align="stretch" justify="center">
-      <v-col cols="12" md="6">
-        <div class="home-top-stack">
-          <div class="home-top-overview">
-            <div class="home-top-overview__eyebrow">Tableau de bord</div>
-            <div class="home-top-overview__subtitle">{{ dashboardSummary }}</div>
-
-            <div class="home-top-overview__meta">
-              <div v-for="item in heroMeta" :key="item.label" class="home-top-overview__pill">
-                <span class="home-top-overview__pill-label">{{ item.label }}</span>
-                <span class="home-top-overview__pill-value">{{ item.value }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="!isCoach" class="home-news-shell">
-            <div class="home-section-heading">
-              <div class="home-section-heading__eyebrow">Actualités</div>
-              <div class="home-section-heading__title">Les nouveautés utiles en ce moment</div>
-            </div>
-            <AppNewsCarousel variant="dashboard" />
-          </div>
-        </div>
-      </v-col>
-
-      <v-col cols="12" md="4">
+      <v-col cols="12" md="10">
         <div class="home-hero-panel home-hero-panel--top">
-          <div class="home-hero-panel__eyebrow">Vue rapide</div>
-          <div class="home-hero-panel__title">{{ heroPanelTitle }}</div>
-          <div class="home-hero-panel__subtitle">{{ heroPanelSubtitle }}</div>
-
-          <div class="home-hero-actions">
-            <v-btn
-              v-for="action in dashboardActions"
-              :key="action.path"
-              class="home-hero-action-btn"
-              :class="`home-hero-action-btn--${action.tone}`"
-              variant="flat"
-              size="small"
-              :to="action.path"
-            >
-              {{ action.label }}
-            </v-btn>
+          <div class="home-hero-panel__header">
+            <div>
+              <div class="home-hero-panel__eyebrow">Vue rapide</div>
+              <div class="home-hero-panel__title">{{ quickViewTitle }}</div>
+              <div class="home-hero-panel__subtitle">{{ quickViewSubtitle }}</div>
+            </div>
+            <v-chip class="home-chip home-chip--panel" size="small" variant="flat">
+              {{ roleLabel }} · {{ accountStatusLabel }}
+            </v-chip>
           </div>
 
-          <div class="home-hero-signal-grid">
+          <div class="home-hero-signal-grid home-hero-signal-grid--wide">
             <div
-              v-for="signal in heroSignals"
+              v-for="signal in quickViewStats"
               :key="signal.label"
               class="home-hero-signal"
               :class="`home-hero-signal--${signal.tone}`"
@@ -1016,6 +1054,71 @@ watch(
               <div class="home-hero-signal__detail">{{ signal.detail }}</div>
             </div>
           </div>
+
+          <div class="home-quickview-grid">
+            <div class="home-quickview-list">
+              <div v-for="item in quickViewPrimaryItems" :key="item.label" class="home-quickview-item">
+                <div class="home-quickview-item__icon">
+                  <v-icon size="18">{{ item.icon }}</v-icon>
+                </div>
+                <div class="home-quickview-item__content">
+                  <div class="home-quickview-item__label">{{ item.label }}</div>
+                  <div class="home-quickview-item__value">{{ item.state }}</div>
+                </div>
+              </div>
+
+              <div class="home-quickview-item home-quickview-item--priority">
+                <div class="home-quickview-item__icon">
+                  <v-icon size="18">{{ isCoach ? 'mdi-bullseye-arrow' : 'mdi-flag-checkered' }}</v-icon>
+                </div>
+                <div class="home-quickview-item__content">
+                  <div class="home-quickview-item__label">
+                    {{ isCoach ? coachQuickViewNextStep.title : learnerQuickViewPriority.label }}
+                  </div>
+                  <div class="home-quickview-item__value">
+                    {{ isCoach ? coachQuickViewNextStep.detail : learnerQuickViewPriority.value }}
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="!isCoach" class="home-quickview-item home-quickview-item--priority">
+                <div class="home-quickview-item__icon">
+                  <v-icon size="18">mdi-arrow-right-circle-outline</v-icon>
+                </div>
+                <div class="home-quickview-item__content">
+                  <div class="home-quickview-item__label">{{ learnerQuickViewNextStep.title }}</div>
+                  <div class="home-quickview-item__value">{{ learnerQuickViewNextStep.detail }}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="home-hero-actions">
+              <div class="home-hero-actions__title">Actions directes</div>
+              <v-btn
+                v-for="action in dashboardActions"
+                :key="action.path"
+                class="home-hero-action-btn"
+                :class="`home-hero-action-btn--${action.tone}`"
+                variant="flat"
+                size="small"
+                :to="action.path"
+              >
+                {{ action.label }}
+              </v-btn>
+            </div>
+          </div>
+        </div>
+      </v-col>
+    </v-row>
+
+    <v-row class="home-grid" align="center" justify="center">
+      <v-col cols="12" md="10">
+        <div class="home-news-shell">
+          <div class="home-section-heading">
+            <div class="home-section-heading__eyebrow">A la une</div>
+            <div class="home-section-heading__title">Les actualités utiles à suivre maintenant</div>
+          </div>
+          <AppNewsCarousel variant="dashboard" />
         </div>
       </v-col>
     </v-row>
@@ -1161,6 +1264,9 @@ watch(
                 <div v-if="client.latestCourseTitle" class="home-coach-client-card__line">
                   <strong>Cours :</strong> {{ client.latestCourseTitle }}
                 </div>
+                <div class="home-coach-client-card__line">
+                  <strong>Statut de suivi :</strong> {{ coachClientStatus(client) }}
+                </div>
                 <div v-if="client.nextSessionAt" class="home-coach-client-card__line">
                   <strong>Prochaine session :</strong> {{ client.nextSessionTitle }} · {{ formatFutureDate(client.nextSessionAt) }}
                 </div>
@@ -1174,6 +1280,12 @@ watch(
                 </div>
                 <div v-if="coachProgressMap[client.id]?.client?.primaryGoal" class="home-coach-client-card__line">
                   <strong>Objectif :</strong> {{ coachProgressMap[client.id].client.primaryGoal }}
+                </div>
+                <div v-if="coachProgressMap[client.id]?.client?.learningFormat" class="home-coach-client-card__line">
+                  <strong>Format préféré :</strong> {{ coachProgressMap[client.id].client.learningFormat }}
+                </div>
+                <div v-if="coachProgressMap[client.id]?.client?.availability" class="home-coach-client-card__line">
+                  <strong>Disponibilité :</strong> {{ coachProgressMap[client.id].client.availability }}
                 </div>
               </div>
 
@@ -1214,31 +1326,6 @@ watch(
           <div v-else class="home-empty-state">
             Aucun client suivi pour le moment. Les demandes de cours et inscriptions apparaîtront ici.
           </div>
-        </v-card>
-      </v-col>
-    </v-row>
-
-    <v-row class="home-grid home-grid--stats" align="stretch" justify="center">
-      <v-col cols="12" md="6" lg="3" v-for="stat in statCards" :key="stat.label">
-        <v-card class="home-stat-card" elevation="6">
-          <div class="home-stat-header">
-            <div class="home-stat-headline">
-              <div class="home-stat-label">{{ stat.label }}</div>
-              <div class="home-stat-hint">{{ stat.hint }}</div>
-            </div>
-
-            <div class="home-stat-mini-chart" :class="`home-stat-mini-chart--${stat.tone}`">
-              <span
-                v-for="(bar, index) in stat.bars"
-                :key="`${stat.label}-${index}`"
-                class="home-stat-mini-chart__bar"
-                :style="{ height: `${bar}%` }"
-              ></span>
-            </div>
-          </div>
-
-          <div class="home-stat-value">{{ stat.value }}</div>
-          <div class="home-stat-note">{{ stat.note }}</div>
         </v-card>
       </v-col>
     </v-row>
@@ -1459,18 +1546,6 @@ watch(
       </v-card>
     </v-dialog>
 
-    <v-row v-if="isCoach" class="home-grid" align="center" justify="center">
-      <v-col cols="12" md="10">
-        <div class="home-news-shell">
-          <div class="home-section-heading">
-            <div class="home-section-heading__eyebrow">Actualités</div>
-            <div class="home-section-heading__title">Les nouveautés utiles en ce moment</div>
-          </div>
-          <AppNewsCarousel variant="dashboard" />
-        </div>
-      </v-col>
-    </v-row>
-
     <v-row class="home-grid home-grid--balanced" align="stretch" justify="center">
       <v-col cols="12" md="5">
         <v-card class="home-card home-card--side" elevation="6">
@@ -1625,75 +1700,29 @@ watch(
   margin-top: 4px;
 }
 
-.home-top-stack {
-  display: grid;
-  gap: 20px;
-}
-
-.home-top-overview {
-  display: grid;
-  gap: 12px;
-}
-
-.home-top-overview__eyebrow {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(19, 58, 59, 0.48);
-}
-
-.home-top-overview__subtitle {
-  max-width: 620px;
-  font-size: 15px;
-  line-height: 1.6;
-  color: rgba(19, 58, 59, 0.72);
-}
-
-.home-top-overview__meta {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.home-top-overview__pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(19, 58, 59, 0.08);
-}
-
-.home-top-overview__pill-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(19, 58, 59, 0.5);
-}
-
-.home-top-overview__pill-value {
-  font-size: 13px;
-  font-weight: 700;
-  color: #133a3b;
-}
-
 .home-hero-panel {
-  padding: 18px;
-  border-radius: 28px;
+  padding: 22px 24px;
+  border-radius: 32px;
   background:
     linear-gradient(170deg, rgba(19, 58, 59, 0.98), rgba(27, 79, 81, 0.96));
   border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 28px 44px rgba(12, 31, 32, 0.16);
   display: grid;
-  gap: 18px;
+  gap: 16px;
 }
 
 .home-hero-panel--top {
   height: 100%;
   min-height: 100%;
+}
+
+.home-hero-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .home-hero-panel__eyebrow {
@@ -1706,21 +1735,32 @@ watch(
 
 .home-hero-panel__title {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
   color: #fffaf2;
 }
 
 .home-hero-panel__subtitle {
+  margin-top: 4px;
+  max-width: 720px;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.45;
   color: rgba(245, 239, 230, 0.78);
 }
 
 .home-hero-actions {
   display: flex;
+  flex-direction: column;
   gap: 10px;
-  flex-wrap: wrap;
+  align-content: flex-start;
+}
+
+.home-hero-actions__title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(245, 239, 230, 0.58);
 }
 
 .home-hero-action-btn {
@@ -1746,12 +1786,17 @@ watch(
 
 .home-hero-signal-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.home-hero-signal-grid--wide {
+  gap: 8px;
 }
 
 .home-hero-signal {
-  padding: 14px 12px;
+  min-height: 92px;
+  padding: 12px 12px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1774,9 +1819,9 @@ watch(
 }
 
 .home-hero-signal__value {
-  margin-top: 8px;
+  margin-top: 6px;
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
   color: #fffaf2;
 }
@@ -1787,13 +1832,62 @@ watch(
   color: rgba(245, 239, 230, 0.7);
 }
 
+.home-quickview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(210px, 0.55fr);
+  gap: 12px;
+}
+
+.home-quickview-list {
+  display: grid;
+  gap: 8px;
+}
+
+.home-quickview-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.home-quickview-item--priority {
+  background: linear-gradient(135deg, rgba(245, 191, 71, 0.14), rgba(255, 255, 255, 0.08));
+  border-color: rgba(245, 191, 71, 0.22);
+}
+
+.home-quickview-item__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 191, 71, 0.16);
+  color: #ffe2a0;
+}
+
+.home-quickview-item__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(245, 239, 230, 0.55);
+}
+
+.home-quickview-item__value {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #fffaf2;
+}
+
 .home-grid {
   margin-top: 32px;
   gap: 20px;
-}
-
-.home-grid--stats {
-  margin-top: 26px;
 }
 
 .home-grid--balanced {
@@ -1827,92 +1921,6 @@ watch(
 .home-news-shell {
   display: grid;
   gap: 14px;
-}
-
-.home-stat-card {
-  border-radius: 22px;
-  min-height: 214px;
-  padding: 22px;
-  background: #fff;
-  border: 1px solid rgba(19, 58, 59, 0.08);
-  box-shadow: 0 16px 30px rgba(12, 31, 32, 0.1);
-  display: grid;
-  gap: 18px;
-}
-
-.home-stat-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.home-stat-headline {
-  min-width: 0;
-}
-
-.home-stat-mini-chart {
-  height: 54px;
-  width: 86px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
-  gap: 5px;
-  padding: 6px 8px;
-  border-radius: 16px;
-  background: rgba(19, 58, 59, 0.05);
-}
-
-.home-stat-mini-chart--teal {
-  background: rgba(28, 124, 125, 0.08);
-}
-
-.home-stat-mini-chart--gold {
-  background: rgba(245, 191, 71, 0.12);
-}
-
-.home-stat-mini-chart--coral {
-  background: rgba(240, 90, 40, 0.1);
-}
-
-.home-stat-mini-chart__bar {
-  width: 7px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #43c4af, #1c7c7d);
-}
-
-.home-stat-mini-chart--gold .home-stat-mini-chart__bar {
-  background: linear-gradient(180deg, #f7cb6a, #d79c1c);
-}
-
-.home-stat-mini-chart--coral .home-stat-mini-chart__bar {
-  background: linear-gradient(180deg, #f58a63, #e45526);
-}
-
-.home-stat-value {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 38px;
-  font-weight: 700;
-  color: #133a3b;
-  line-height: 1;
-}
-
-.home-stat-label {
-  font-family: 'DM Sans', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  color: rgba(19, 58, 59, 0.78);
-}
-
-.home-stat-hint {
-  font-size: 12px;
-  color: rgba(19, 58, 59, 0.5);
-}
-
-.home-stat-note {
-  font-size: 12px;
-  color: rgba(19, 58, 59, 0.62);
-  line-height: 1.5;
 }
 
 .home-card {
@@ -1972,6 +1980,11 @@ watch(
   background: rgba(28, 124, 125, 0.12);
   color: #1c7c7d;
   font-weight: 600;
+}
+
+.home-chip--panel {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff4df;
 }
 
 .home-filter-toggle {
@@ -2608,7 +2621,8 @@ watch(
 
 @media (max-width: 960px) {
   .home-coach-summary-grid,
-  .home-hero-signal-grid {
+  .home-hero-signal-grid,
+  .home-quickview-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2651,7 +2665,7 @@ watch(
 
   .home-hero-actions,
   .home-action-grid,
-  .home-top-overview__meta {
+  .home-hero-panel__header {
     flex-direction: column;
   }
 }

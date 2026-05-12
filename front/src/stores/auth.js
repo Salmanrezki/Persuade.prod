@@ -8,7 +8,7 @@ import {
   onAuthStateChanged,
 } from 'firebase/auth'
 
-import { createUserProfile, getUserProfile } from '@/services/userService'
+import { createUserProfile, getUserProfile, normalizeUserProfile, normalizeUserRole } from '@/services/userService'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -57,7 +57,7 @@ export const useAuthStore = defineStore('auth', {
 
     async register(email, password, firstname, birthdate, role) {
       const cred = await createUserWithEmailAndPassword(auth, email, password)
-      const normalizedRole = role === 'coach' ? 'coach' : 'apprenant'
+      const normalizedRole = normalizeUserRole(role)
 
       await createUserProfile(cred.user.uid, {
         email,
@@ -88,11 +88,11 @@ export const useAuthStore = defineStore('auth', {
       this.profileSyncing = true
       try {
         const profile = await getUserProfile(this.user.uid)
-        this.profile = profile || { uid: this.user.uid, email: this.user.email }
+        this.profile = normalizeUserProfile(profile || {}, { uid: this.user.uid, email: this.user.email })
         this.hasOnboarded = true
         this.profileLoaded = true
       } catch (error) {
-        this.profile = { uid: this.user.uid, email: this.user.email }
+        this.profile = normalizeUserProfile({}, { uid: this.user.uid, email: this.user.email })
         this.hasOnboarded = true
         this.profileLoaded = true
       } finally {
@@ -101,7 +101,7 @@ export const useAuthStore = defineStore('auth', {
     },
 
     setProfile(data) {
-      this.profile = data
+      this.profile = normalizeUserProfile(data || {}, { uid: this.user?.uid, email: this.user?.email })
       this.hasOnboarded = true
       this.profileLoaded = true
       this.profileSyncing = false

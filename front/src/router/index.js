@@ -3,17 +3,18 @@ import { useAuthStore } from '@/stores/auth'
 import { LEGACY_ROUTE_REDIRECTS, ROUTE_PATHS } from '@/router/paths'
 
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
-import LandingView from '@/views/LandingView.vue'
-import AuthView from '@/views/AuthView.vue'
-import HomeView from '@/views/HomeView.vue'
-import CoursesView from '@/views/CoursesView.vue'
-import CoachCoursesView from '@/views/CoachCoursesView.vue'
-import MasterclassView from '@/views/MasterclassView.vue'
-import ChatView from '@/views/ChatView.vue'
-import OnboardingView from '@/views/OnboardingView.vue'
-import PracticalExercisesView from '@/views/PracticalExercisesView.vue'
-import ProfileView from '@/views/ProfileView.vue'
-import PreferencesView from '@/views/PreferencesView.vue'
+
+const LandingView = () => import('@/views/LandingView.vue')
+const AuthView = () => import('@/views/AuthView.vue')
+const HomeView = () => import('@/views/HomeView.vue')
+const CoursesView = () => import('@/views/CoursesView.vue')
+const CoachCoursesView = () => import('@/views/CoachCoursesView.vue')
+const MasterclassView = () => import('@/views/MasterclassView.vue')
+const ChatView = () => import('@/views/ChatView.vue')
+const OnboardingView = () => import('@/views/OnboardingView.vue')
+const PracticalExercisesView = () => import('@/views/PracticalExercisesView.vue')
+const ProfileView = () => import('@/views/ProfileView.vue')
+const PreferencesView = () => import('@/views/PreferencesView.vue')
 
 const routes = [
   {
