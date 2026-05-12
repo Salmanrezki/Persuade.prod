@@ -574,8 +574,8 @@ const cancelEditCourse = () => {
 const handleSubmitCoachCourse = async () => {
   coachFormError.value = ''
 
-  if (!newCoachCourse.value.title || !newCoachCourse.value.description || !newCoachCourse.value.videoUrl) {
-    coachFormError.value = 'Merci de remplir le titre, la description et le média.'
+  if (!newCoachCourse.value.title || !newCoachCourse.value.description) {
+    coachFormError.value = 'Merci de remplir le titre et la description.'
     return
   }
 

@@ -132,7 +132,7 @@ router.get('/progress/me', verifyToken, async (req, res) => {
     const profile = await getUserProfile(req.user.uid)
     const learningProgress = profile?.learningProgress || {
       viewedCourses: [],
-      practicalExercises: { completed: {}, notes: {} },
+      practicalExercises: { completed: {}, notes: {}, scores: {} },
       updatedAt: null,
     }
 
@@ -165,6 +165,11 @@ router.put('/progress/me', verifyToken, async (req, res) => {
         req.body?.practicalExercises?.notes &&
         typeof req.body.practicalExercises.notes === 'object'
           ? req.body.practicalExercises.notes
+          : {},
+      scores:
+        req.body?.practicalExercises?.scores &&
+        typeof req.body.practicalExercises.scores === 'object'
+          ? req.body.practicalExercises.scores
           : {},
     }
 

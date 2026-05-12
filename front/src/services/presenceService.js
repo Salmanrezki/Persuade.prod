@@ -11,6 +11,10 @@ let focusHandler = null
 let blurHandler = null
 let beforeUnloadHandler = null
 
+const isPermissionError = (error) =>
+  error?.code === 'permission-denied' ||
+  error?.message?.toLowerCase?.().includes('missing or insufficient permissions')
+
 const toMillis = (value) => {
   if (!value) return 0
   if (typeof value?.toMillis === 'function') return value.toMillis()
@@ -54,6 +58,7 @@ const refreshPresence = async () => {
   try {
     await writePresence(activeUid, resolvePresenceStatus())
   } catch (error) {
+    if (isPermissionError(error)) return
     console.error('Failed to update presence', error)
   }
 }
@@ -129,6 +134,7 @@ export const stopUserPresence = async () => {
   try {
     await writePresence(uid, 'offline')
   } catch (error) {
+    if (isPermissionError(error)) return
     console.error('Failed to clear presence', error)
   }
 }

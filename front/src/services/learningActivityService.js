@@ -46,7 +46,7 @@ export const recordViewedCourse = (uid, course) => {
 export const getViewedCourses = (uid) => readJson(getKey(VIEWED_COURSES_STORAGE_PREFIX, uid), [])
 
 export const getExerciseProgress = (uid) =>
-  readJson(getKey(EXERCISE_PROGRESS_STORAGE_PREFIX, uid), { completed: {}, notes: {} })
+  readJson(getKey(EXERCISE_PROGRESS_STORAGE_PREFIX, uid), { completed: {}, notes: {}, scores: {} })
 
 export const setExerciseCompleted = (uid, exerciseId, completed) => {
   const key = getKey(EXERCISE_PROGRESS_STORAGE_PREFIX, uid)
@@ -69,6 +69,25 @@ export const setExerciseNote = (uid, exerciseId, note) => {
     notes: {
       ...current.notes,
       [exerciseId]: note,
+    },
+  })
+  scheduleLearningProgressSync(uid)
+}
+
+export const setExerciseScore = (uid, exerciseId, scorePayload) => {
+  const key = getKey(EXERCISE_PROGRESS_STORAGE_PREFIX, uid)
+  const current = getExerciseProgress(uid)
+  const previous = current.scores?.[exerciseId]
+  const nextScore =
+    previous && Number(previous.percentage || 0) > Number(scorePayload?.percentage || 0)
+      ? previous
+      : scorePayload
+
+  writeJson(key, {
+    ...current,
+    scores: {
+      ...(current.scores || {}),
+      [exerciseId]: nextScore,
     },
   })
   scheduleLearningProgressSync(uid)

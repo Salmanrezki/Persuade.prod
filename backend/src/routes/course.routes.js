@@ -240,7 +240,7 @@ router.post('/', verifyToken, async (req, res) => {
       includeCreatedAt: true,
     })
 
-    if (!courseData.title || !courseData.description || !courseData.videoUrl) {
+    if (!courseData.title || !courseData.description) {
       return res.status(400).json({ message: 'Missing required fields' })
     }
 

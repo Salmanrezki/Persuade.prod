@@ -395,6 +395,22 @@ const coachProgressMap = computed(() =>
   }, {})
 )
 
+const getClientViewedCourses = (clientId) => {
+  const viewedCourses = coachProgressMap.value[clientId]?.learningProgress?.viewedCourses
+  return Array.isArray(viewedCourses) ? viewedCourses.slice(0, 3) : []
+}
+
+const getClientPlannedCourses = (clientId) =>
+  courseRequests.value
+    .filter((request) => request?.studentId === clientId && request?.status === 'accepted')
+    .slice(0, 3)
+
+const getClientPlannedSessions = (clientId) =>
+  masterclassRegistrations.value
+    .filter((registration) => registration?.studentId === clientId && registration?.status !== 'declined')
+    .sort((left, right) => toMillis(left?.scheduleAt) - toMillis(right?.scheduleAt))
+    .slice(0, 3)
+
 const levelPriority = {
   Débutant: 1,
   'Tous niveaux': 2,
@@ -1286,6 +1302,43 @@ watch(
                 </div>
                 <div v-if="coachProgressMap[client.id]?.client?.availability" class="home-coach-client-card__line">
                   <strong>Disponibilité :</strong> {{ coachProgressMap[client.id].client.availability }}
+                </div>
+              </div>
+
+              <div v-if="getClientViewedCourses(client.id).length" class="home-coach-client-card__section">
+                <div class="home-coach-client-card__section-title">Cours consultés</div>
+                <div class="home-coach-client-card__tag-list">
+                  <span
+                    v-for="course in getClientViewedCourses(client.id)"
+                    :key="`${client.key}-viewed-${course.id}`"
+                    class="home-coach-client-card__tag"
+                  >
+                    {{ course.title }}
+                  </span>
+                </div>
+              </div>
+
+              <div v-if="getClientPlannedCourses(client.id).length" class="home-coach-client-card__section">
+                <div class="home-coach-client-card__section-title">Cours particuliers planifiés</div>
+                <div
+                  v-for="course in getClientPlannedCourses(client.id)"
+                  :key="`${client.key}-planned-course-${course.id}`"
+                  class="home-coach-client-card__plan-item"
+                >
+                  <span>{{ course.courseTitle || 'Cours particulier' }}</span>
+                  <span>{{ formatRelativeDate(course.updatedAt || course.createdAt) }}</span>
+                </div>
+              </div>
+
+              <div v-if="getClientPlannedSessions(client.id).length" class="home-coach-client-card__section">
+                <div class="home-coach-client-card__section-title">Sessions planifiées</div>
+                <div
+                  v-for="session in getClientPlannedSessions(client.id)"
+                  :key="`${client.key}-planned-session-${session.id}`"
+                  class="home-coach-client-card__plan-item"
+                >
+                  <span>{{ session.masterclassTitle || 'Masterclass' }}</span>
+                  <span>{{ session.scheduleAt ? formatFutureDate(session.scheduleAt) : 'Date à confirmer' }}</span>
                 </div>
               </div>
 
@@ -2435,6 +2488,46 @@ watch(
 .home-coach-client-card__line {
   font-size: 13px;
   color: rgba(19, 58, 59, 0.76);
+}
+
+.home-coach-client-card__section {
+  display: grid;
+  gap: 8px;
+}
+
+.home-coach-client-card__section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(19, 58, 59, 0.52);
+}
+
+.home-coach-client-card__tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.home-coach-client-card__tag {
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(28, 124, 125, 0.08);
+  color: #1c7c7d;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.home-coach-client-card__plan-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(19, 58, 59, 0.04);
+  font-size: 12px;
+  color: rgba(19, 58, 59, 0.72);
 }
 
 .home-coach-client-card__timeline-item {
