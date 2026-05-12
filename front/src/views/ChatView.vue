@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import logoUrl from '@/assets/logo.png'
 import { db } from '@/services/firebase'
 import {
@@ -21,6 +22,8 @@ import { useAuthStore } from '@/stores/auth'
 import { getUserProfile } from '@/services/userService'
 
 const profile = ref(null)
+const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 const contacts = ref([])
 const conversations = ref([])
@@ -312,6 +315,23 @@ const clearAttachment = () => {
   attachment.value = null
 }
 
+const maybeStartConversationFromRoute = async () => {
+  const contactId = typeof route.query.contact === 'string' ? route.query.contact : ''
+  if (!contactId || !profile.value?.uid) return
+
+  if (selectedContactId.value === contactId || conversations.value.some((item) => item.id === conversationIdFor(profile.value.uid, contactId))) {
+    selectedConversationId.value = conversationIdFor(profile.value.uid, contactId)
+    router.replace({ query: { ...route.query, contact: undefined } })
+    return
+  }
+
+  const contact = contacts.value.find((item) => item.uid === contactId)
+  if (!contact) return
+
+  await startConversation(contact)
+  router.replace({ query: { ...route.query, contact: undefined } })
+}
+
 const updateUnread = (conversationsList) => {
   let unreadCount = 0
   conversationsList.forEach((conv) => {
@@ -443,6 +463,7 @@ onMounted(async () => {
       throw new Error('Missing user profile')
     }
     await Promise.all([loadContacts(), loadConversations()])
+    await maybeStartConversationFromRoute()
     updateUnread(conversations.value)
     setupContactsListener()
     setupConversationListener()
@@ -463,6 +484,13 @@ onMounted(async () => {
   window.addEventListener('focus', focusListener)
   window.addEventListener('blur', blurListener)
 })
+
+watch(
+  () => route.query.contact,
+  async () => {
+    await maybeStartConversationFromRoute()
+  }
+)
 
 onBeforeUnmount(() => {
   if (conversationsUnsub) conversationsUnsub()

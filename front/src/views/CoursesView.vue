@@ -5,6 +5,7 @@ import logoUrl from '@/assets/logo.png'
 import { useAuthStore } from '@/stores/auth'
 import { getUserProfile } from '@/services/userService'
 import { getCourses, invalidateContent } from '@/services/contentService'
+import { recordViewedCourse } from '@/services/learningActivityService'
 
 const LIBRARY_IMAGE_MAX_SIZE = 1024 * 1024 * 1.5
 const auth = useAuthStore()
@@ -185,6 +186,7 @@ const coverPreview = computed(() => newLibraryCourse.value.coverImage || '')
 const openCourse = (course) => {
   activeCourse.value = course
   dialog.value = true
+  recordViewedCourse(auth.user?.uid, course)
 }
 
 const parseLineList = (value) =>

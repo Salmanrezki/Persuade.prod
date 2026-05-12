@@ -138,12 +138,12 @@ const isCoach = computed(() => role.value === 'coach')
 const isLearner = computed(() => role.value === 'apprenant')
 const isEditingMasterclass = computed(() => !!editingMasterclassId.value)
 const formTitle = computed(() =>
-  isEditingMasterclass.value ? 'Modifier la masterclass' : 'Planifier une masterclass'
+  isEditingMasterclass.value ? 'Modifier ma masterclass' : 'Créer ma masterclass'
 )
 const formSubtitle = computed(() =>
   isEditingMasterclass.value
     ? 'Mettez à jour le contenu, la date, l’image ou les modalités de votre session.'
-    : 'Ajoutez une image, un programme, des bénéfices et les modalités détaillées.'
+    : 'Créez une nouvelle masterclass avec image, programme, bénéfices et modalités détaillées.'
 )
 
 const now = () => new Date()
@@ -187,6 +187,11 @@ const filteredMasterclasses = computed(() => allMasterclasses.value.filter(match
 const filteredScheduledMasterclasses = computed(() => scheduledMasterclasses.value.filter(matchesMasterclassFilters))
 
 const filteredFeaturedMasterclasses = computed(() => featuredMasterclasses.value.filter(matchesMasterclassFilters))
+const featuredDisplayMasterclasses = computed(() =>
+  isCoach.value
+    ? sortItems(filteredFeaturedMasterclasses.value.filter((item) => isOwnedMasterclass(item)))
+    : sortItems(filteredFeaturedMasterclasses.value)
+)
 
 const myScheduled = computed(() =>
   masterclasses.value.filter(
@@ -204,6 +209,11 @@ const sortedFeaturedMasterclasses = computed(() => sortItems(filteredFeaturedMas
 const sortedScheduledMasterclasses = computed(() => sortItems(filteredScheduledMasterclasses.value))
 const sortedMyScheduled = computed(() => sortItems(filteredMyScheduled.value))
 const sortedAllMasterclasses = computed(() => sortItems(filteredMasterclasses.value))
+const allDisplayMasterclasses = computed(() =>
+  isCoach.value
+    ? sortItems(filteredMasterclasses.value.filter((item) => isOwnedMasterclass(item)))
+    : sortedAllMasterclasses.value
+)
 
 const scheduledList = computed(() =>
   isCoach.value ? sortedMyScheduled.value : sortedScheduledMasterclasses.value
@@ -214,7 +224,7 @@ const paginatedScheduledMasterclasses = computed(() =>
 )
 
 const paginatedAllMasterclasses = computed(() =>
-  paginateItems(sortedAllMasterclasses.value, allPage.value)
+  paginateItems(allDisplayMasterclasses.value, allPage.value)
 )
 
 const scheduledPageCount = computed(() =>
@@ -222,7 +232,7 @@ const scheduledPageCount = computed(() =>
 )
 
 const allPageCount = computed(() =>
-  Math.max(1, Math.ceil(sortedAllMasterclasses.value.length / pageSize.value))
+  Math.max(1, Math.ceil(allDisplayMasterclasses.value.length / pageSize.value))
 )
 
 const ownedFeaturedMasterclasses = computed(() =>
@@ -775,19 +785,19 @@ onMounted(async () => {
                 <v-img :src="logoUrl" alt="Logo Persuade" width="72" height="72" class="masterclass-logo" />
                 <div class="masterclass-brand-text">Persuade</div>
               </div>
-              <div class="masterclass-hero-title">Masterclass</div>
+              <div class="masterclass-hero-title">{{ isCoach ? 'Mes masterclass' : 'Masterclass' }}</div>
               <div class="masterclass-hero-subtitle">
-                {{ isCoach ? 'Créez des sessions riches avec couverture, programme et infos détaillées.' : 'Explorez des masterclass plus complètes avec programme, image et modalités claires.' }}
+                {{ isCoach ? 'Mettez en avant vos propres masterclass, gérez vos sessions et créez de nouveaux formats experts.' : 'Explorez des masterclass plus complètes avec programme, image et modalités claires.' }}
               </div>
             </div>
 
             <div class="masterclass-hero-stats">
               <div class="masterclass-hero-stat-card">
-                <div class="masterclass-hero-stat">{{ scheduledMasterclasses.length }}</div>
+                <div class="masterclass-hero-stat">{{ isCoach ? scheduledList.length : scheduledMasterclasses.length }}</div>
                 <div class="masterclass-hero-label">planifiées</div>
               </div>
               <div class="masterclass-hero-stat-card">
-              <div class="masterclass-hero-stat">{{ filteredFeaturedMasterclasses.length }}</div>
+              <div class="masterclass-hero-stat">{{ featuredDisplayMasterclasses.length }}</div>
                 <div class="masterclass-hero-label">mises en avant</div>
               </div>
             </div>
@@ -807,7 +817,7 @@ onMounted(async () => {
         <div v-if="!loading" class="masterclass-filters">
           <v-text-field
             v-model="searchQuery"
-            label="Rechercher une masterclass"
+            :label="isCoach ? 'Rechercher dans mes masterclass' : 'Rechercher une masterclass'"
             variant="outlined"
             density="comfortable"
             hide-details
@@ -864,15 +874,15 @@ onMounted(async () => {
           />
         </div>
 
-        <div v-if="!loading && filteredFeaturedMasterclasses.length" class="masterclass-section">
-          <div class="masterclass-section-title">Sélection du moment</div>
+        <div v-if="!loading && featuredDisplayMasterclasses.length" class="masterclass-section">
+          <div class="masterclass-section-title">{{ isCoach ? 'Mes masterclass mises en avant' : 'Sélection du moment' }}</div>
           <div class="masterclass-section-subtitle">
-            Les masterclass les plus visibles et les plus complètes.
+            {{ isCoach ? 'Les masterclass que vous avez choisies de mettre en avant.' : 'Les masterclass les plus visibles et les plus complètes.' }}
           </div>
         </div>
 
-        <v-row v-if="!loading && sortedFeaturedMasterclasses.length" class="masterclass-list">
-          <v-col cols="12" md="6" v-for="item in sortedFeaturedMasterclasses" :key="`featured-${item.id}`">
+        <v-row v-if="!loading && featuredDisplayMasterclasses.length" class="masterclass-list">
+          <v-col cols="12" md="6" v-for="item in featuredDisplayMasterclasses" :key="`featured-${item.id}`">
             <v-card class="masterclass-card masterclass-card--featured" elevation="6">
               <div class="masterclass-card-cover" :style="coverStyle(item)">
                 <div class="masterclass-card-cover-top">
@@ -1143,9 +1153,9 @@ onMounted(async () => {
         </div>
 
         <div v-if="!loading" class="masterclass-section">
-          <div class="masterclass-section-title">Toutes les masterclass</div>
+          <div class="masterclass-section-title">{{ isCoach ? 'Toutes mes masterclass' : 'Toutes les masterclass' }}</div>
           <div class="masterclass-section-subtitle">
-            Catalogue complet des sessions, y compris brouillons, passées ou annulées.
+            {{ isCoach ? 'Retrouvez toutes vos masterclass, y compris brouillons, passées ou annulées.' : 'Catalogue complet des sessions, y compris brouillons, passées ou annulées.' }}
           </div>
         </div>
 
@@ -1332,7 +1342,7 @@ onMounted(async () => {
             <div>
               <div class="masterclass-panel-title">Réordonner la mise en avant</div>
               <div class="masterclass-panel-subtitle">
-                Glissez vos masterclass mises en avant pour changer l’ordre d’affichage.
+                Glissez vos masterclass mises en avant pour changer leur ordre d’affichage.
               </div>
             </div>
             <v-btn

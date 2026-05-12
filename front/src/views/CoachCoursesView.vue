@@ -6,6 +6,7 @@ import { db } from '@/services/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { getUserProfile } from '@/services/userService'
 import { addDoc, collection, deleteDoc, doc, getDocs, query, serverTimestamp, updateDoc, where } from 'firebase/firestore'
+import { recordViewedCourse } from '@/services/learningActivityService'
 
 const COURSE_IMAGE_MAX_SIZE = 1024 * 1024 * 1.5
 const auth = useAuthStore()
@@ -181,6 +182,7 @@ const coverPreview = computed(() => newCoachCourse.value.coverImage || '')
 const openCourse = (course) => {
   activeCourse.value = course
   dialog.value = true
+  recordViewedCourse(auth.user?.uid, course)
 }
 
 const parseLineList = (value) =>
@@ -316,7 +318,7 @@ const learnerOverviewCards = computed(() => {
     {
       label: 'Accompagnements',
       value: coachCourses.value.length,
-      hint: 'cours coach ouverts',
+      hint: 'cours particuliers ouverts',
       icon: 'mdi-school-outline',
     },
     {
@@ -777,9 +779,9 @@ onMounted(async () => {
                 <v-img :src="logoUrl" alt="Logo Persuade" width="72" height="72" class="coach-logo" />
                 <div class="coach-brand-text">Persuade</div>
               </div>
-              <div class="coach-hero-title">Cours avec coach</div>
+              <div class="coach-hero-title">{{ isCoach ? 'Mes cours particuliers' : 'Cours avec coach' }}</div>
               <div class="coach-hero-subtitle">
-                {{ isCoach ? 'Créez des offres coach plus riches, modifiez-les et gérez les demandes.' : 'Découvrez les accompagnements coach avec détails, bénéfices et modalités.' }}
+                {{ isCoach ? 'Créez vos accompagnements individuels, suivez les demandes et pilotez votre relation client.' : 'Découvrez les accompagnements coach avec détails, bénéfices et modalités.' }}
               </div>
             </div>
 
@@ -815,7 +817,7 @@ onMounted(async () => {
         <div v-if="!loading" class="coach-filters">
           <v-text-field
             v-model="searchQuery"
-            label="Rechercher un cours coach"
+            :label="isCoach ? 'Rechercher un cours particulier' : 'Rechercher un cours coach'"
             variant="outlined"
             density="comfortable"
             hide-details
@@ -1187,9 +1189,9 @@ onMounted(async () => {
         </v-row>
 
         <div v-if="!loading" class="coach-section">
-          <div class="coach-section-title">{{ isCoach ? 'Mes cours coach' : 'Cours avec coach' }}</div>
+          <div class="coach-section-title">{{ isCoach ? 'Mes cours particuliers' : 'Cours avec coach' }}</div>
           <div class="coach-section-subtitle">
-            {{ isCoach ? 'Vos offres publiées et réservables.' : 'Sélectionnez un accompagnement et envoyez une demande.' }}
+            {{ isCoach ? 'Vos accompagnements publiés, réservables et suivis côté coach.' : 'Sélectionnez un accompagnement et envoyez une demande.' }}
           </div>
         </div>
 
@@ -1413,7 +1415,7 @@ onMounted(async () => {
             <div class="coach-form-cover-preview" :style="coverStyle({ coverImage: coverPreview || '' })">
               <div class="coach-form-cover-overlay">
                 <div class="coach-form-cover-label">Aperçu couverture</div>
-                <div class="coach-form-cover-title">{{ newCoachCourse.title || 'Titre du cours coach' }}</div>
+                <div class="coach-form-cover-title">{{ newCoachCourse.title || 'Titre du cours particulier' }}</div>
                 <div class="coach-form-cover-subtitle">
                   {{ newCoachCourse.subtitle || 'Sous-titre, promesse ou angle du cours.' }}
                 </div>

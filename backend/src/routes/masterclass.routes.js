@@ -2,6 +2,7 @@ import express from 'express'
 import admin from '../firebaseAdmin.js'
 import { verifyToken } from '../middleware/authMiddleware.js'
 import { masterclassSeedData } from '../data/masterclassSeedData.js'
+import { logFirestoreWarning } from '../utils/firestoreErrors.js'
 import {
   countSeedRegistrationsByMasterclass,
   masterclassSeedRegistrations,
@@ -20,21 +21,13 @@ const DEFAULT_LEVEL = 'Tous niveaux'
 const DEFAULT_FORMAT = 'online'
 const DEFAULT_LANGUAGE = 'Français'
 const DEFAULT_STATUS = 'scheduled'
-const PUBLIC_READ_TIMEOUT_MS = 2500
 const PUBLIC_CACHE_TTL_MS = 30 * 1000
+const PUBLIC_REFRESH_RETRY_MS = 60 * 1000
 
 const getUserProfile = async (uid) => {
   const doc = await usersCollection().doc(uid).get()
   return doc.exists ? doc.data() : null
 }
-
-const withTimeout = (promise, timeoutMs, label) =>
-  Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
-    }),
-  ])
 
 const sanitizeString = (value, fallback = '') =>
   typeof value === 'string' && value.trim() ? value.trim() : fallback
@@ -139,16 +132,29 @@ let publicMasterclassesLastSyncAt = 0
 let registrationSummaryLastSyncAt = 0
 let publicMasterclassesRefreshPromise = null
 let registrationSummaryRefreshPromise = null
+let publicMasterclassesLastRefreshAttemptAt = 0
+let registrationSummaryLastRefreshAttemptAt = 0
+
+const shouldRefreshPublicMasterclassesCache = () => {
+  const now = Date.now()
+  const cacheIsStale = now - publicMasterclassesLastSyncAt > PUBLIC_CACHE_TTL_MS
+  const retryWindowPassed = now - publicMasterclassesLastRefreshAttemptAt > PUBLIC_REFRESH_RETRY_MS
+  return cacheIsStale && retryWindowPassed
+}
+
+const shouldRefreshRegistrationSummaryCache = () => {
+  const now = Date.now()
+  const cacheIsStale = now - registrationSummaryLastSyncAt > PUBLIC_CACHE_TTL_MS
+  const retryWindowPassed = now - registrationSummaryLastRefreshAttemptAt > PUBLIC_REFRESH_RETRY_MS
+  return cacheIsStale && retryWindowPassed
+}
 
 const refreshPublicMasterclassesCache = async () => {
   if (publicMasterclassesRefreshPromise) return publicMasterclassesRefreshPromise
 
+  publicMasterclassesLastRefreshAttemptAt = Date.now()
   publicMasterclassesRefreshPromise = (async () => {
-    const snapshot = await withTimeout(
-      masterclassCollection().get(),
-      PUBLIC_READ_TIMEOUT_MS,
-      'masterclasses fetch'
-    )
+    const snapshot = await masterclassCollection().get()
     const items = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
@@ -169,12 +175,9 @@ const refreshPublicMasterclassesCache = async () => {
 const refreshRegistrationSummaryCache = async () => {
   if (registrationSummaryRefreshPromise) return registrationSummaryRefreshPromise
 
+  registrationSummaryLastRefreshAttemptAt = Date.now()
   registrationSummaryRefreshPromise = (async () => {
-    const snapshot = await withTimeout(
-      registrationsCollection().get(),
-      PUBLIC_READ_TIMEOUT_MS,
-      'masterclass registrations summary fetch'
-    )
+    const snapshot = await registrationsCollection().get()
     const summary = {}
 
     snapshot.docs.forEach((doc) => {
@@ -224,11 +227,9 @@ const incrementSummaryCache = (masterclassId, delta) => {
 }
 
 router.get('/', async (_req, res) => {
-  const cacheIsStale = Date.now() - publicMasterclassesLastSyncAt > PUBLIC_CACHE_TTL_MS
-
-  if (cacheIsStale) {
+  if (shouldRefreshPublicMasterclassesCache()) {
     refreshPublicMasterclassesCache().catch((error) => {
-      console.error('GET /api/masterclasses refresh failed:', error)
+      logFirestoreWarning('GET /api/masterclasses refresh failed', error)
     })
   }
 
@@ -236,10 +237,10 @@ router.get('/', async (_req, res) => {
 })
 
 router.get('/registrations/summary', async (_req, res) => {
-  const cacheIsStale = Date.now() - registrationSummaryLastSyncAt > PUBLIC_CACHE_TTL_MS
-
-  if (cacheIsStale) {
-    refreshRegistrationSummaryCache().catch(() => {})
+  if (shouldRefreshRegistrationSummaryCache()) {
+    refreshRegistrationSummaryCache().catch((error) => {
+      logFirestoreWarning('GET /api/masterclasses/registrations/summary refresh failed', error)
+    })
   }
 
   res.json(registrationSummaryCache)

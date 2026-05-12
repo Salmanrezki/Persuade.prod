@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { ROUTE_PATHS } from '@/router/paths'
 import { useRoute, useRouter } from 'vue-router'
@@ -25,8 +25,12 @@ const mobileDrawer = ref(false)
 const sectionSeenMap = ref({})
 const sectionLatestMap = ref({})
 const sectionNotificationReady = ref(false)
+const tourSpotlightTarget = ref('')
+const tourSpotlightTone = ref('teal')
+const tourSpotlightActive = ref(false)
 
 let notificationsInterval = null
+let tourSpotlightListener = null
 
 const SECTION_STORAGE_PREFIX = 'persuade.section-seen'
 const SECTION_KEYS = {
@@ -36,6 +40,7 @@ const SECTION_KEYS = {
   practicalExercises: ROUTE_PATHS.practicalExercises,
   chat: ROUTE_PATHS.chat,
 }
+const isCoach = computed(() => auth.profile?.role === 'coach')
 
 const getStorageKey = (uid) => `${SECTION_STORAGE_PREFIX}.${uid}`
 
@@ -59,8 +64,8 @@ const navItems = computed(() => [
     tone: 'coral',
   },
   {
-    title: 'Cours avec coach',
-    subtitle: 'Sessions guidees',
+    title: isCoach.value ? 'Mes cours particuliers' : 'Cours avec coach',
+    subtitle: isCoach.value ? 'Offres et suivi client' : 'Sessions guidees',
     path: ROUTE_PATHS.coachCourses,
     icon: 'mdi-account-tie-outline',
     image: navCoachUrl,
@@ -68,8 +73,8 @@ const navItems = computed(() => [
     tone: 'teal',
   },
   {
-    title: 'Masterclass',
-    subtitle: 'Formats experts',
+    title: isCoach.value ? 'Mes masterclass' : 'Masterclass',
+    subtitle: isCoach.value ? 'Créer et mettre en avant' : 'Formats experts',
     path: ROUTE_PATHS.masterclass,
     icon: 'mdi-presentation-play',
     image: navMasterclassUrl,
@@ -117,6 +122,7 @@ const userInitials = computed(() => {
 })
 
 const isActive = (path) => route.path === path
+const isTourTarget = (target) => tourSpotlightActive.value && tourSpotlightTarget.value === target
 const hasUnreadBadge = (item) => Number(item.badge || 0) > 0
 const navStatusLabel = (item) => {
   if (hasUnreadBadge(item)) return String(item.badge)
@@ -300,6 +306,13 @@ const logout = async () => {
   router.push(ROUTE_PATHS.login)
 }
 
+const handleTourSpotlight = (event) => {
+  const detail = event?.detail || {}
+  tourSpotlightActive.value = !!detail.active
+  tourSpotlightTarget.value = detail.target || ''
+  tourSpotlightTone.value = detail.tone || 'teal'
+}
+
 watch(
   () => [auth.user?.uid, auth.profileLoaded, auth.hasOnboarded, route.path],
   ([uid]) => {
@@ -325,8 +338,17 @@ watch(
   }
 )
 
+onMounted(() => {
+  if (typeof window === 'undefined') return
+  tourSpotlightListener = (event) => handleTourSpotlight(event)
+  window.addEventListener('persuade-tour-spotlight', tourSpotlightListener)
+})
+
 onBeforeUnmount(() => {
   stopNotificationsPolling()
+  if (typeof window !== 'undefined' && tourSpotlightListener) {
+    window.removeEventListener('persuade-tour-spotlight', tourSpotlightListener)
+  }
 })
 </script>
 
@@ -412,7 +434,10 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="app-sidebar-hero__action"
-            :class="{ 'app-sidebar-hero__action--active': isActive(ROUTE_PATHS.profile) }"
+            :class="[
+              { 'app-sidebar-hero__action--active': isActive(ROUTE_PATHS.profile) },
+              isTourTarget('profile') ? `app-tour-spotlight app-tour-spotlight--${tourSpotlightTone}` : '',
+            ]"
             @click="goTo(ROUTE_PATHS.profile)"
           >
             <div class="app-profile-card__avatar-wrap">
@@ -445,6 +470,7 @@ onBeforeUnmount(() => {
                 :class="[
                   `app-sidebar-item--${item.tone}`,
                   { 'app-sidebar-item--active': isActive(item.path) },
+                  isTourTarget(item.path) ? `app-tour-spotlight app-tour-spotlight--${tourSpotlightTone}` : '',
                 ]"
                 @click="goTo(item.path)"
               >
@@ -487,7 +513,10 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="app-sidebar-utility-card app-sidebar-utility-card--mobile app-sidebar-utility-card--preferences"
-            :class="{ 'app-sidebar-utility-card--active': isActive(ROUTE_PATHS.preferences) }"
+            :class="[
+              { 'app-sidebar-utility-card--active': isActive(ROUTE_PATHS.preferences) },
+              isTourTarget(ROUTE_PATHS.preferences) ? `app-tour-spotlight app-tour-spotlight--${tourSpotlightTone}` : '',
+            ]"
             @click="goTo(ROUTE_PATHS.preferences)"
           >
             <span class="app-sidebar-utility-card__icon">
@@ -554,7 +583,10 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="app-sidebar-hero__action"
-            :class="{ 'app-sidebar-hero__action--active': isActive(ROUTE_PATHS.profile) }"
+            :class="[
+              { 'app-sidebar-hero__action--active': isActive(ROUTE_PATHS.profile) },
+              isTourTarget('profile') ? `app-tour-spotlight app-tour-spotlight--${tourSpotlightTone}` : '',
+            ]"
             @click="goTo(ROUTE_PATHS.profile)"
           >
             <div class="app-profile-card__avatar-wrap">
@@ -587,6 +619,7 @@ onBeforeUnmount(() => {
                 :class="[
                   `app-sidebar-item--${item.tone}`,
                   { 'app-sidebar-item--active': isActive(item.path) },
+                  isTourTarget(item.path) ? `app-tour-spotlight app-tour-spotlight--${tourSpotlightTone}` : '',
                 ]"
                 @click="goTo(item.path)"
               >
@@ -631,7 +664,10 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="app-sidebar-utility-card app-sidebar-utility-card--preferences"
-            :class="{ 'app-sidebar-utility-card--active': isActive(ROUTE_PATHS.preferences) }"
+            :class="[
+              { 'app-sidebar-utility-card--active': isActive(ROUTE_PATHS.preferences) },
+              isTourTarget(ROUTE_PATHS.preferences) ? `app-tour-spotlight app-tour-spotlight--${tourSpotlightTone}` : '',
+            ]"
             @click="goTo(ROUTE_PATHS.preferences)"
           >
             <span class="app-sidebar-utility-card__icon">
@@ -1485,6 +1521,50 @@ onBeforeUnmount(() => {
 .app-sidebar-item :deep(.v-list-item__content) {
   opacity: 1;
   min-width: 0;
+}
+
+.app-tour-spotlight {
+  position: relative;
+  isolation: isolate;
+}
+
+.app-tour-spotlight::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 24px;
+  border: 2px solid rgba(28, 124, 125, 0.42);
+  box-shadow:
+    0 0 0 10px rgba(28, 124, 125, 0.08),
+    0 18px 30px rgba(6, 18, 22, 0.2);
+  pointer-events: none;
+  animation: app-tour-pulse 1.8s ease-in-out infinite;
+}
+
+.app-tour-spotlight--gold::after {
+  border-color: rgba(245, 191, 71, 0.5);
+  box-shadow:
+    0 0 0 10px rgba(245, 191, 71, 0.12),
+    0 18px 30px rgba(6, 18, 22, 0.2);
+}
+
+.app-tour-spotlight--coral::after {
+  border-color: rgba(240, 90, 40, 0.48);
+  box-shadow:
+    0 0 0 10px rgba(240, 90, 40, 0.1),
+    0 18px 30px rgba(6, 18, 22, 0.2);
+}
+
+@keyframes app-tour-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+  50% {
+    transform: scale(1.01);
+    opacity: 1;
+  }
 }
 
 .app-sidebar-utility-card {

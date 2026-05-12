@@ -6,6 +6,7 @@ import courseRoutes from './routes/course.routes.js'
 import requestRoutes from './routes/request.routes.js'
 import masterclassRoutes from './routes/masterclass.routes.js'
 import chatRoutes from './routes/chat.routes.js'
+import followupRoutes from './routes/followup.routes.js'
 
 const app = express()
 const port = Number(process.env.PORT || 3001)
@@ -70,6 +71,7 @@ app.use('/api/courses', courseRoutes)
 app.use('/api/requests', requestRoutes)
 app.use('/api/masterclasses', masterclassRoutes)
 app.use('/api/chat', chatRoutes)
+app.use('/api/follow-up', followupRoutes)
 
 app.use('/api', (_req, res) => {
   res.status(404).json({ message: 'API route not found' })

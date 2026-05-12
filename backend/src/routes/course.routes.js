@@ -2,6 +2,7 @@ import express from 'express'
 import admin from '../firebaseAdmin.js'
 import { verifyToken } from '../middleware/authMiddleware.js'
 import { librarySeedCourses } from '../data/librarySeedCourses.js'
+import { logFirestoreWarning } from '../utils/firestoreErrors.js'
 
 const router = express.Router()
 
@@ -14,8 +15,8 @@ const DEFAULT_DURATION = '—'
 const DEFAULT_CATEGORY = 'Coaching'
 const DEFAULT_LANGUAGE = 'Français'
 const DEFAULT_COACHING_MODE = 'one_to_one'
-const PUBLIC_READ_TIMEOUT_MS = 2500
 const PUBLIC_CACHE_TTL_MS = 30 * 1000
+const PUBLIC_REFRESH_RETRY_MS = 60 * 1000
 
 const getUserProfile = async (uid) => {
   const doc = await usersCollection().doc(uid).get()
@@ -67,23 +68,24 @@ const sortCourses = (items) =>
     return toMillis(b.createdAt) - toMillis(a.createdAt)
   })
 
-const withTimeout = (promise, timeoutMs, label) =>
-  Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
-    }),
-  ])
-
 let publicCoursesCache = sortCourses(librarySeedCourses)
 let publicCoursesLastSyncAt = 0
 let publicCoursesRefreshPromise = null
+let publicCoursesLastRefreshAttemptAt = 0
+
+const shouldRefreshPublicCoursesCache = () => {
+  const now = Date.now()
+  const cacheIsStale = now - publicCoursesLastSyncAt > PUBLIC_CACHE_TTL_MS
+  const retryWindowPassed = now - publicCoursesLastRefreshAttemptAt > PUBLIC_REFRESH_RETRY_MS
+  return cacheIsStale && retryWindowPassed
+}
 
 const refreshPublicCoursesCache = async () => {
   if (publicCoursesRefreshPromise) return publicCoursesRefreshPromise
 
+  publicCoursesLastRefreshAttemptAt = Date.now()
   publicCoursesRefreshPromise = (async () => {
-    const snapshot = await withTimeout(collection().get(), PUBLIC_READ_TIMEOUT_MS, 'courses fetch')
+    const snapshot = await collection().get()
     const storedCourses = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
@@ -154,11 +156,9 @@ const buildCoursePayload = (body, user, profile, options = {}) => {
 const collection = () => routerCollection()
 
 router.get('/', async (_req, res) => {
-  const cacheIsStale = Date.now() - publicCoursesLastSyncAt > PUBLIC_CACHE_TTL_MS
-
-  if (cacheIsStale) {
+  if (shouldRefreshPublicCoursesCache()) {
     refreshPublicCoursesCache().catch((error) => {
-      console.error('GET /api/courses refresh failed:', error)
+      logFirestoreWarning('GET /api/courses refresh failed', error)
     })
   }
 
