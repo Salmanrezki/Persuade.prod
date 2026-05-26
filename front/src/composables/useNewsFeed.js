@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
-import { getCourses, getMasterclasses } from '@/services/contentService'
+import { getCourses } from '@/services/contentService'
 import { ROUTE_PATHS } from '@/router/paths'
+import { curatedMasterclasses } from '@/data/curatedMasterclasses'
 
 const items = ref([])
 const loading = ref(false)
@@ -38,21 +39,20 @@ const formatShortDate = (value) => {
 
 const buildMasterclassItems = (entries) =>
   entries
-    .filter((item) => item?.status !== 'cancelled')
-    .filter((item) => item?.title || item?.subtitle || item?.scheduleAt)
+    .filter((item) => item?.title || item?.subtitle || item?.sortDate)
     .map((item) => ({
       id: `masterclass-${item.id}`,
       type: 'masterclass',
       title: item.title,
       subtitle: item.subtitle || 'Session a venir',
-      meta: item.scheduleAt ? `Le ${formatShortDate(item.scheduleAt)}` : 'Programmation en cours',
+      meta: item.displayDate || (item.sortDate ? `Le ${formatShortDate(item.sortDate)}` : 'Programmation en cours'),
       route: ROUTE_PATHS.masterclass,
       label: 'Masterclass',
       cta: 'Voir la session',
-      image: item.coverImage || '',
+      image: '',
       icon: 'mdi-presentation-play',
       tone: 'gold',
-      sortValue: item.scheduleAt ? toMillis(item.scheduleAt) : Number.MAX_SAFE_INTEGER,
+      sortValue: item.sortDate ? toMillis(item.sortDate) : Number.MAX_SAFE_INTEGER,
     }))
     .sort((left, right) => left.sortValue - right.sortValue)
 
@@ -69,7 +69,7 @@ const buildCourseItems = (entries, options) =>
       route: options.route,
       label: options.label,
       cta: options.cta,
-      image: item.coverImage || '',
+      image: options.showImage ? item.coverImage || '' : '',
       icon: options.icon,
       tone: options.tone,
       sortValue: toMillis(item.createdAt || item.updatedAt),
@@ -107,19 +107,11 @@ const fetchNewsFeed = async ({ force = false } = {}) => {
     error.value = ''
 
     try {
-      const [coursesRes, masterclassesRes] = await Promise.allSettled([
-        getCourses(),
-        getMasterclasses(),
-      ])
+      const [coursesRes] = await Promise.allSettled([getCourses()])
 
       const courseEntries =
         coursesRes.status === 'fulfilled' && Array.isArray(coursesRes.value) ? coursesRes.value : []
-      const masterclassEntries =
-        masterclassesRes.status === 'fulfilled' && Array.isArray(masterclassesRes.value)
-          ? masterclassesRes.value
-          : []
-
-      const masterclassItems = buildMasterclassItems(masterclassEntries).slice(0, 4)
+      const masterclassItems = buildMasterclassItems(curatedMasterclasses).slice(0, 2)
       const libraryItems = buildCourseItems(courseEntries, {
         prefix: 'library-course',
         route: ROUTE_PATHS.courses,
@@ -127,6 +119,7 @@ const fetchNewsFeed = async ({ force = false } = {}) => {
         cta: 'Voir le cours',
         icon: 'mdi-play-circle-outline',
         tone: 'teal',
+        showImage: false,
         filter: (item) => item?.type === 'library' || !item?.coachId,
       }).slice(0, 4)
       const coachItems = buildCourseItems(courseEntries, {
@@ -136,10 +129,11 @@ const fetchNewsFeed = async ({ force = false } = {}) => {
         cta: 'Voir le parcours',
         icon: 'mdi-account-tie-outline',
         tone: 'coral',
+        showImage: true,
         filter: (item) => !!item?.coachId,
       }).slice(0, 3)
 
-      const nextItems = interleaveItems([libraryItems, coachItems, masterclassItems], 6)
+      const nextItems = interleaveItems([masterclassItems, libraryItems, coachItems], 6)
       items.value = nextItems
       lastFetchedAt = Date.now()
       return items.value

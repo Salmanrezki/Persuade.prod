@@ -1,7 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import api from '@/services/api'
-import logoUrl from '@/assets/logo.png'
 import { db } from '@/services/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { getUserProfile } from '@/services/userService'
@@ -26,6 +25,8 @@ const coachRequests = ref([])
 
 const dialog = ref(false)
 const activeCourse = ref(null)
+const coachDialog = ref(false)
+const activeCoachProfile = ref(null)
 
 const actionCourseId = ref('')
 const updatingRequestId = ref('')
@@ -115,7 +116,7 @@ const isCoach = computed(() => role.value === 'coach')
 const isLearner = computed(() => role.value === 'apprenant')
 const isEditingCourse = computed(() => !!editingCourseId.value)
 const formTitle = computed(() =>
-  isEditingCourse.value ? 'Modifier un cours avec coach' : 'Créer un cours avec coach'
+  isEditingCourse.value ? 'Modifier un cours particulier' : 'Créer un cours particulier'
 )
 const formSubtitle = computed(() =>
   isEditingCourse.value
@@ -183,6 +184,11 @@ const openCourse = (course) => {
   activeCourse.value = course
   dialog.value = true
   recordViewedCourse(auth.user?.uid, course)
+}
+
+const openCoachProfile = (coach) => {
+  activeCoachProfile.value = coach
+  coachDialog.value = true
 }
 
 const parseLineList = (value) =>
@@ -356,6 +362,11 @@ const learnerCoachSpotlights = computed(() => {
         sector: coachProfile.sectorDetail || coachProfile.sector || '',
         seniority: coachProfile.seniority || '',
         availability: coachProfile.availability || '',
+        meta: [
+          coachProfile.sectorDetail || coachProfile.sector || '',
+          coachProfile.seniority || '',
+          coachProfile.availability || '',
+        ].filter(Boolean),
         courseCount: 0,
         featuredCount: 0,
         categories: new Set(),
@@ -409,6 +420,9 @@ const coachMetaForCourse = (course) => {
     coachProfile?.availability,
   ].filter(Boolean)
 }
+
+const coursesForCoachProfile = (coachUid) =>
+  sortItems(coachCourses.value.filter((course) => course.coachId === coachUid)).slice(0, 4)
 
 const canCancelRequest = (request) => request?.status === 'pending'
 
@@ -775,14 +789,7 @@ onMounted(async () => {
         <v-card class="coach-hero-card" elevation="8">
           <div class="coach-hero-content">
             <div class="coach-hero-left">
-              <div class="coach-brand">
-                <v-img :src="logoUrl" alt="Logo Persuade" width="72" height="72" class="coach-logo" />
-                <div class="coach-brand-text">Persuade</div>
-              </div>
-              <div class="coach-hero-title">{{ isCoach ? 'Mes cours particuliers' : 'Cours avec coach' }}</div>
-              <div class="coach-hero-subtitle">
-                {{ isCoach ? 'Créez vos accompagnements individuels, suivez les demandes et pilotez votre relation client.' : 'Découvrez les accompagnements coach avec détails, bénéfices et modalités.' }}
-              </div>
+              <div class="coach-hero-title">Cours particuliers</div>
             </div>
 
             <div class="coach-hero-stats">
@@ -814,10 +821,10 @@ onMounted(async () => {
           {{ errorMessage }}
         </v-alert>
 
-        <div v-if="!loading" class="coach-filters">
+        <div v-if="false && !loading" class="coach-filters">
           <v-text-field
             v-model="searchQuery"
-            :label="isCoach ? 'Rechercher un cours particulier' : 'Rechercher un cours coach'"
+            :label="'Rechercher un cours particulier'"
             variant="outlined"
             density="comfortable"
             hide-details
@@ -874,7 +881,7 @@ onMounted(async () => {
           />
         </div>
 
-        <div v-if="isCoach && !loading" class="coach-dashboard">
+        <div v-if="false && isCoach && !loading" class="coach-dashboard">
           <div class="coach-dashboard-grid">
             <v-card
               v-for="card in coachDashboardCards"
@@ -946,59 +953,10 @@ onMounted(async () => {
         </div>
 
         <div v-if="isLearner && !loading" class="learner-dashboard">
-          <div class="learner-dashboard-grid">
-            <v-card
-              v-for="card in learnerOverviewCards"
-              :key="card.label"
-              class="learner-dashboard-card"
-              elevation="4"
-            >
-              <div class="learner-dashboard-card-top">
-                <div class="learner-dashboard-icon">
-                  <v-icon size="20">{{ card.icon }}</v-icon>
-                </div>
-                <div class="learner-dashboard-value">{{ card.value }}</div>
-              </div>
-              <div class="learner-dashboard-label">{{ card.label }}</div>
-              <div class="learner-dashboard-hint">{{ card.hint }}</div>
-            </v-card>
-          </div>
-
-          <v-card class="learner-illustration-card" elevation="4">
-            <div class="learner-illustration-copy">
-              <div class="coach-panel-title">Choisir un coach plus facilement</div>
-              <div class="coach-panel-subtitle">
-                Identifiez le coach, sa spécialité, le format, les bénéfices et les prérequis avant d’envoyer une demande.
-              </div>
-              <div class="learner-illustration-points">
-                <span class="learner-illustration-pill">Profil coach visible</span>
-                <span class="learner-illustration-pill">Objectifs détaillés</span>
-                <span class="learner-illustration-pill">Annulation simple</span>
-              </div>
-            </div>
-
-            <div class="learner-illustration-visual" aria-hidden="true">
-              <div class="learner-visual-card learner-visual-card--primary">
-                <div class="learner-visual-avatar"></div>
-                <div class="learner-visual-lines">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-              </div>
-              <div class="learner-visual-card learner-visual-card--secondary">
-                <div class="learner-visual-badge"></div>
-                <div class="learner-visual-progress"></div>
-              </div>
-              <div class="learner-visual-orbit learner-visual-orbit--one"></div>
-              <div class="learner-visual-orbit learner-visual-orbit--two"></div>
-            </div>
-          </v-card>
-
           <v-card class="learner-coaches-card" elevation="4">
-            <div class="coach-panel-title">Coachs à découvrir</div>
+            <div class="coach-panel-title">Coachs de la plateforme</div>
             <div class="coach-panel-subtitle">
-              Les coachs les plus présents sur cette section, avec leur spécialité et leurs formats.
+              Découvrez les coachs disponibles et ouvrez leur fiche pour voir leur profil et leurs cours.
             </div>
 
             <div v-if="learnerCoachSpotlights.length" class="learner-coaches-grid">
@@ -1021,9 +979,6 @@ onMounted(async () => {
                   </div>
                   <div class="learner-coach-tags">
                     <span class="learner-coach-tag">{{ coach.courseCount }} cours</span>
-                    <span class="learner-coach-tag" v-if="coach.featuredCount">
-                      {{ coach.featuredCount }} mis en avant
-                    </span>
                     <span
                       v-for="category in coach.categories"
                       :key="`${coach.uid}-${category}`"
@@ -1032,6 +987,9 @@ onMounted(async () => {
                       {{ category }}
                     </span>
                   </div>
+                  <v-btn class="coach-action-btn-outline" size="small" @click="openCoachProfile(coach)">
+                    En savoir plus
+                  </v-btn>
                 </div>
               </div>
             </div>
@@ -1040,31 +998,44 @@ onMounted(async () => {
           </v-card>
         </div>
 
-        <div v-if="!loading && sortedFeaturedCourses.length" class="coach-section">
+        <div v-if="false && !loading && sortedFeaturedCourses.length" class="coach-section">
           <div class="coach-section-title">Sélection coach</div>
           <div class="coach-section-subtitle">Les accompagnements les plus visibles du moment.</div>
         </div>
 
-        <v-row v-if="!loading && sortedFeaturedCourses.length" class="coach-list">
+        <v-row v-if="false && !loading && sortedFeaturedCourses.length" class="coach-list">
           <v-col cols="12" md="6" v-for="course in sortedFeaturedCourses" :key="`featured-${course.id}`">
             <v-card class="coach-card coach-card--featured" elevation="6">
-              <div class="coach-card-cover" :style="coverStyle(course)">
-                <div class="coach-card-cover-top">
-                  <div class="coach-card-pill">{{ course.level || 'Tous niveaux' }}</div>
-                  <div class="coach-card-pill coach-card-pill--ghost">{{ coachingModeLabel(course.coachingMode) }}</div>
-                </div>
-                <div class="coach-card-cover-bottom">
-                  <div class="coach-card-badge">À la une</div>
-                  <div class="coach-card-cover-title">{{ course.title }}</div>
-                  <div v-if="course.subtitle" class="coach-card-cover-subtitle">{{ course.subtitle }}</div>
-                </div>
-              </div>
-
               <div class="coach-card-body">
-                <div class="coach-card-inline-chips">
+                <div class="coach-card-head">
+                  <div class="coach-card-head-top">
+                    <div class="coach-card-badge">À la une</div>
+                    <div class="coach-card-pill coach-card-pill--ghost">{{ coachingModeLabel(course.coachingMode) }}</div>
+                  </div>
+                  <div class="coach-card-title">{{ course.title }}</div>
+                  <div v-if="course.subtitle" class="coach-card-subtitle">{{ course.subtitle }}</div>
+                </div>
+
+                <div class="coach-card-inline-chips coach-card-inline-chips--top">
+                  <span class="coach-inline-chip">{{ course.level || 'Tous niveaux' }}</span>
                   <span class="coach-inline-chip">{{ course.category || 'Coaching' }}</span>
                   <span class="coach-inline-chip">{{ course.language || 'Français' }}</span>
                   <span class="coach-inline-chip" v-if="course.sessionCount">{{ course.sessionCount }}</span>
+                </div>
+
+                <div class="coach-card-overview">
+                  <div class="coach-card-kpi">
+                    <span class="coach-card-kpi__label">Tarif</span>
+                    <strong class="coach-card-kpi__value">{{ course.price || 'Sur demande' }}</strong>
+                  </div>
+                  <div class="coach-card-kpi">
+                    <span class="coach-card-kpi__label">Durée</span>
+                    <strong class="coach-card-kpi__value">{{ course.duration || '—' }}</strong>
+                  </div>
+                  <div class="coach-card-kpi">
+                    <span class="coach-card-kpi__label">Format</span>
+                    <strong class="coach-card-kpi__value">{{ coachingModeLabel(course.coachingMode) }}</strong>
+                  </div>
                 </div>
 
                 <div class="coach-card-description">{{ course.description }}</div>
@@ -1094,16 +1065,16 @@ onMounted(async () => {
                     <span>{{ coachNameForCourse(course) }}</span>
                   </div>
                   <div class="coach-card-highlight">
-                    <v-icon size="18">mdi-cash</v-icon>
-                    <span>{{ course.price || 'Sur demande' }}</span>
-                  </div>
-                  <div class="coach-card-highlight">
-                    <v-icon size="18">mdi-timer-outline</v-icon>
-                    <span>{{ course.duration || '—' }}</span>
+                    <v-icon size="18">mdi-folder-outline</v-icon>
+                    <span>{{ course.category || 'Coaching' }}</span>
                   </div>
                   <div class="coach-card-highlight" v-if="course.meetingLink">
                     <v-icon size="18">mdi-link-variant</v-icon>
                     <span>Lien de session prêt</span>
+                  </div>
+                  <div class="coach-card-highlight" v-if="course.targetAudience">
+                    <v-icon size="18">mdi-bullseye-arrow</v-icon>
+                    <span>{{ course.targetAudience }}</span>
                   </div>
                 </div>
 
@@ -1189,27 +1160,46 @@ onMounted(async () => {
         </v-row>
 
         <div v-if="!loading" class="coach-section">
-          <div class="coach-section-title">{{ isCoach ? 'Mes cours particuliers' : 'Cours avec coach' }}</div>
+          <div class="coach-section-title">Cours particuliers</div>
           <div class="coach-section-subtitle">
-            {{ isCoach ? 'Vos accompagnements publiés, réservables et suivis côté coach.' : 'Sélectionnez un accompagnement et envoyez une demande.' }}
+            {{ isCoach ? 'Cours visibles sur la plateforme.' : 'Parcourez les cours disponibles et ouvrez leur fiche.' }}
           </div>
         </div>
 
         <v-row v-if="!loading" class="coach-list">
           <v-col cols="12" md="4" v-for="course in paginatedCoachCourses" :key="course.id">
             <v-card class="coach-card" elevation="6">
-              <div class="coach-card-cover coach-card-cover--compact" :style="coverStyle(course)">
-                <div class="coach-card-cover-top">
-                  <div class="coach-card-pill">{{ course.level || 'Tous niveaux' }}</div>
-                  <div class="coach-card-pill coach-card-pill--ghost">{{ coachingModeLabel(course.coachingMode) }}</div>
-                </div>
-                <div class="coach-card-cover-bottom">
-                  <div class="coach-card-cover-title">{{ course.title }}</div>
-                  <div v-if="course.subtitle" class="coach-card-cover-subtitle">{{ course.subtitle }}</div>
-                </div>
-              </div>
-
               <div class="coach-card-body">
+                <div class="coach-card-head coach-card-head--compact">
+                  <div class="coach-card-head-top">
+                    <div class="coach-card-pill">{{ course.level || 'Tous niveaux' }}</div>
+                    <div class="coach-card-pill coach-card-pill--ghost">{{ coachingModeLabel(course.coachingMode) }}</div>
+                  </div>
+                  <div class="coach-card-title">{{ course.title }}</div>
+                  <div v-if="course.subtitle" class="coach-card-subtitle">{{ course.subtitle }}</div>
+                </div>
+
+                <div class="coach-card-inline-chips coach-card-inline-chips--top">
+                  <span class="coach-inline-chip">{{ course.category || 'Coaching' }}</span>
+                  <span class="coach-inline-chip">{{ course.language || 'Français' }}</span>
+                  <span class="coach-inline-chip" v-if="course.sessionCount">{{ course.sessionCount }}</span>
+                </div>
+
+                <div class="coach-card-overview coach-card-overview--compact">
+                  <div class="coach-card-kpi">
+                    <span class="coach-card-kpi__label">Tarif</span>
+                    <strong class="coach-card-kpi__value">{{ course.price || 'Sur demande' }}</strong>
+                  </div>
+                  <div class="coach-card-kpi">
+                    <span class="coach-card-kpi__label">Durée</span>
+                    <strong class="coach-card-kpi__value">{{ course.duration || '—' }}</strong>
+                  </div>
+                  <div class="coach-card-kpi">
+                    <span class="coach-card-kpi__label">Format</span>
+                    <strong class="coach-card-kpi__value">{{ coachingModeLabel(course.coachingMode) }}</strong>
+                  </div>
+                </div>
+
                 <div class="coach-card-description">{{ course.description }}</div>
 
                 <div v-if="isLearner" class="learner-coach-profile learner-coach-profile--compact">
@@ -1230,28 +1220,16 @@ onMounted(async () => {
 
                 <div class="coach-card-meta">
                   <div class="coach-card-line">
-                    <v-icon size="18">mdi-account-circle</v-icon>
-                    <span>{{ coachNameForCourse(course) }}</span>
-                  </div>
-                  <div class="coach-card-line">
                     <v-icon size="18">mdi-folder-outline</v-icon>
                     <span>{{ course.category || 'Coaching' }}</span>
                   </div>
                   <div class="coach-card-line">
-                    <v-icon size="18">mdi-translate</v-icon>
-                    <span>{{ course.language || 'Français' }}</span>
+                    <v-icon size="18">mdi-account-circle</v-icon>
+                    <span>{{ coachNameForCourse(course) }}</span>
                   </div>
-                  <div class="coach-card-line">
-                    <v-icon size="18">mdi-cash</v-icon>
-                    <span>{{ course.price || 'Sur demande' }}</span>
-                  </div>
-                  <div class="coach-card-line" v-if="course.sessionCount">
-                    <v-icon size="18">mdi-counter</v-icon>
-                    <span>{{ course.sessionCount }}</span>
-                  </div>
-                  <div class="coach-card-line">
-                    <v-icon size="18">mdi-timer-outline</v-icon>
-                    <span>{{ course.duration || '—' }}</span>
+                  <div class="coach-card-line" v-if="course.meetingLink">
+                    <v-icon size="18">mdi-link-variant</v-icon>
+                    <span>Lien de session disponible</span>
                   </div>
                 </div>
 
@@ -1285,34 +1263,11 @@ onMounted(async () => {
 
                 <div class="coach-card-actions">
                   <v-btn class="coach-action-btn-outline" size="large" @click="openCourse(course)">
-                    Voir détails
-                  </v-btn>
-                  <v-btn
-                    v-if="isLearner && !requestMap[course.id]"
-                    class="coach-card-btn"
-                    size="large"
-                    :loading="actionCourseId === course.id"
-                    @click="requestCourse(course)"
-                  >
-                    Demander un cours
-                  </v-btn>
-                  <v-btn
-                    v-if="isLearner && requestMap[course.id]"
-                    :class="canCancelRequest(requestMap[course.id]) ? 'coach-action-btn-danger' : 'coach-action-btn-outline'"
-                    size="large"
-                    :loading="cancellingRequestId === requestMap[course.id].id"
-                    :disabled="!canCancelRequest(requestMap[course.id])"
-                    @click="cancelRequest(requestMap[course.id])"
-                  >
-                    {{
-                      canCancelRequest(requestMap[course.id])
-                        ? 'Annuler la demande'
-                        : statusLabel(requestMap[course.id].status)
-                    }}
+                    En savoir plus
                   </v-btn>
                 </div>
 
-                <div v-if="isCoach && isOwnedCourse(course)" class="coach-owner-actions">
+                <div v-if="false && isCoach && isOwnedCourse(course)" class="coach-owner-actions">
                   <v-btn
                     class="coach-action-btn-outline"
                     size="small"
@@ -1350,7 +1305,7 @@ onMounted(async () => {
           />
         </div>
 
-        <div v-if="isCoach" class="coach-panel">
+        <div v-if="false && isCoach" class="coach-panel">
           <div class="coach-panel-header">
             <div>
               <div class="coach-panel-title">Réordonner la mise en avant</div>
@@ -1395,7 +1350,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div v-if="isCoach" class="coach-panel">
+        <div v-if="false && isCoach" class="coach-panel">
           <div class="coach-panel-header">
             <div>
               <div class="coach-panel-title">{{ formTitle }}</div>
@@ -1412,7 +1367,7 @@ onMounted(async () => {
           </div>
 
           <div class="coach-form-cover">
-            <div class="coach-form-cover-preview" :style="coverStyle({ coverImage: coverPreview || '' })">
+            <div class="coach-form-cover-preview">
               <div class="coach-form-cover-overlay">
                 <div class="coach-form-cover-label">Aperçu couverture</div>
                 <div class="coach-form-cover-title">{{ newCoachCourse.title || 'Titre du cours particulier' }}</div>
@@ -1546,7 +1501,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div v-if="isLearner" class="coach-panel">
+        <div v-if="false && isLearner" class="coach-panel">
           <div class="coach-panel-title">Mes demandes</div>
           <div class="coach-panel-subtitle">Suivez l’état de vos demandes.</div>
 
@@ -1580,7 +1535,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div v-if="isCoach" class="coach-panel">
+        <div v-if="false && isCoach" class="coach-panel">
           <div class="coach-panel-title">Demandes reçues</div>
           <div class="coach-panel-subtitle">Acceptez ou refusez les demandes.</div>
 
@@ -1627,7 +1582,7 @@ onMounted(async () => {
 
     <v-dialog v-model="dialog" max-width="960">
       <v-card class="course-dialog" elevation="10">
-        <div class="course-dialog-cover" :style="coverStyle(activeCourse)">
+        <div class="course-dialog-cover">
           <div class="course-dialog-cover-top">
             <div class="coach-card-pill">{{ activeCourse?.level || 'Tous niveaux' }}</div>
             <div class="coach-card-pill coach-card-pill--ghost">{{ coachingModeLabel(activeCourse?.coachingMode) }}</div>
@@ -1752,6 +1707,64 @@ onMounted(async () => {
         </div>
       </v-card>
     </v-dialog>
+
+    <v-dialog v-model="coachDialog" max-width="760">
+      <v-card class="course-dialog" elevation="10">
+        <div class="course-dialog-cover course-dialog-cover--plain">
+          <div class="course-dialog-cover-bottom">
+            <div class="course-dialog-title">{{ activeCoachProfile?.name || 'Coach' }}</div>
+            <div class="course-dialog-subtitle">{{ activeCoachProfile?.headline || 'Coach de la plateforme' }}</div>
+          </div>
+          <v-btn icon="mdi-close" variant="text" class="course-dialog-close" @click="coachDialog = false"></v-btn>
+        </div>
+
+        <div class="course-dialog-content">
+          <div class="course-dialog-grid">
+            <div class="course-dialog-main">
+              <div v-if="activeCoachProfile?.meta?.length" class="course-dialog-coach-meta">
+                <span
+                  v-for="item in activeCoachProfile.meta"
+                  :key="`coach-dialog-meta-${item}`"
+                  class="course-dialog-coach-chip"
+                >
+                  {{ item }}
+                </span>
+              </div>
+
+              <div class="course-dialog-block">
+                <div class="course-dialog-block-title">Cours disponibles</div>
+                <div class="coach-card-list">
+                  <div
+                    v-for="course in coursesForCoachProfile(activeCoachProfile?.uid)"
+                    :key="`coach-course-${course.id}`"
+                    class="coach-card-list-item"
+                  >
+                    {{ course.title }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="course-dialog-side">
+              <div class="course-dialog-side-card">
+                <div class="course-dialog-side-line">
+                  <v-icon size="18">mdi-folder-outline</v-icon>
+                  <span>{{ activeCoachProfile?.courseCount || 0 }} cours</span>
+                </div>
+                <div class="course-dialog-side-line" v-if="activeCoachProfile?.sector">
+                  <v-icon size="18">mdi-briefcase-outline</v-icon>
+                  <span>{{ activeCoachProfile.sector }}</span>
+                </div>
+                <div class="course-dialog-side-line" v-if="activeCoachProfile?.seniority">
+                  <v-icon size="18">mdi-star-outline</v-icon>
+                  <span>{{ activeCoachProfile.seniority }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -1785,10 +1798,10 @@ onMounted(async () => {
 
 .coach-hero-card {
   border-radius: 28px;
-  padding: 24px;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(19, 58, 59, 0.1);
-  box-shadow: 0 20px 45px rgba(12, 31, 32, 0.16);
+  padding: 20px 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 241, 233, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  box-shadow: 0 24px 56px rgba(21, 18, 14, 0.1);
 }
 
 .coach-hero-content {
@@ -1799,41 +1812,13 @@ onMounted(async () => {
   gap: 24px;
 }
 
-.coach-brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 12px;
-}
-
-.coach-logo {
-  border-radius: 20px;
-  background: #fff;
-  padding: 8px;
-  box-shadow: 0 14px 26px rgba(12, 31, 32, 0.18);
-}
-
-.coach-brand-text {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 18px;
-  font-weight: 600;
-  color: #133a3b;
-  letter-spacing: 0.02em;
-}
-
 .coach-hero-title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 26px;
-  font-weight: 700;
+  font-family: 'Space Grotesk', 'DM Sans', 'Avenir Next', 'Segoe UI', sans-serif;
+  font-size: clamp(1.35rem, 1.8vw, 1.7rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
   color: #133a3b;
-}
-
-.coach-hero-subtitle {
-  margin-top: 6px;
-  max-width: 720px;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 15px;
-  color: rgba(19, 58, 59, 0.7);
 }
 
 .coach-hero-stats {
@@ -1846,20 +1831,20 @@ onMounted(async () => {
   min-width: 120px;
   padding: 14px 16px;
   border-radius: 18px;
-  background: rgba(19, 58, 59, 0.05);
-  border: 1px solid rgba(19, 58, 59, 0.08);
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(28, 26, 22, 0.08);
 }
 
 .coach-hero-stat {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 30px;
   font-weight: 700;
-  color: #133a3b;
+  color: #1c1a16;
 }
 
 .coach-hero-label {
   font-size: 12px;
-  color: rgba(19, 58, 59, 0.6);
+  color: #625b53;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -2257,9 +2242,11 @@ onMounted(async () => {
 }
 
 .coach-section-title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 20px;
+  font-family: 'Space Grotesk', 'DM Sans', 'Avenir Next', 'Segoe UI', sans-serif;
+  font-size: 15px;
   font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
   color: #133a3b;
 }
 
@@ -2291,7 +2278,7 @@ onMounted(async () => {
 }
 
 .coach-card--featured {
-  border-color: rgba(245, 177, 63, 0.22);
+  border-color: rgba(19, 58, 59, 0.08);
 }
 
 .coach-card-cover {
@@ -2326,14 +2313,14 @@ onMounted(async () => {
   align-items: center;
   padding: 7px 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(10px);
+  background: rgba(19, 58, 59, 0.07);
+  color: #133a3b;
   font-size: 12px;
   font-weight: 700;
 }
 
 .coach-card-pill--ghost {
-  background: rgba(8, 23, 23, 0.24);
+  background: rgba(19, 58, 59, 0.1);
 }
 
 .coach-card-badge {
@@ -2341,8 +2328,8 @@ onMounted(async () => {
   align-items: center;
   padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(245, 177, 63, 0.92);
-  color: #3e2200;
+  background: rgba(19, 58, 59, 0.08);
+  color: #133a3b;
   font-size: 12px;
   font-weight: 700;
 }
@@ -2365,6 +2352,38 @@ onMounted(async () => {
   padding: 20px;
   display: grid;
   gap: 14px;
+}
+
+.coach-card-head {
+  display: grid;
+  gap: 10px;
+  padding: 0 0 2px;
+}
+
+.coach-card-head--compact {
+  gap: 8px;
+}
+
+.coach-card-head-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.coach-card-title {
+  color: #133a3b;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.coach-card-subtitle {
+  color: rgba(19, 58, 59, 0.72);
+  font-size: 14px;
+  line-height: 1.45;
 }
 
 .learner-coach-profile {
@@ -2401,6 +2420,10 @@ onMounted(async () => {
   gap: 8px;
 }
 
+.coach-card-inline-chips--top {
+  margin-top: -2px;
+}
+
 .coach-inline-chip {
   display: inline-flex;
   align-items: center;
@@ -2412,9 +2435,43 @@ onMounted(async () => {
   font-weight: 600;
 }
 
+.coach-card-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.coach-card-overview--compact {
+  gap: 8px;
+}
+
+.coach-card-kpi {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(244, 249, 248, 0.96), rgba(255, 255, 255, 0.98));
+  border: 1px solid rgba(19, 58, 59, 0.08);
+}
+
+.coach-card-kpi__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(19, 58, 59, 0.52);
+}
+
+.coach-card-kpi__value {
+  font-size: 15px;
+  line-height: 1.3;
+  color: #133a3b;
+}
+
 .coach-card-description {
   font-size: 14px;
   color: rgba(19, 58, 59, 0.72);
+  line-height: 1.6;
 }
 
 .coach-card-highlights {
@@ -2449,6 +2506,10 @@ onMounted(async () => {
   gap: 8px;
 }
 
+.coach-card-meta {
+  padding-top: 2px;
+}
+
 .coach-card-stats {
   display: flex;
   flex-wrap: wrap;
@@ -2470,6 +2531,9 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(19, 58, 59, 0.04);
   font-size: 13px;
   color: rgba(19, 58, 59, 0.65);
 }
@@ -2564,9 +2628,11 @@ onMounted(async () => {
 }
 
 .coach-panel-title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 18px;
+  font-family: 'Space Grotesk', 'DM Sans', 'Avenir Next', 'Segoe UI', sans-serif;
+  font-size: 15px;
   font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
   color: #133a3b;
 }
 
@@ -2632,11 +2698,8 @@ onMounted(async () => {
   min-height: 220px;
   border-radius: 22px;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(8, 23, 23, 0.08), rgba(8, 23, 23, 0.58)),
-    linear-gradient(130deg, #1c7c7d, #133a3b 55%, #f2b03f);
-  background-size: cover;
-  background-position: center;
+  background: #f8fbfb;
+  border: 1px solid rgba(19, 58, 59, 0.08);
   display: flex;
 }
 
@@ -2647,7 +2710,7 @@ onMounted(async () => {
   flex-direction: column;
   justify-content: flex-end;
   gap: 8px;
-  color: #fff;
+  color: #133a3b;
 }
 
 .coach-form-cover-label {
@@ -2655,7 +2718,7 @@ onMounted(async () => {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(19, 58, 59, 0.58);
 }
 
 .coach-form-cover-title {
@@ -2748,12 +2811,9 @@ onMounted(async () => {
   position: relative;
   min-height: 220px;
   padding: 20px;
-  background:
-    linear-gradient(180deg, rgba(8, 23, 23, 0.08), rgba(8, 23, 23, 0.58)),
-    linear-gradient(130deg, #1c7c7d, #133a3b 55%, #f2b03f);
-  background-size: cover;
-  background-position: center;
-  color: #fff;
+  background: #f8fbfb;
+  border-bottom: 1px solid rgba(19, 58, 59, 0.08);
+  color: #133a3b;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -2763,7 +2823,7 @@ onMounted(async () => {
   position: absolute;
   top: 12px;
   right: 12px;
-  color: #fff;
+  color: #133a3b;
 }
 
 .course-dialog-content {
@@ -2880,6 +2940,7 @@ onMounted(async () => {
   .coach-dashboard-grid,
   .coach-dashboard-panels,
   .coach-filters,
+  .coach-card-overview,
   .coach-card-highlights,
   .coach-form-cover,
   .course-dialog-grid {

@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import api from '@/services/api'
-import logoUrl from '@/assets/logo.png'
 import { useAuthStore } from '@/stores/auth'
 import { getUserProfile } from '@/services/userService'
 import { getCourses, invalidateContent } from '@/services/contentService'
@@ -9,6 +9,7 @@ import { recordViewedCourse } from '@/services/learningActivityService'
 
 const LIBRARY_IMAGE_MAX_SIZE = 1024 * 1024 * 1.5
 const auth = useAuthStore()
+const route = useRoute()
 
 const courses = ref([])
 const profile = ref(null)
@@ -33,6 +34,10 @@ const reorderLoading = ref(false)
 
 const dialog = ref(false)
 const activeCourse = ref(null)
+const expandedVideoId = ref('')
+const expandedLibraryCourseId = ref('')
+const externalVideoDialog = ref(false)
+const activeExternalVideo = ref(null)
 
 const newLibraryCourse = ref(createEmptyLibraryCourse())
 
@@ -182,6 +187,127 @@ const isVideoFile = computed(() => {
 })
 const embeddedVideoUrl = computed(() => normalizeVideoUrl(activeCourse.value?.videoUrl || ''))
 const coverPreview = computed(() => newLibraryCourse.value.coverImage || '')
+
+const externalNegotiationVideos = [
+  {
+    id: 'yt-WzHPqGWIAKI',
+    title: 'Closing : techniques et posture de vente',
+    subtitle: 'Nouvelle vidéo francophone ajoutée à la sélection.',
+    description:
+      'Un contenu supplémentaire en français autour du closing, de la posture commerciale et de la conduite d’échange.',
+    source: 'YouTube',
+    channel: 'Sélection francophone',
+    level: 'Intermédiaire',
+    duration: 'À visionner',
+    topic: 'Closing',
+    cta: 'Regarder sur la plateforme',
+    videoUrl: 'https://www.youtube.com/watch?v=WzHPqGWIAKI',
+    thumbnailUrl: 'https://i.ytimg.com/vi/WzHPqGWIAKI/hqdefault.jpg',
+    notes: [
+      'Vidéo ajoutée depuis ton lien',
+      'Approche pratique orientée closing',
+      'Complète bien la sélection francophone',
+    ],
+  },
+  {
+    id: 'yt-ehFdn0PkRaA',
+    title: 'Closing et posture de négociation',
+    subtitle: 'Vidéo de référence francophone fournie comme inspiration.',
+    description:
+      'Un contenu orienté closing, persuasion et conduite d’échange pour travailler la posture de négociation.',
+    source: 'YouTube',
+    channel: 'Sélection francophone',
+    level: 'Intermédiaire',
+    duration: 'À visionner',
+    topic: 'Closing',
+    cta: 'Voir sur YouTube',
+    videoUrl: 'https://www.youtube.com/watch?v=ehFdn0PkRaA',
+    thumbnailUrl: 'https://i.ytimg.com/vi/ehFdn0PkRaA/hqdefault.jpg',
+    notes: [
+      'Travail de posture et de conviction',
+      'Approche concrète orientée closing',
+      'Pertinent pour la négociation commerciale',
+    ],
+  },
+  {
+    id: 'yt-9M9vP8_1Geg',
+    title: 'Négociation commerciale : les clés d’une démarche raisonnée',
+    subtitle: 'Webinar francophone orienté stratégie, marge et concessions.',
+    description:
+      'Une vidéo en français sur la préparation d’une négociation commerciale, les concessions et la défense de la valeur.',
+    source: 'YouTube',
+    channel: 'Kestio',
+    level: 'Avancé',
+    duration: '40 min env.',
+    topic: 'Négociation commerciale',
+    cta: 'Voir la vidéo',
+    videoUrl: 'https://www.youtube.com/watch?v=9M9vP8_1Geg',
+    thumbnailUrl: 'https://i.ytimg.com/vi/9M9vP8_1Geg/hqdefault.jpg',
+    notes: [
+      'Préparation d’une négociation',
+      'Gestion des concessions',
+      'Défense de la valeur commerciale',
+    ],
+  },
+  {
+    id: 'yt-N9duDfWSfU4',
+    title: 'Négociation : ne cherchez pas le compromis',
+    subtitle: 'TEDxGEM · approche francophone de la négociation.',
+    description:
+      'Une vidéo en français qui remet en question l’idée du compromis automatique et propose une autre lecture de la négociation.',
+    source: 'YouTube',
+    channel: 'TEDx / Julien Pelabere',
+    level: 'Intermédiaire',
+    duration: 'TEDx',
+    topic: 'Négociation',
+    cta: 'Voir la vidéo',
+    videoUrl: 'https://www.youtube.com/watch?v=N9duDfWSfU4',
+    thumbnailUrl: 'https://i.ytimg.com/vi/N9duDfWSfU4/hqdefault.jpg',
+    notes: [
+      'Réflexion sur le compromis',
+      'Vision moderne de la négociation',
+      'Bonne ressource de posture',
+    ],
+  },
+  {
+    id: 'yt-rPysw4YEsm8',
+    title: 'La Négociation raisonnée en 40 minutes',
+    subtitle: 'Approche francophone inspirée de la méthode Harvard.',
+    description:
+      'Une présentation en français des principes de négociation raisonnée, utile pour structurer des échanges complexes.',
+    source: 'YouTube',
+    channel: 'Sélection francophone',
+    level: 'Avancé',
+    duration: '40 min',
+    topic: 'Négociation raisonnée',
+    cta: 'Voir la vidéo',
+    videoUrl: 'https://www.youtube.com/watch?v=rPysw4YEsm8',
+    thumbnailUrl: 'https://i.ytimg.com/vi/rPysw4YEsm8/hqdefault.jpg',
+    notes: [
+      'Méthode Harvard',
+      'Approche structurée',
+      'Utile en négociation pro',
+    ],
+  },
+]
+
+const toggleExternalVideo = (videoId) => {
+  expandedVideoId.value = expandedVideoId.value === videoId ? '' : videoId
+}
+
+const openExternalVideo = (video) => {
+  activeExternalVideo.value = video
+  externalVideoDialog.value = true
+}
+
+const closeExternalVideo = () => {
+  externalVideoDialog.value = false
+  activeExternalVideo.value = null
+}
+
+const toggleLibraryCourse = (courseId) => {
+  expandedLibraryCourseId.value = expandedLibraryCourseId.value === courseId ? '' : courseId
+}
 
 const openCourse = (course) => {
   activeCourse.value = course
@@ -537,6 +663,10 @@ onMounted(async () => {
   }
 
   loading.value = false
+
+  if (route.query.autoplay === 'first' && externalNegotiationVideos.length > 0) {
+    openExternalVideo(externalNegotiationVideos[0])
+  }
 })
 </script>
 
@@ -549,24 +679,17 @@ onMounted(async () => {
         <v-card class="courses-hero-card" elevation="8">
           <div class="courses-hero-content">
             <div class="courses-hero-left">
-              <div class="courses-brand">
-                <v-img :src="logoUrl" alt="Logo Persuade" width="72" height="72" class="courses-logo" />
-                <div class="courses-brand-text">Persuade</div>
-              </div>
               <div class="courses-hero-title">Cours pré-enregistrés</div>
-              <div class="courses-hero-subtitle">
-                Explorez une bibliothèque vidéo dédiée à la négociation, avec méthodes, cas concrets et visionnage intégré.
-              </div>
             </div>
 
             <div class="courses-hero-stats">
               <div class="courses-hero-stat-card">
-                <div class="courses-hero-stat">{{ libraryCourses.length }}</div>
-                <div class="courses-hero-label">cours disponibles</div>
+                <div class="courses-hero-stat">{{ externalNegotiationVideos.length }}</div>
+                <div class="courses-hero-label">vidéos disponibles</div>
               </div>
               <div class="courses-hero-stat-card">
-                <div class="courses-hero-stat">{{ featuredLibraryCourses.length }}</div>
-                <div class="courses-hero-label">mis en avant</div>
+                <div class="courses-hero-stat">{{ externalNegotiationVideos.length }}</div>
+                <div class="courses-hero-label">sélection active</div>
               </div>
             </div>
           </div>
@@ -582,574 +705,92 @@ onMounted(async () => {
           {{ errorMessage }}
         </v-alert>
 
-        <div v-if="!loading" class="courses-filters">
-          <v-text-field
-            v-model="searchQuery"
-            label="Rechercher un cours"
-            variant="outlined"
-            density="comfortable"
-            hide-details
-          />
-          <v-select
-            v-model="filterLevel"
-            :items="filterLevelOptions"
-            :item-title="filterLevelLabel"
-            :item-value="(item) => item"
-            label="Niveau"
-            variant="outlined"
-            density="comfortable"
-            hide-details
-          />
-          <v-select
-            v-model="filterMode"
-            :items="filterModeOptions"
-            :item-title="filterModeLabel"
-            :item-value="(item) => item"
-            label="Format"
-            variant="outlined"
-            density="comfortable"
-            hide-details
-          />
-          <v-select
-            v-model="filterCategory"
-            :items="categoryOptions"
-            :item-title="filterCategoryLabel"
-            :item-value="(item) => item"
-            label="Catégorie"
-            variant="outlined"
-            density="comfortable"
-            hide-details
-          />
-          <v-select
-            v-model="sortOption"
-            :items="sortOptions"
-            item-title="title"
-            item-value="value"
-            label="Tri"
-            variant="outlined"
-            density="comfortable"
-            hide-details
-          />
-          <v-select
-            v-model="pageSize"
-            :items="pageSizeOptions"
-            :item-title="pageSizeLabel"
-            :item-value="(item) => item"
-            label="Pagination"
-            variant="outlined"
-            density="comfortable"
-            hide-details
-          />
-        </div>
-
-        <div v-if="!loading && sortedFeaturedLibraryCourses.length" class="courses-section">
-          <div class="courses-section-title">Sélection vidéo</div>
-          <div class="courses-section-subtitle">Les contenus les plus mis en avant du moment.</div>
-        </div>
-
-        <v-row v-if="!loading && sortedFeaturedLibraryCourses.length" class="courses-list">
-          <v-col cols="12" md="6" v-for="course in sortedFeaturedLibraryCourses" :key="`featured-${course.id}`">
-            <v-card class="course-card course-card--featured" elevation="6">
-              <div class="course-card-cover" :style="coverStyle(course)">
-                <div class="course-card-cover-top">
-                  <div class="course-card-pill">{{ course.level || 'Tous niveaux' }}</div>
-                  <div class="course-card-pill course-card-pill--ghost">{{ courseModeLabel(course.coachingMode) }}</div>
-                </div>
-                <div class="course-card-cover-bottom">
-                  <div class="course-card-badge">À la une</div>
-                  <div class="course-card-cover-title">{{ course.title }}</div>
-                  <div v-if="course.subtitle" class="course-card-cover-subtitle">{{ course.subtitle }}</div>
-                </div>
-              </div>
-
-              <div class="course-card-body">
-                <div class="course-card-inline-chips">
-                  <span class="course-inline-chip">{{ course.category || 'Bibliothèque' }}</span>
-                  <span class="course-inline-chip">{{ course.language || 'Français' }}</span>
-                  <span class="course-inline-chip" v-if="course.sessionCount">{{ course.sessionCount }}</span>
-                </div>
-
-                <div class="course-card-description">{{ course.description }}</div>
-
-                <div class="course-card-highlights">
-                  <div class="course-card-highlight">
-                    <v-icon size="18">mdi-timer-outline</v-icon>
-                    <span>{{ course.duration || '—' }}</span>
-                  </div>
-                  <div class="course-card-highlight">
-                    <v-icon size="18">mdi-cash</v-icon>
-                    <span>{{ course.price || 'Inclus' }}</span>
-                  </div>
-                  <div class="course-card-highlight">
-                    <v-icon size="18">mdi-account-check-outline</v-icon>
-                    <span>{{ course.targetAudience || 'Tout public' }}</span>
-                  </div>
-                  <div class="course-card-highlight">
-                    <v-icon size="18">mdi-play-circle-outline</v-icon>
-                    <span>Accès immédiat</span>
-                  </div>
-                </div>
-
-                <div v-if="course.outcomes?.length" class="course-card-block">
-                  <div class="course-card-block-title">Vous allez apprendre</div>
-                  <div class="course-card-list">
-                    <div v-for="entry in course.outcomes.slice(0, 3)" :key="entry" class="course-card-list-item">
-                      {{ entry }}
-                    </div>
-                  </div>
-                </div>
-
-                <div class="course-card-actions">
-                  <v-btn class="course-card-btn" size="large" @click="openCourse(course)">
-                    Accéder
-                  </v-btn>
-                </div>
-
-                <div v-if="isCoach && isOwnedLibraryCourse(course)" class="course-owner-actions">
-                  <v-btn
-                    class="course-action-btn-outline"
-                    size="small"
-                    :loading="duplicateLoadingId === course.id"
-                    @click="duplicateLibraryCourse(course)"
-                  >
-                    Dupliquer
-                  </v-btn>
-                  <v-btn class="course-action-btn-outline" size="small" @click="startEditLibraryCourse(course)">
-                    Modifier
-                  </v-btn>
-                  <v-btn
-                    class="course-action-btn-danger"
-                    size="small"
-                    :loading="deleteLoadingId === course.id"
-                    @click="deleteLibraryCourse(course)"
-                  >
-                    Supprimer
-                  </v-btn>
-                </div>
-              </div>
-            </v-card>
-          </v-col>
-        </v-row>
-
-        <div v-if="!loading && learningPaths.length" class="courses-section">
-          <div class="courses-section-title">Parcours par niveau</div>
-          <div class="courses-section-subtitle">
-            Une lecture plus simple pour progresser du bon cours au bon moment.
-          </div>
-        </div>
-
-        <v-row v-if="!loading && learningPaths.length" class="courses-paths">
-          <v-col cols="12" md="4" v-for="path in learningPaths" :key="path.id">
-            <v-card class="courses-path-card" :class="`courses-path-card--${path.tone}`" elevation="4">
-              <div class="courses-path-card__header">
-                <div>
-                  <div class="courses-path-card__title">{{ path.title }}</div>
-                  <div class="courses-path-card__subtitle">{{ path.subtitle }}</div>
-                </div>
-                <div class="courses-path-card__count">{{ path.total }}</div>
-              </div>
-
-              <div class="courses-path-card__list">
-                <button
-                  v-for="course in path.courses"
-                  :key="`${path.id}-${course.id}`"
-                  type="button"
-                  class="courses-path-card__item"
-                  @click="openCourse(course)"
-                >
-                  <div class="courses-path-card__item-main">
-                    <span class="courses-path-card__item-title">{{ course.title }}</span>
-                    <span class="courses-path-card__item-meta">
-                      {{ course.level || 'Tous niveaux' }} · {{ course.duration || '—' }}
-                    </span>
-                  </div>
-                  <v-icon size="18">mdi-play-circle-outline</v-icon>
-                </button>
-              </div>
-
-              <v-btn class="course-action-btn-outline" size="small" @click="activateLevelPath(path)">
-                Voir ce niveau
-              </v-btn>
-            </v-card>
-          </v-col>
-        </v-row>
-
         <div v-if="!loading" class="courses-section">
-          <div class="courses-section-title">Cours pré-enregistrés</div>
-          <div class="courses-section-subtitle">Des contenus de négociation disponibles immédiatement, directement sur la plateforme.</div>
+          <div class="courses-section-title">Vidéos closing & négociation</div>
+          <div class="courses-section-subtitle">
+            Une sélection de vidéos en français pour travailler le closing, les objections et la négociation.
+          </div>
         </div>
 
-        <v-row v-if="!loading" class="courses-list">
-          <v-col cols="12" md="4" v-for="course in paginatedLibraryCourses" :key="course.id">
-            <v-card class="course-card" elevation="6">
-              <div class="course-card-cover course-card-cover--compact" :style="coverStyle(course)">
-                <div class="course-card-cover-top">
-                  <div class="course-card-pill">{{ course.level || 'Tous niveaux' }}</div>
-                  <div class="course-card-pill course-card-pill--ghost">{{ courseModeLabel(course.coachingMode) }}</div>
-                </div>
-                <div class="course-card-cover-bottom">
-                  <div class="course-card-cover-title">{{ course.title }}</div>
-                  <div v-if="course.subtitle" class="course-card-cover-subtitle">{{ course.subtitle }}</div>
-                </div>
-              </div>
+        <v-row v-if="!loading" class="courses-list courses-list--videos">
+          <v-col cols="12" md="6" v-for="video in externalNegotiationVideos" :key="video.id">
+            <v-card class="course-video-card" elevation="4">
+              <v-img
+                :src="video.thumbnailUrl"
+                :alt="video.title"
+                class="course-video-card__poster"
+                aspect-ratio="16/9"
+                cover
+              />
 
-              <div class="course-card-body">
-                <div class="course-card-description">{{ course.description }}</div>
-
-                <div class="course-card-meta">
-                  <div class="course-card-line">
-                    <v-icon size="18">mdi-folder-outline</v-icon>
-                    <span>{{ course.category || 'Général' }}</span>
+              <div class="course-video-card__body">
+                <div class="course-video-card__top">
+                  <div>
+                    <div class="course-video-card__title">{{ video.title }}</div>
+                    <div class="course-video-card__subtitle">{{ video.subtitle }}</div>
                   </div>
-                  <div class="course-card-line">
-                    <v-icon size="18">mdi-timer-outline</v-icon>
-                    <span>{{ course.duration || '—' }}</span>
-                  </div>
-                  <div class="course-card-line">
-                    <v-icon size="18">mdi-translate</v-icon>
-                    <span>{{ course.language || 'Français' }}</span>
-                  </div>
-                  <div class="course-card-line">
-                    <v-icon size="18">mdi-cash</v-icon>
-                    <span>{{ course.price || 'Inclus' }}</span>
+                  <div class="course-video-card__chips">
+                    <span class="course-video-card__chip">{{ video.topic }}</span>
+                    <span class="course-video-card__chip">{{ video.level }}</span>
                   </div>
                 </div>
 
-                <div v-if="course.prerequisites?.length" class="course-card-block">
-                  <div class="course-card-block-title">Pré-requis</div>
-                  <div class="course-card-list">
-                    <div v-for="entry in course.prerequisites.slice(0, 2)" :key="entry" class="course-card-list-item">
-                      {{ entry }}
+                <div class="course-video-card__actions">
+                  <v-btn class="course-action-btn-outline" size="small" @click="toggleExternalVideo(video.id)">
+                    {{ expandedVideoId === video.id ? 'Fermer détails' : 'Voir détails' }}
+                  </v-btn>
+                  <v-btn class="course-card-btn" size="small" @click="openExternalVideo(video)">
+                    Regarder ici
+                  </v-btn>
+                </div>
+
+                <v-expand-transition>
+                  <div v-if="expandedVideoId === video.id" class="course-video-card__details">
+                    <div class="course-video-card__description">{{ video.description }}</div>
+                    <div class="course-video-card__meta">
+                      <span>{{ video.channel }}</span>
+                      <span>{{ video.duration }}</span>
+                      <span>{{ video.source }}</span>
+                    </div>
+                    <div class="course-video-card__list">
+                      <div v-for="note in video.notes" :key="note" class="course-video-card__list-item">
+                        {{ note }}
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                <div class="course-card-actions">
-                  <v-btn class="course-card-btn" size="large" @click="openCourse(course)">
-                    Accéder
-                  </v-btn>
-                </div>
-
-                <div v-if="isCoach && isOwnedLibraryCourse(course)" class="course-owner-actions">
-                  <v-btn
-                    class="course-action-btn-outline"
-                    size="small"
-                    :loading="duplicateLoadingId === course.id"
-                    @click="duplicateLibraryCourse(course)"
-                  >
-                    Dupliquer
-                  </v-btn>
-                  <v-btn class="course-action-btn-outline" size="small" @click="startEditLibraryCourse(course)">
-                    Modifier
-                  </v-btn>
-                  <v-btn
-                    class="course-action-btn-danger"
-                    size="small"
-                    :loading="deleteLoadingId === course.id"
-                    @click="deleteLibraryCourse(course)"
-                  >
-                    Supprimer
-                  </v-btn>
-                </div>
+                </v-expand-transition>
               </div>
             </v-card>
           </v-col>
         </v-row>
-
-        <div v-if="!loading && libraryPageCount > 1" class="courses-pagination">
-          <div class="courses-pagination-label">
-            {{ sortedLibraryCourses.length }} résultat(s) · tri {{ sortLabel(sortOption).toLowerCase() }}
-          </div>
-          <v-pagination
-            v-model="libraryPage"
-            :length="libraryPageCount"
-            rounded="circle"
-            density="comfortable"
-          />
-        </div>
-
-        <div v-if="isCoach" class="courses-panel">
-          <div class="courses-panel-header">
-            <div>
-              <div class="courses-panel-title">Réordonner la mise en avant</div>
-              <div class="courses-panel-subtitle">
-                Glissez vos cours à la une pour choisir leur ordre d’affichage.
-              </div>
-            </div>
-            <v-btn
-              class="course-card-btn"
-              size="small"
-              :disabled="orderedOwnedFeaturedCourses.length < 2 || !hasFeaturedReorderChanges"
-              :loading="reorderLoading"
-              @click="saveFeaturedOrder"
-            >
-              Enregistrer l’ordre
-            </v-btn>
-          </div>
-
-          <div v-if="orderedOwnedFeaturedCourses.length < 2" class="courses-empty">
-            Ajoutez au moins deux cours mis en avant pour les réordonner.
-          </div>
-
-          <div v-else class="courses-reorder-list">
-            <div
-              v-for="(course, index) in orderedOwnedFeaturedCourses"
-              :key="`reorder-${course.id}`"
-              class="courses-reorder-item"
-              draggable="true"
-              @dragstart="handleFeaturedDragStart(course.id)"
-              @dragover.prevent
-              @drop="handleFeaturedDrop(course.id)"
-            >
-              <div class="courses-reorder-rank">{{ index + 1 }}</div>
-              <div class="courses-reorder-main">
-                <div class="courses-reorder-title">{{ course.title }}</div>
-                <div class="courses-reorder-subtitle">
-                  {{ course.category || 'Bibliothèque' }} · {{ course.duration || '—' }}
-                </div>
-              </div>
-              <v-icon size="20">mdi-drag</v-icon>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="isCoach" class="courses-panel">
-          <div class="courses-panel-header">
-            <div>
-              <div class="courses-panel-title">{{ formTitle }}</div>
-              <div class="courses-panel-subtitle">{{ formSubtitle }}</div>
-            </div>
-            <v-btn
-              v-if="isEditingLibraryCourse"
-              class="course-action-btn-outline"
-              size="small"
-              @click="cancelEditLibraryCourse"
-            >
-              Annuler l’édition
-            </v-btn>
-          </div>
-
-          <div class="courses-form-cover">
-            <div class="courses-form-cover-preview" :style="coverStyle({ coverImage: coverPreview || '' })">
-              <div class="courses-form-cover-overlay">
-                <div class="courses-form-cover-label">Aperçu couverture</div>
-                <div class="courses-form-cover-title">{{ newLibraryCourse.title || 'Titre du cours' }}</div>
-                <div class="courses-form-cover-subtitle">
-                  {{ newLibraryCourse.subtitle || 'Sous-titre, promesse ou angle du contenu.' }}
-                </div>
-              </div>
-            </div>
-
-            <div class="courses-form-cover-actions">
-              <v-file-input
-                label="Téléverser une image"
-                accept="image/*"
-                variant="outlined"
-                hide-details
-                @update:modelValue="handleLibraryImageSelected"
-              />
-              <v-text-field
-                v-model="newLibraryCourse.coverImage"
-                label="Ou coller une URL d’image"
-                variant="outlined"
-                hide-details
-              />
-              <v-btn variant="text" @click="clearLibraryImage">Retirer l’image</v-btn>
-            </div>
-          </div>
-
-          <v-row class="courses-form">
-            <v-col cols="12" md="7">
-              <v-text-field v-model="newLibraryCourse.title" label="Titre" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="5">
-              <v-text-field v-model="newLibraryCourse.subtitle" label="Sous-titre / promesse" variant="outlined" />
-            </v-col>
-            <v-col cols="12">
-              <v-textarea v-model="newLibraryCourse.description" label="Description" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="3">
-              <v-select v-model="newLibraryCourse.level" :items="levelOptions" label="Niveau" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="3">
-              <v-select
-                v-model="newLibraryCourse.coachingMode"
-                :items="formatOptions"
-                label="Format"
-                variant="outlined"
-              />
-            </v-col>
-            <v-col cols="12" md="3">
-              <v-select v-model="newLibraryCourse.language" :items="languageOptions" label="Langue" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="3">
-              <v-text-field v-model="newLibraryCourse.duration" label="Durée" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="4">
-              <v-text-field v-model="newLibraryCourse.category" label="Catégorie" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="4">
-              <v-text-field v-model="newLibraryCourse.sessionCount" label="Format / volume" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="4">
-              <v-text-field v-model="newLibraryCourse.price" label="Prix" variant="outlined" />
-            </v-col>
-            <v-col cols="12">
-              <v-text-field v-model="newLibraryCourse.targetAudience" label="Public cible" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="6">
-              <v-textarea
-                v-model="newLibraryCourse.prerequisites"
-                label="Pré-requis (une ligne = un point)"
-                variant="outlined"
-                rows="4"
-              />
-            </v-col>
-            <v-col cols="12" md="6">
-              <v-textarea
-                v-model="newLibraryCourse.outcomes"
-                label="Résultats pédagogiques (une ligne = un point)"
-                variant="outlined"
-                rows="4"
-              />
-            </v-col>
-            <v-col cols="12">
-              <v-textarea
-                v-model="newLibraryCourse.bookingNotes"
-                label="Notes pédagogiques / contexte"
-                variant="outlined"
-                rows="3"
-              />
-            </v-col>
-            <v-col cols="12">
-              <v-text-field
-                v-model="newLibraryCourse.videoUrl"
-                label="Lien vidéo ou média"
-                variant="outlined"
-                placeholder="https://..."
-              />
-            </v-col>
-            <v-col cols="12">
-              <v-text-field
-                v-model="newLibraryCourse.meetingLink"
-                label="Lien complémentaire (optionnel)"
-                variant="outlined"
-                placeholder="https://..."
-              />
-            </v-col>
-            <v-col cols="12" md="4">
-              <v-checkbox v-model="newLibraryCourse.featured" label="Mettre en avant" hide-details />
-            </v-col>
-          </v-row>
-
-          <div v-if="libraryFormError" class="courses-error">{{ libraryFormError }}</div>
-
-          <div class="courses-form-footer">
-            <v-btn
-              v-if="isEditingLibraryCourse"
-              class="course-action-btn-outline"
-              size="large"
-              @click="cancelEditLibraryCourse"
-            >
-              Annuler
-            </v-btn>
-            <v-btn
-              class="course-card-btn"
-              size="large"
-              :loading="libraryFormLoading"
-              @click="handleSubmitLibraryCourse"
-            >
-              {{ isEditingLibraryCourse ? 'Enregistrer les modifications' : 'Créer le cours pré-enregistré' }}
-            </v-btn>
-          </div>
-        </div>
       </v-col>
     </v-row>
 
-    <v-dialog v-model="dialog" max-width="960">
+    <v-dialog v-model="externalVideoDialog" max-width="980">
       <v-card class="course-dialog" elevation="10">
-        <div class="course-dialog-cover" :style="coverStyle(activeCourse)">
+        <div class="course-dialog-cover course-dialog-cover--plain">
           <div class="course-dialog-cover-top">
-            <div class="course-card-pill">{{ activeCourse?.level || 'Tous niveaux' }}</div>
-            <div class="course-card-pill course-card-pill--ghost">{{ courseModeLabel(activeCourse?.coachingMode) }}</div>
+            <div class="course-card-pill">{{ activeExternalVideo?.level || 'Tous niveaux' }}</div>
+            <div class="course-card-pill course-card-pill--ghost">{{ activeExternalVideo?.topic || 'Vidéo' }}</div>
           </div>
           <div class="course-dialog-cover-bottom">
-            <div class="course-dialog-title">{{ activeCourse?.title }}</div>
-            <div class="course-dialog-subtitle">{{ activeCourse?.subtitle || activeCourse?.description }}</div>
+            <div class="course-dialog-title">{{ activeExternalVideo?.title }}</div>
+            <div class="course-dialog-subtitle">{{ activeExternalVideo?.subtitle || activeExternalVideo?.description }}</div>
           </div>
-          <v-btn icon="mdi-close" variant="text" class="course-dialog-close" @click="dialog = false"></v-btn>
+          <v-btn icon="mdi-close" variant="text" class="course-dialog-close" @click="closeExternalVideo"></v-btn>
         </div>
 
         <div class="course-dialog-content">
-          <div class="course-dialog-grid">
-            <div class="course-dialog-main">
-              <div class="course-dialog-text">{{ activeCourse?.description }}</div>
-
-              <div v-if="activeCourse?.outcomes?.length" class="course-dialog-block">
-                <div class="course-dialog-block-title">Objectifs</div>
-                <div class="course-card-list">
-                  <div v-for="entry in activeCourse.outcomes" :key="entry" class="course-card-list-item">
-                    {{ entry }}
-                  </div>
-                </div>
-              </div>
-
-              <div v-if="activeCourse?.prerequisites?.length" class="course-dialog-block">
-                <div class="course-dialog-block-title">Pré-requis</div>
-                <div class="course-card-list">
-                  <div v-for="entry in activeCourse.prerequisites" :key="entry" class="course-card-list-item">
-                    {{ entry }}
-                  </div>
-                </div>
-              </div>
-
-              <div v-if="activeCourse?.bookingNotes" class="course-dialog-note">
-                {{ activeCourse.bookingNotes }}
-              </div>
-            </div>
-
-            <div class="course-dialog-side">
-              <div class="course-dialog-side-card">
-                <div class="course-dialog-side-line">
-                  <v-icon size="18">mdi-folder-outline</v-icon>
-                  <span>{{ activeCourse?.category || 'Bibliothèque' }}</span>
-                </div>
-                <div class="course-dialog-side-line">
-                  <v-icon size="18">mdi-translate</v-icon>
-                  <span>{{ activeCourse?.language || 'Français' }}</span>
-                </div>
-                <div class="course-dialog-side-line">
-                  <v-icon size="18">mdi-cash</v-icon>
-                  <span>{{ activeCourse?.price || 'Inclus' }}</span>
-                </div>
-                <div class="course-dialog-side-line">
-                  <v-icon size="18">mdi-timer-outline</v-icon>
-                  <span>{{ activeCourse?.duration || '—' }}</span>
-                </div>
-                <div class="course-dialog-side-line" v-if="activeCourse?.sessionCount">
-                  <v-icon size="18">mdi-counter</v-icon>
-                  <span>{{ activeCourse.sessionCount }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <div class="course-dialog-media">
-            <template v-if="hasVideo">
-              <video v-if="isVideoFile" controls :src="activeCourse.videoUrl" />
-              <iframe
-                v-else
-                :src="embeddedVideoUrl"
-                title="Cours vidéo"
-                frameborder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                referrerpolicy="strict-origin-when-cross-origin"
-                allowfullscreen
-              ></iframe>
-            </template>
-            <div v-else class="course-dialog-empty">
-              Aucun média disponible pour ce cours.
-            </div>
+            <iframe
+              v-if="activeExternalVideo?.videoUrl"
+              :src="normalizeVideoUrl(activeExternalVideo.videoUrl)"
+              :title="activeExternalVideo?.title || 'Vidéo'"
+              frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              referrerpolicy="strict-origin-when-cross-origin"
+              allowfullscreen
+            ></iframe>
           </div>
         </div>
       </v-card>
@@ -1187,10 +828,10 @@ onMounted(async () => {
 
 .courses-hero-card {
   border-radius: 28px;
-  padding: 24px;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(19, 58, 59, 0.1);
-  box-shadow: 0 20px 45px rgba(12, 31, 32, 0.16);
+  padding: 20px 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 241, 233, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  box-shadow: 0 24px 56px rgba(21, 18, 14, 0.1);
 }
 
 .courses-hero-content {
@@ -1201,41 +842,13 @@ onMounted(async () => {
   gap: 24px;
 }
 
-.courses-brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 12px;
-}
-
-.courses-logo {
-  border-radius: 20px;
-  background: #fff;
-  padding: 8px;
-  box-shadow: 0 14px 26px rgba(12, 31, 32, 0.18);
-}
-
-.courses-brand-text {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 18px;
-  font-weight: 600;
-  color: #133a3b;
-  letter-spacing: 0.02em;
-}
-
 .courses-hero-title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 26px;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+  font-size: clamp(2rem, 3vw, 2.8rem);
   font-weight: 700;
-  color: #133a3b;
-}
-
-.courses-hero-subtitle {
-  margin-top: 6px;
-  max-width: 720px;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 15px;
-  color: rgba(19, 58, 59, 0.7);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: #1c1a16;
 }
 
 .courses-hero-stats {
@@ -1248,20 +861,20 @@ onMounted(async () => {
   min-width: 120px;
   padding: 14px 16px;
   border-radius: 18px;
-  background: rgba(19, 58, 59, 0.05);
-  border: 1px solid rgba(19, 58, 59, 0.08);
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(28, 26, 22, 0.08);
 }
 
 .courses-hero-stat {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 30px;
   font-weight: 700;
-  color: #133a3b;
+  color: #1c1a16;
 }
 
 .courses-hero-label {
   font-size: 12px;
-  color: rgba(19, 58, 59, 0.6);
+  color: #625b53;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -1296,6 +909,10 @@ onMounted(async () => {
 
 .courses-list {
   row-gap: 24px;
+}
+
+.courses-list--videos {
+  margin-bottom: 10px;
 }
 
 .courses-paths {
@@ -1410,6 +1027,11 @@ onMounted(async () => {
   display: grid;
 }
 
+.course-card-poster {
+  border-bottom: 1px solid rgba(19, 58, 59, 0.08);
+  background: rgba(19, 58, 59, 0.05);
+}
+
 .course-card--featured {
   border-color: rgba(245, 177, 63, 0.22);
 }
@@ -1487,6 +1109,37 @@ onMounted(async () => {
   gap: 14px;
 }
 
+.course-card-head {
+  display: grid;
+  gap: 8px;
+}
+
+.course-card-head--compact {
+  gap: 8px;
+}
+
+.course-card-head-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.course-card-title {
+  color: #133a3b;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.course-card-subtitle {
+  color: rgba(19, 58, 59, 0.72);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 .course-card-inline-chips {
   display: flex;
   flex-wrap: wrap;
@@ -1507,6 +1160,7 @@ onMounted(async () => {
 .course-card-description {
   font-size: 14px;
   color: rgba(19, 58, 59, 0.72);
+  line-height: 1.6;
 }
 
 .course-card-highlights {
@@ -1533,12 +1187,136 @@ onMounted(async () => {
   gap: 8px;
 }
 
+.course-card-details {
+  display: grid;
+  gap: 12px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(19, 58, 59, 0.08);
+}
+
 .course-card-line {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(19, 58, 59, 0.04);
   font-size: 13px;
   color: rgba(19, 58, 59, 0.65);
+}
+
+.course-video-card {
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(19, 58, 59, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 244, 238, 0.96));
+  box-shadow: 0 16px 30px rgba(12, 31, 32, 0.08);
+}
+
+.course-video-card__poster {
+  border-bottom: 1px solid rgba(19, 58, 59, 0.08);
+}
+
+.course-video-card__body {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.course-video-card__top {
+  display: grid;
+  gap: 10px;
+}
+
+.course-video-card__title {
+  color: #133a3b;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.course-video-card__subtitle {
+  margin-top: 4px;
+  color: rgba(19, 58, 59, 0.7);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.course-video-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.course-video-card__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(19, 58, 59, 0.06);
+  color: #133a3b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.course-video-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.course-video-card__details {
+  display: grid;
+  gap: 12px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(19, 58, 59, 0.08);
+}
+
+.course-video-card__description {
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(19, 58, 59, 0.72);
+}
+
+.course-video-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.course-video-card__meta span {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(19, 58, 59, 0.05);
+  color: rgba(19, 58, 59, 0.72);
+  font-size: 12px;
+}
+
+.course-video-card__list {
+  display: grid;
+  gap: 8px;
+}
+
+.course-video-card__list-item {
+  position: relative;
+  padding-left: 16px;
+  color: rgba(19, 58, 59, 0.72);
+  font-size: 13px;
+}
+
+.course-video-card__list-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #1c7c7d;
 }
 
 .course-card-block-title,
@@ -1776,11 +1554,18 @@ onMounted(async () => {
   justify-content: space-between;
 }
 
+.course-dialog-cover--plain {
+  min-height: 150px;
+  background: #f8fbfb;
+  border-bottom: 1px solid rgba(19, 58, 59, 0.08);
+  color: #133a3b;
+}
+
 .course-dialog-close {
   position: absolute;
   top: 12px;
   right: 12px;
-  color: #fff;
+  color: #133a3b;
 }
 
 .course-dialog-content {

@@ -145,30 +145,29 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
-            <div v-if="item.image" class="news-carousel__media">
-              <v-img
-                :src="item.image"
-                :alt="item.title"
-                :aspect-ratio="mediaAspectRatio"
-                class="news-carousel__image"
-                cover
-                loading="lazy"
-                gradient="to bottom, rgba(8, 23, 23, 0.06), rgba(8, 23, 23, 0.32)"
-              >
-                <template #placeholder>
-                  <div class="news-carousel__media-placeholder"></div>
-                </template>
-                <template #error>
-                  <div class="news-carousel__media-fallback">
-                    <v-icon size="22">mdi-image-off-outline</v-icon>
-                  </div>
-                </template>
-              </v-img>
-            </div>
-
             <div class="news-carousel__slide-body">
-              <div class="news-carousel__item-title">{{ item.title }}</div>
-              <div class="news-carousel__item-subtitle">{{ item.subtitle }}</div>
+              <div class="news-carousel__body-row">
+                <div class="news-carousel__body-copy">
+                  <div class="news-carousel__item-title">{{ item.title }}</div>
+                  <div class="news-carousel__item-subtitle">{{ item.subtitle }}</div>
+                </div>
+
+                <div v-if="item.image" class="news-carousel__thumb">
+                  <v-img
+                    :src="item.image"
+                    :alt="item.title"
+                    class="news-carousel__thumb-image"
+                    cover
+                    loading="lazy"
+                  >
+                    <template #error>
+                      <div class="news-carousel__thumb-fallback">
+                        <v-icon size="18">mdi-image-off-outline</v-icon>
+                      </div>
+                    </template>
+                  </v-img>
+                </div>
+              </div>
             </div>
 
             <div class="news-carousel__slide-footer">
@@ -319,7 +318,7 @@ onBeforeUnmount(() => {
 
 .news-carousel__slide {
   width: 100%;
-  min-height: 182px;
+  min-height: 158px;
   border: 0;
   border-radius: 22px;
   padding: 16px;
@@ -337,7 +336,7 @@ onBeforeUnmount(() => {
 }
 
 .news-carousel--sidebar .news-carousel__slide {
-  min-height: 136px;
+  min-height: 128px;
   padding: 12px;
 }
 
@@ -394,42 +393,40 @@ onBeforeUnmount(() => {
 }
 
 .news-carousel__slide-body {
-  margin: 14px 0;
+  margin: 12px 0;
 }
 
-.news-carousel__media {
-  width: 100%;
-  margin-top: 14px;
+.news-carousel__body-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+
+.news-carousel__body-copy {
+  min-width: 0;
+}
+
+.news-carousel__thumb {
+  width: 74px;
+  height: 74px;
   border-radius: 16px;
   overflow: hidden;
-  background: linear-gradient(180deg, rgba(226, 234, 232, 0.9), rgba(205, 218, 215, 0.92));
+  border: 1px solid rgba(19, 58, 59, 0.08);
+  background: rgba(255, 255, 255, 0.56);
+  flex-shrink: 0;
 }
 
-.news-carousel--sidebar .news-carousel__media {
-  margin-top: 10px;
+.news-carousel__thumb-image {
+  width: 100%;
+  height: 100%;
 }
 
-.news-carousel__image {
-  display: block;
-}
-
-.news-carousel__media-placeholder,
-.news-carousel__media-fallback {
-  min-height: 78px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.news-carousel__media-placeholder {
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.54), rgba(255, 255, 255, 0.18)),
-    linear-gradient(180deg, rgba(16, 52, 53, 0.12), rgba(16, 52, 53, 0.2));
-  background-size: 220% 100%;
-  animation: news-carousel-shimmer 1.4s ease-in-out infinite;
-}
-
-.news-carousel__media-fallback {
+.news-carousel__thumb-fallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
   color: rgba(19, 58, 59, 0.46);
   background: linear-gradient(180deg, rgba(244, 248, 247, 0.96), rgba(230, 237, 235, 0.96));
 }
@@ -455,16 +452,6 @@ onBeforeUnmount(() => {
 .news-carousel--sidebar .news-carousel__item-subtitle {
   font-size: 11px;
   margin-top: 6px;
-}
-
-@keyframes news-carousel-shimmer {
-  0% {
-    background-position: 100% 0;
-  }
-
-  100% {
-    background-position: -100% 0;
-  }
 }
 
 .news-carousel__meta {
@@ -511,5 +498,16 @@ onBeforeUnmount(() => {
 
 .news-carousel--sidebar .news-carousel__dot--active {
   background: #f5bf47;
+}
+
+@media (max-width: 720px) {
+  .news-carousel__body-row {
+    grid-template-columns: 1fr;
+  }
+
+  .news-carousel__thumb {
+    width: 100%;
+    height: 68px;
+  }
 }
 </style>

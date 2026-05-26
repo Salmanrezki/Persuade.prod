@@ -50,15 +50,6 @@ const buildSteps = (role) => {
         title: 'Echangez avec vos clients',
         text: 'Le chat vous permet de suivre chaque client, partager des ressources et organiser les prochaines etapes.',
       },
-      {
-        id: 'profile',
-        path: ROUTE_PATHS.profile,
-        target: 'profile',
-        tone: 'coral',
-        eyebrow: 'Profil',
-        title: 'Soignez votre fiche coach',
-        text: 'Votre profil, vos préférences et votre positionnement influencent la manière dont les apprenants vous perçoivent.',
-      },
     ]
   }
 
@@ -160,9 +151,14 @@ const isCurrentRouteStep = computed(() => currentStep.value?.path === route.path
 const progressLabel = computed(() =>
   currentStep.value ? `${currentStepIndex.value + 1} / ${tourSteps.value.length}` : '0 / 0'
 )
+const progressValue = computed(() => {
+  if (!tourSteps.value.length) return 0
+  return ((currentStepIndex.value + 1) / tourSteps.value.length) * 100
+})
 const showResumeChip = computed(
   () => !!auth.user && !tourCompleted.value && tourPaused.value && tourSteps.value.length > 0
 )
+const currentToneClass = computed(() => `tour-dialog--${currentStep.value?.tone || 'teal'}`)
 
 const syncTourState = () => {
   const uid = auth.user?.uid || ''
@@ -266,31 +262,52 @@ watch(
 
 <template>
   <div v-if="auth.user && route.path !== ROUTE_PATHS.onboarding">
-    <v-dialog v-model="dialogOpen" max-width="720" persistent>
-      <v-card class="tour-dialog" :class="`tour-dialog--${currentStep?.tone || 'teal'}`">
+    <v-dialog
+      v-model="dialogOpen"
+      max-width="720"
+      persistent
+      content-class="tour-dialog-overlay"
+    >
+      <v-card class="tour-dialog" :class="currentToneClass">
         <div class="tour-dialog__header">
-          <div>
+          <div class="tour-dialog__hero">
             <div class="tour-dialog__eyebrow">{{ currentStep?.eyebrow || 'Découverte' }}</div>
             <div class="tour-dialog__title">{{ currentStep?.title || 'Visite guidée' }}</div>
+            <div class="tour-dialog__lede">
+              {{ currentStep?.text || 'Découvrez les espaces essentiels de la plateforme.' }}
+            </div>
           </div>
-          <v-chip class="tour-dialog__progress" :class="`tour-dialog__progress--${currentStep?.tone || 'teal'}`" size="small" variant="flat">{{ progressLabel }}</v-chip>
+          <div class="tour-dialog__header-meta">
+            <v-chip class="tour-dialog__progress" :class="`tour-dialog__progress--${currentStep?.tone || 'teal'}`" size="small" variant="flat">
+              Étape {{ progressLabel }}
+            </v-chip>
+            <v-progress-linear
+              :model-value="progressValue"
+              rounded
+              height="8"
+              class="tour-dialog__progress-bar"
+            />
+          </div>
         </div>
 
         <div class="tour-dialog__body">
-          <div class="tour-dialog__text">
-            {{ currentStep?.text || 'Découvrez les espaces essentiels de la plateforme.' }}
-          </div>
-
-          <div class="tour-dialog__route">
-            <span class="tour-dialog__route-label">Page ciblée</span>
-            <span class="tour-dialog__route-value">{{ currentStep?.path }}</span>
-          </div>
-
-          <div class="tour-dialog__status" :class="isCurrentRouteStep ? 'tour-dialog__status--ready' : ''">
+          <v-sheet class="tour-dialog__status" :class="isCurrentRouteStep ? 'tour-dialog__status--ready' : ''" rounded="xl">
             <v-icon size="18">{{ isCurrentRouteStep ? 'mdi-check-circle-outline' : 'mdi-compass-outline' }}</v-icon>
-            <span>
+            <span class="tour-dialog__status-text">
               {{ isCurrentRouteStep ? 'Vous êtes sur la bonne page. Passez à l étape suivante quand vous êtes prêt.' : 'Ouvrez cette page pour continuer la visite guidée.' }}
             </span>
+          </v-sheet>
+
+          <div class="tour-dialog__steps">
+            <span
+              v-for="(step, index) in tourSteps"
+              :key="step.id"
+              class="tour-dialog__step-dot"
+              :class="{
+                'tour-dialog__step-dot--current': index === currentStepIndex,
+                'tour-dialog__step-dot--done': index < currentStepIndex,
+              }"
+            />
           </div>
         </div>
 
@@ -317,6 +334,7 @@ watch(
 
     <div v-if="showResumeChip" class="tour-resume">
       <v-btn class="tour-resume__btn" :class="`tour-resume__btn--${currentStep?.tone || 'teal'}`" size="large" variant="flat" @click="openTour">
+        <v-icon start size="18">mdi-motion-play-outline</v-icon>
         Reprendre la visite
       </v-btn>
     </div>
@@ -324,38 +342,62 @@ watch(
 </template>
 
 <style scoped>
+:global(.tour-dialog-overlay) {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  padding-left: 40px;
+  padding-right: 40px;
+}
+
 .tour-dialog {
+  --tour-ink: #1c1a16;
+  --tour-muted: #625b53;
+  --tour-line: rgba(28, 26, 22, 0.08);
   border-radius: 30px;
   padding: 24px;
   background:
-    radial-gradient(circle at top right, rgba(245, 191, 71, 0.18), transparent 32%),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(246, 242, 234, 0.98));
-  border: 1px solid rgba(19, 58, 59, 0.08);
+    radial-gradient(circle at top right, rgba(181, 93, 63, 0.14), transparent 32%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.99), rgba(247, 241, 233, 0.98));
+  border: 1px solid var(--tour-line);
+  box-shadow: 0 28px 80px rgba(21, 18, 14, 0.16);
 }
 
 .tour-dialog--teal {
   background:
-    radial-gradient(circle at top right, rgba(67, 196, 175, 0.18), transparent 32%),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(240, 247, 246, 0.98));
+    radial-gradient(circle at top right, rgba(46, 75, 64, 0.14), transparent 32%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.99), rgba(241, 246, 242, 0.98));
 }
 
 .tour-dialog--gold {
   background:
-    radial-gradient(circle at top right, rgba(245, 191, 71, 0.22), transparent 34%),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(250, 245, 234, 0.98));
+    radial-gradient(circle at top right, rgba(196, 146, 55, 0.16), transparent 34%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.99), rgba(251, 245, 234, 0.98));
 }
 
 .tour-dialog--coral {
   background:
-    radial-gradient(circle at top right, rgba(240, 90, 40, 0.2), transparent 34%),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(249, 239, 235, 0.98));
+    radial-gradient(circle at top right, rgba(181, 93, 63, 0.18), transparent 34%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.99), rgba(250, 240, 236, 0.98));
 }
 
 .tour-dialog__header {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: space-between;
   gap: 16px;
+}
+
+.tour-dialog__hero {
+  flex: 1;
+  min-width: 0;
+}
+
+.tour-dialog__header-meta {
+  width: 152px;
+  display: grid;
+  align-content: start;
+  gap: 12px;
 }
 
 .tour-dialog__eyebrow {
@@ -363,37 +405,52 @@ watch(
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(19, 58, 59, 0.5);
+  color: #b55d3f;
 }
 
 .tour-dialog__title {
   margin-top: 8px;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 28px;
   font-weight: 700;
   line-height: 1.2;
-  color: #133a3b;
+  letter-spacing: -0.04em;
+  color: var(--tour-ink);
+}
+
+.tour-dialog__lede {
+  margin-top: 10px;
+  max-width: 38rem;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--tour-muted);
 }
 
 .tour-dialog__progress {
-  background: rgba(19, 58, 59, 0.08);
-  color: #133a3b;
+  justify-self: end;
+  background: rgba(28, 26, 22, 0.06);
+  color: var(--tour-ink);
   font-weight: 700;
 }
 
 .tour-dialog__progress--teal {
-  background: rgba(28, 124, 125, 0.12);
-  color: #176d6e;
+  background: rgba(46, 75, 64, 0.12);
+  color: #2e4b40;
 }
 
 .tour-dialog__progress--gold {
-  background: rgba(245, 191, 71, 0.2);
-  color: #a56e08;
+  background: rgba(196, 146, 55, 0.18);
+  color: #86611d;
 }
 
 .tour-dialog__progress--coral {
-  background: rgba(240, 90, 40, 0.18);
-  color: #c95730;
+  background: rgba(181, 93, 63, 0.14);
+  color: #a24d32;
+}
+
+.tour-dialog__progress-bar {
+  background: rgba(28, 26, 22, 0.06);
+  border-radius: 999px;
 }
 
 .tour-dialog__body {
@@ -402,50 +459,46 @@ watch(
   gap: 14px;
 }
 
-.tour-dialog__text {
-  font-size: 15px;
-  line-height: 1.7;
-  color: rgba(19, 58, 59, 0.78);
-}
-
-.tour-dialog__route {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(19, 58, 59, 0.08);
-}
-
-.tour-dialog__route-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(19, 58, 59, 0.52);
-}
-
-.tour-dialog__route-value {
-  font-size: 13px;
-  font-weight: 700;
-  color: #133a3b;
-}
-
 .tour-dialog__status {
   display: flex;
   align-items: flex-start;
   gap: 10px;
   padding: 14px 16px;
   border-radius: 18px;
-  background: rgba(19, 58, 59, 0.05);
-  color: rgba(19, 58, 59, 0.72);
+  background: rgba(28, 26, 22, 0.04);
+  color: var(--tour-muted);
 }
 
 .tour-dialog__status--ready {
-  background: rgba(28, 124, 125, 0.12);
-  color: #176d6e;
+  background: rgba(46, 75, 64, 0.1);
+  color: #2e4b40;
+}
+
+.tour-dialog__status-text {
+  line-height: 1.55;
+}
+
+.tour-dialog__steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tour-dialog__step-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(28, 26, 22, 0.14);
+  transition: transform 180ms ease, background 180ms ease, width 180ms ease;
+}
+
+.tour-dialog__step-dot--done {
+  background: rgba(46, 75, 64, 0.38);
+}
+
+.tour-dialog__step-dot--current {
+  width: 28px;
+  background: #b55d3f;
 }
 
 .tour-dialog__actions {
@@ -461,14 +514,15 @@ watch(
   text-transform: none;
   font-weight: 700;
   border-radius: 14px;
+  min-height: 44px;
 }
 
 .tour-dialog__btn--outline {
-  color: #133a3b;
+  color: var(--tour-ink);
 }
 
 .tour-dialog__btn--solid {
-  background: #133a3b;
+  background: #2e4b40;
   color: #fff8ef;
 }
 
@@ -483,33 +537,42 @@ watch(
   border-radius: 999px;
   text-transform: none;
   font-weight: 700;
-  background: #133a3b;
+  background: #2e4b40;
   color: #fff8ef;
-  box-shadow: 0 16px 30px rgba(12, 31, 32, 0.18);
+  box-shadow: 0 18px 34px rgba(21, 18, 14, 0.18);
 }
 
 .tour-resume__btn--teal {
-  background: #133a3b;
+  background: #2e4b40;
 }
 
 .tour-resume__btn--gold {
-  background: #b77d17;
+  background: #9b7220;
 }
 
 .tour-resume__btn--coral {
-  background: #b95331;
+  background: #b55d3f;
 }
 
 @media (max-width: 720px) {
+  :global(.tour-dialog-overlay) {
+    justify-content: center;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
   .tour-dialog {
     padding: 20px;
   }
 
   .tour-dialog__header,
-  .tour-dialog__route,
   .tour-dialog__actions {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .tour-dialog__header-meta {
+    width: 100%;
   }
 
   .tour-resume {

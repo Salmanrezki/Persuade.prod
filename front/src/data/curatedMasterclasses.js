@@ -1,0 +1,53 @@
+export const curatedMasterclasses = [
+  {
+    id: 'nera-2026-05-28',
+    title: 'Masterclass Négociation d’influence avancé',
+    subtitle: 'Session digitale certifiante',
+    description:
+      'Une session francophone orientée négociation d’influence pour structurer une méthode plus solide et gagner en impact.',
+    displayDate: '28 mai 2026 · Digital',
+    sortDate: '2026-05-28',
+    duration: '2 jours + digital',
+    format: 'online',
+    language: 'Français',
+    location: 'En ligne',
+    price: '5 490 €',
+    organizer: 'Institut NERA',
+    sourceLabel: 'Institut NERA',
+    sourceUrl: 'https://www.institut-nera.com/masterclass-negociation-influence-avance/',
+    tags: ['Négociation', 'Influence', 'Certification'],
+    takeaways: [
+      'Mieux comprendre la mécanique de décision',
+      'Négocier avec plus d’assurance',
+      'Éviter les compromis inutiles',
+    ],
+    targetAudience: 'Entrepreneurs, commerciaux, recruteurs et profils exposés à la négociation',
+    featured: true,
+  },
+  {
+    id: 'adn-2026-06-15',
+    title: 'Négocier dans des situations complexes',
+    subtitle: 'Masterclass intensive avec Marwan Mery',
+    description:
+      'Une session approfondie sur la négociation complexe, les rapports de force, la tactique et la préparation des accords sensibles.',
+    displayDate: '15–16 juin 2026',
+    sortDate: '2026-06-15',
+    duration: '2 jours / 14 heures',
+    format: 'in_person',
+    language: 'Français',
+    location: 'Paris',
+    price: '2 700 € HT',
+    organizer: 'ADN Group',
+    sourceLabel: 'ADN Group',
+    sourceUrl: 'https://www.adngroup.com/formation/negociation-complexe-essentials-formation-masterclass',
+    tags: ['Négociation complexe', 'Influence', 'Crise'],
+    takeaways: [
+      'Cartographier les parties prenantes',
+      'Construire une vraie stratégie de négociation',
+      'Clôturer un accord en contexte tendu',
+    ],
+    targetAudience: 'Professionnels confrontés à des négociations complexes ou à forts enjeux',
+    featured: true,
+  },
+].sort((left, right) => new Date(left.sortDate).getTime() - new Date(right.sortDate).getTime())
+

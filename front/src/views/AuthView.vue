@@ -1,188 +1,209 @@
 <template>
-  <v-container class="auth-container fill-height" fluid>
-    <div class="auth-backdrop" aria-hidden="true"></div>
+  <v-container fluid class="auth-page pa-4 pa-sm-6">
+    <v-container class="auth-frame pa-0">
+      <MarketingNavbar class="mb-8" :nav-items="navItems" cta-label="Accueil" :cta-to="ROUTE_PATHS.landing" />
 
-    <v-row class="auth-header" align="center" justify="center">
-      <v-col cols="12" class="d-flex flex-column align-center">
-        <v-img
-          :src="logoUrl"
-          alt="Logo Persuade"
-          width="120"
-          height="120"
-          class="auth-logo"
-        />
-        <div class="auth-title">Persuade</div>
-        <div class="auth-subtitle">Connectez-vous ou créez votre compte</div>
-      </v-col>
-    </v-row>
+      <v-row justify="center" class="fill-height align-center">
+        <v-col cols="12" sm="10" md="8" lg="5" xl="4">
+          <v-card class="auth-card" rounded="xl" elevation="0">
+            <v-card-text class="pa-6 pa-sm-8">
+              <div class="text-center mb-6">
+                <h1 class="auth-title mb-2">
+                  {{ isRegisterMode ? 'Inscription' : 'Connexion' }}
+                </h1>
+              </div>
 
-    <v-row class="auth-grid" align="center" justify="center">
-      <!-- LOGIN -->
-      <v-col cols="12" md="5">
-        <v-card class="auth-card">
-          <v-card-item>
-            <div class="auth-card-title">Connexion</div>
-            <div class="auth-card-subtitle">Accédez à votre espace personnel</div>
-          </v-card-item>
+              <v-btn-toggle
+                v-model="activeMode"
+                mandatory
+                divided
+                variant="outlined"
+                class="auth-toggle mb-6"
+              >
+                <v-btn value="login" class="auth-toggle__button">J'ai deja un compte</v-btn>
+                <v-btn value="register" class="auth-toggle__button">Creer un compte</v-btn>
+              </v-btn-toggle>
 
-          <v-card-text class="auth-card-body">
-            <v-alert
-              v-if="loginError"
-              type="error"
-              variant="tonal"
-              density="comfortable"
-              class="auth-alert"
-            >
-              {{ loginError }}
-            </v-alert>
+              <v-alert
+                v-if="activeError"
+                type="error"
+                variant="tonal"
+                density="comfortable"
+                class="mb-4"
+              >
+                {{ activeError }}
+              </v-alert>
 
-            <v-text-field
-              v-model="loginEmail"
-              label="Email"
-              type="email"
-              prepend-inner-icon="mdi-email-outline"
-              variant="outlined"
-              density="comfortable"
-              required
-            />
+              <v-form v-if="!isRegisterMode" @submit.prevent="login">
+                <v-text-field
+                  v-model="loginEmail"
+                  label="Email"
+                  type="email"
+                  prepend-inner-icon="mdi-email-outline"
+                  variant="outlined"
+                  density="comfortable"
+                  class="mb-3"
+                  hide-details="auto"
+                  autocomplete="email"
+                  required
+                />
 
-            <v-text-field
-              v-model="loginPassword"
-              label="Mot de passe"
-              type="password"
-              prepend-inner-icon="mdi-lock-outline"
-              variant="outlined"
-              density="comfortable"
-              required
-            />
-          </v-card-text>
+                <v-text-field
+                  v-model="loginPassword"
+                  label="Mot de passe"
+                  :type="showLoginPassword ? 'text' : 'password'"
+                  prepend-inner-icon="mdi-lock-outline"
+                  :append-inner-icon="showLoginPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+                  variant="outlined"
+                  density="comfortable"
+                  class="mb-6"
+                  hide-details="auto"
+                  autocomplete="current-password"
+                  required
+                  @click:append-inner="showLoginPassword = !showLoginPassword"
+                />
 
-          <v-card-actions class="auth-card-actions">
-            <v-btn block class="auth-btn auth-btn-primary" size="large" @click="login">
-              Se connecter
-            </v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-col>
+                <v-btn
+                  type="submit"
+                  block
+                  size="large"
+                  class="auth-submit"
+                  :loading="isLoggingIn"
+                  :disabled="isLoggingIn"
+                >
+                  Se connecter
+                </v-btn>
 
-      <!-- REGISTER -->
-      <v-col cols="12" md="5">
-        <v-card class="auth-card">
-          <v-card-item>
-            <div class="auth-card-title">Inscription</div>
-            <div class="auth-card-subtitle">Inscrivez-vous comme apprenant ou coach</div>
-          </v-card-item>
+                <div v-if="isLoggingIn" class="auth-loading-hint" aria-live="polite">
+                  <v-progress-circular indeterminate size="18" width="2" color="#234744" />
+                  <span>Connexion en cours...</span>
+                </div>
+              </v-form>
 
-          <v-card-text class="auth-card-body">
-            <v-alert
-              v-if="registerError"
-              type="error"
-              variant="tonal"
-              density="comfortable"
-              class="auth-alert"
-            >
-              {{ registerError }}
-            </v-alert>
+              <v-form v-else @submit.prevent="register">
+                <v-text-field
+                  v-model="registerFirstname"
+                  label="Prenom"
+                  prepend-inner-icon="mdi-account-outline"
+                  variant="outlined"
+                  density="comfortable"
+                  class="mb-3"
+                  hide-details="auto"
+                  autocomplete="given-name"
+                  required
+                />
 
-            <v-text-field
-              v-model="registerFirstname"
-              label="Prénom"
-              prepend-inner-icon="mdi-account-outline"
-              variant="outlined"
-              density="comfortable"
-              required
-            />
+                <v-text-field
+                  v-model="registerEmail"
+                  label="Email"
+                  type="email"
+                  prepend-inner-icon="mdi-email-outline"
+                  variant="outlined"
+                  density="comfortable"
+                  class="mb-3"
+                  hide-details="auto"
+                  autocomplete="email"
+                  required
+                />
 
-            <v-text-field
-              v-model="registerEmail"
-              label="Email"
-              type="email"
-              prepend-inner-icon="mdi-email-outline"
-              variant="outlined"
-              density="comfortable"
-              required
-            />
+                <v-text-field
+                  v-model="registerPassword"
+                  label="Mot de passe"
+                  :type="showRegisterPassword ? 'text' : 'password'"
+                  prepend-inner-icon="mdi-lock-outline"
+                  :append-inner-icon="showRegisterPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+                  variant="outlined"
+                  density="comfortable"
+                  class="mb-3"
+                  hide-details="auto"
+                  autocomplete="new-password"
+                  required
+                  @click:append-inner="showRegisterPassword = !showRegisterPassword"
+                />
 
-            <v-text-field
-              v-model="registerPassword"
-              label="Mot de passe"
-              type="password"
-              prepend-inner-icon="mdi-lock-outline"
-              variant="outlined"
-              density="comfortable"
-              required
-            />
+                <v-text-field
+                  v-model="registerBirthdate"
+                  label="Date de naissance"
+                  type="date"
+                  prepend-inner-icon="mdi-cake-variant-outline"
+                  variant="outlined"
+                  density="comfortable"
+                  class="mb-3"
+                  hide-details="auto"
+                  required
+                />
 
-            <v-text-field
-              v-model="registerBirthdate"
-              label="Date de naissance"
-              type="date"
-              prepend-inner-icon="mdi-cake-variant-outline"
-              variant="outlined"
-              density="comfortable"
-              required
-            />
+                <v-select
+                  v-model="registerRole"
+                  :items="roleOptions"
+                  label="Role"
+                  prepend-inner-icon="mdi-account-badge-outline"
+                  variant="outlined"
+                  density="comfortable"
+                  class="mb-6"
+                  hide-details="auto"
+                  required
+                />
 
-            <v-select
-              v-model="registerRole"
-              :items="roleOptions"
-              label="Rôle"
-              prepend-inner-icon="mdi-account-badge-outline"
-              variant="outlined"
-              density="comfortable"
-              required
-            />
-
-            <v-alert
-              v-if="registerRole === 'coach'"
-              type="info"
-              variant="tonal"
-              density="comfortable"
-              class="auth-alert"
-            >
-              Les comptes coach sont relus après inscription afin de garantir des profils de qualité sur la plateforme.
-            </v-alert>
-
-          </v-card-text>
-
-          <v-card-actions class="auth-card-actions">
-            <v-btn block class="auth-btn auth-btn-secondary" size="large" @click="register">
-              S’inscrire
-            </v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-col>
-    </v-row>
+                <v-btn
+                  type="submit"
+                  block
+                  size="large"
+                  class="auth-submit"
+                  :loading="isRegistering"
+                >
+                  Creer mon compte
+                </v-btn>
+              </v-form>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+    </v-container>
   </v-container>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ROUTE_PATHS } from '@/router/paths'
-import logoUrl from '@/assets/logo.png'
+import MarketingNavbar from '@/components/MarketingNavbar.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
 
-// LOGIN
+const activeMode = ref('login')
+const navItems = [
+  { label: 'Vision', href: `${ROUTE_PATHS.landing}#vision` },
+  { label: 'Fonctionnalites', href: `${ROUTE_PATHS.landing}#fonctionnalites` },
+  { label: 'Apercu', href: `${ROUTE_PATHS.landing}#preview` },
+  { label: 'Equipe', href: `${ROUTE_PATHS.landing}#equipe` },
+  { label: 'Contact', href: `${ROUTE_PATHS.landing}#contact` },
+]
+
 const loginEmail = ref('')
 const loginPassword = ref('')
 const loginError = ref('')
+const showLoginPassword = ref(false)
+const isLoggingIn = ref(false)
 
-// REGISTER
 const registerFirstname = ref('')
 const registerEmail = ref('')
 const registerPassword = ref('')
 const registerBirthdate = ref('')
 const registerRole = ref('apprenant')
 const registerError = ref('')
+const showRegisterPassword = ref(false)
+const isRegistering = ref(false)
 
 const roleOptions = [
   { title: 'Apprenant', value: 'apprenant' },
   { title: 'Coach', value: 'coach' },
 ]
+
+const isRegisterMode = computed(() => activeMode.value === 'register')
+const activeError = computed(() => (isRegisterMode.value ? registerError.value : loginError.value))
 
 const authErrorMessages = {
   'auth/email-already-in-use': 'Cet email est deja utilise.',
@@ -196,19 +217,28 @@ const authErrorMessages = {
 const getAuthErrorMessage = (error) =>
   authErrorMessages[error?.code] || 'Une erreur est survenue. Reessaie.'
 
+watch(activeMode, () => {
+  loginError.value = ''
+  registerError.value = ''
+})
+
 const login = async () => {
   loginError.value = ''
+  isLoggingIn.value = true
 
   try {
     await auth.login(loginEmail.value, loginPassword.value)
-    router.push(ROUTE_PATHS.home)
+    await router.push(ROUTE_PATHS.home)
   } catch (error) {
     loginError.value = getAuthErrorMessage(error)
+  } finally {
+    isLoggingIn.value = false
   }
 }
 
 const register = async () => {
   registerError.value = ''
+  isRegistering.value = true
 
   try {
     await auth.register(
@@ -218,130 +248,107 @@ const register = async () => {
       registerBirthdate.value,
       registerRole.value
     )
-    router.push(ROUTE_PATHS.home)
+    await router.push(ROUTE_PATHS.home)
   } catch (error) {
     registerError.value = getAuthErrorMessage(error)
+  } finally {
+    isRegistering.value = false
   }
 }
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
-.auth-container {
-  position: relative;
+.auth-page {
   min-height: 100vh;
-  padding: 32px 16px 64px;
   background:
-    radial-gradient(circle at top left, rgba(47, 154, 123, 0.18), transparent 32%),
-    radial-gradient(circle at top right, rgba(243, 177, 63, 0.16), transparent 28%),
-    linear-gradient(145deg, #0d1f24 0%, #133a3b 48%, #1b4f51 100%);
-  overflow: hidden;
+    radial-gradient(circle at 12% 10%, rgba(35, 71, 68, 0.1), transparent 24%),
+    radial-gradient(circle at 82% 14%, rgba(181, 93, 63, 0.1), transparent 22%),
+    linear-gradient(180deg, #ffffff 0%, #fffaf5 54%, #ffffff 100%);
 }
 
-.auth-backdrop {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(65% 55% at 18% 16%, rgba(67, 196, 175, 0.18), transparent 70%),
-    radial-gradient(42% 36% at 82% 14%, rgba(245, 191, 71, 0.16), transparent 72%),
-    radial-gradient(55% 48% at 50% 100%, rgba(255, 255, 255, 0.06), transparent 78%);
-  filter: blur(18px);
-  opacity: 0.95;
-  z-index: 0;
-}
-
-.auth-header,
-.auth-grid {
-  position: relative;
-  z-index: 1;
-}
-
-.auth-logo {
-  border-radius: 24px;
-  background: #fff;
-  padding: 12px;
-  box-shadow: none;
-}
-
-.auth-title {
-  margin-top: 16px;
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 28px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: #f8fbfb;
-}
-
-.auth-subtitle {
-  margin-top: 6px;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 15px;
-  color: rgba(248, 251, 251, 0.82);
-}
-
-.auth-grid {
-  margin-top: 28px;
-  gap: 24px;
+.auth-frame {
+  max-width: 1160px;
 }
 
 .auth-card {
-  border-radius: 24px;
-  padding: 6px 6px 10px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(19, 58, 59, 0.08);
-  box-shadow: none;
-  backdrop-filter: blur(12px);
+  border: 1px solid rgba(35, 71, 68, 0.12);
+  background: #ffffff;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 24px 56px rgba(35, 71, 68, 0.08);
 }
 
-.auth-card-title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 22px;
-  font-weight: 600;
-  color: #133a3b;
+.auth-title {
+  color: #234744;
+  font-size: clamp(1.9rem, 4vw, 2.4rem);
+  line-height: 1;
 }
 
-.auth-card-subtitle {
-  font-family: 'DM Sans', sans-serif;
-  font-size: 14px;
-  color: rgba(19, 58, 59, 0.65);
-  margin-top: 4px;
+.auth-subtitle {
+  color: rgba(35, 71, 68, 0.68);
+  line-height: 1.6;
 }
 
-.auth-card-body {
+.auth-toggle {
+  width: 100%;
   display: grid;
-  gap: 16px;
-  padding-top: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-radius: 16px;
+  overflow: hidden;
 }
 
-.auth-alert {
-  margin-bottom: 4px;
+.auth-toggle :deep(.v-btn) {
+  flex: 1 1 50%;
 }
 
-.auth-card-actions {
-  padding: 0 16px 16px;
-}
-
-.auth-btn {
+.auth-toggle__button {
+  min-height: 3rem;
   text-transform: none;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  box-shadow: none !important;
 }
 
-.auth-btn-primary {
-  background: linear-gradient(120deg, #1c7c7d, #2d9a7b);
-  color: #fff;
+:deep(.auth-toggle .v-btn) {
+  color: #234744;
+  background: #ffffff;
 }
 
-.auth-btn-secondary {
-  background: linear-gradient(120deg, #f3b13f, #f07c2f);
-  color: #2b1906;
+:deep(.auth-toggle .v-btn--active) {
+  color: #fffdf8;
+  background: linear-gradient(135deg, #b55d3f, #c97958);
 }
 
-@media (max-width: 960px) {
-  .auth-grid {
-    margin-top: 20px;
-  }
+.auth-submit {
+  min-height: 3.2rem;
+  text-transform: none;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #234744, #2f5a56);
+  color: #fffaf4;
+  box-shadow: none;
 }
+
+.auth-loading-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  width: 100%;
+  margin-top: 0.9rem;
+  color: rgba(35, 71, 68, 0.78);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+:deep(.v-field) {
+  border-radius: 16px;
+}
+
+:deep(.v-field--variant-outlined .v-field__outline) {
+  color: rgba(35, 71, 68, 0.18);
+}
+
+:deep(.v-label.v-field-label) {
+  color: rgba(35, 71, 68, 0.62);
+}
+
 </style>

@@ -1,7 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import logoUrl from '@/assets/logo.png'
 import { db } from '@/services/firebase'
 import {
   addDoc,
@@ -87,6 +86,11 @@ const selectedOtherUser = computed(() => {
 })
 
 const displayedConversations = computed(() => enrichConversations(conversations.value))
+const unreadConversationCount = computed(() =>
+  displayedConversations.value.filter((conv) => lastMessageMap.value[conv.id]).length
+)
+const currentMessageCount = computed(() => messages.value.length)
+const selectedConversationEmpty = computed(() => selectedConversationId.value && messages.value.length === 0)
 
 const toMillis = (value) => {
   if (!value) return 0
@@ -509,24 +513,23 @@ onBeforeUnmount(() => {
 
     <v-row class="chat-hero" align="center" justify="center">
       <v-col cols="12" md="10">
-        <v-card class="chat-hero-card" elevation="8">
+        <v-card class="chat-hero-card" elevation="0">
           <div class="chat-hero-content">
-            <div class="chat-hero-left">
-              <div class="chat-brand">
-                <v-img :src="logoUrl" alt="Logo Persuade" width="72" height="72" class="chat-logo" />
-                <div class="chat-brand-text">Persuade</div>
-              </div>
+            <div class="chat-hero-copy">
               <div class="chat-hero-title">Chat</div>
-              <div class="chat-hero-subtitle">
-                {{ isCoach ? 'Discutez avec vos apprenants.' : 'Contactez les coachs disponibles.' }}
-              </div>
             </div>
 
-            <div class="chat-hero-info">
-              <div class="chat-hero-stat">{{ displayedConversations.length }}</div>
-              <div class="chat-hero-label">conversations</div>
-              <v-btn class="chat-notify" variant="text" @click="requestNotifications">
-                Activer notifications
+            <div class="chat-hero-stats">
+              <v-sheet class="chat-hero-stat-card" rounded="xl">
+                <div class="chat-hero-stat">{{ displayedConversations.length }}</div>
+                <div class="chat-hero-label">conversations</div>
+              </v-sheet>
+              <v-sheet class="chat-hero-stat-card" rounded="xl">
+                <div class="chat-hero-stat">{{ unreadConversationCount }}</div>
+                <div class="chat-hero-label">non lues</div>
+              </v-sheet>
+              <v-btn class="chat-notify" variant="flat" @click="requestNotifications">
+                Activer les notifications
               </v-btn>
             </div>
           </div>
@@ -536,108 +539,142 @@ onBeforeUnmount(() => {
 
     <v-row class="chat-grid" align="center" justify="center">
       <v-col cols="12" md="10">
-        <v-progress-linear v-if="loading" color="#1c7c7d" indeterminate class="mb-6" />
+        <v-progress-linear v-if="loading" color="#2e4b40" indeterminate class="mb-6" />
 
         <v-alert v-if="errorMessage" type="error" variant="tonal" class="mb-6">
           {{ errorMessage }}
         </v-alert>
 
         <div class="chat-shell">
-          <aside class="chat-sidebar">
-            <div class="chat-sidebar-header">
-              <div>
-                <div class="chat-sidebar-title">Conversations</div>
-                <div class="chat-sidebar-subtitle">Vos échanges récents.</div>
+          <v-sheet class="chat-sidebar" rounded="xl">
+            <v-sheet class="chat-sidebar-section chat-sidebar-section--highlight" rounded="xl">
+              <div class="chat-sidebar-header">
+                <div>
+                  <div class="chat-sidebar-title">Conversations</div>
+                  <div class="chat-sidebar-subtitle">Vos échanges récents et leur état.</div>
+                </div>
+                <v-btn class="chat-refresh" variant="text" :loading="refreshing" @click="refreshAll">
+                  Actualiser
+                </v-btn>
               </div>
-              <v-btn class="chat-refresh" variant="text" :loading="refreshing" @click="refreshAll">
-                Actualiser
-              </v-btn>
-            </div>
 
-            <div class="chat-conversation-list" v-if="displayedConversations.length">
-              <button
-                v-for="conv in displayedConversations"
-                :key="conv.id"
-                class="chat-conversation"
-                :class="{ active: conv.id === selectedConversationId }"
-                @click="selectConversation(conv)"
-              >
-                <div class="chat-avatar">
-                  <img
-                    v-if="conv.otherUser?.profilePhoto"
-                    :src="conv.otherUser.profilePhoto"
-                    alt="Photo"
-                    class="chat-avatar-img"
-                  />
-                  <v-icon v-else size="22">mdi-account</v-icon>
-                </div>
-                <div class="chat-conversation-info">
-                  <div class="chat-conversation-head">
-                    <div class="chat-conversation-name">
-                      {{ conv.otherUser?.firstname || conv.otherUser?.email || 'Utilisateur' }}
+              <div class="chat-sidebar-summary">
+                <v-chip class="chat-chip" size="small" variant="flat">
+                  {{ displayedConversations.length }} au total
+                </v-chip>
+                <v-chip class="chat-chip chat-chip--accent" size="small" variant="flat">
+                  {{ unreadConversationCount }} non lue(s)
+                </v-chip>
+              </div>
+
+              <v-list v-if="displayedConversations.length" class="chat-conversation-list" bg-color="transparent">
+                <v-list-item
+                  v-for="conv in displayedConversations"
+                  :key="conv.id"
+                  class="chat-conversation"
+                  :class="{ active: conv.id === selectedConversationId }"
+                  rounded="xl"
+                  @click="selectConversation(conv)"
+                >
+                  <template #prepend>
+                    <v-avatar size="42" class="chat-avatar">
+                      <img
+                        v-if="conv.otherUser?.profilePhoto"
+                        :src="conv.otherUser.profilePhoto"
+                        alt="Photo"
+                        class="chat-avatar-img"
+                      />
+                      <v-icon v-else size="22">mdi-account</v-icon>
+                    </v-avatar>
+                  </template>
+
+                  <div class="chat-conversation-info">
+                    <div class="chat-conversation-head">
+                      <div class="chat-conversation-name">
+                        {{ conv.otherUser?.firstname || conv.otherUser?.email || 'Utilisateur' }}
+                      </div>
+                      <div class="chat-presence" :class="presenceClass(conv.otherUser)">
+                        <span class="chat-presence-dot"></span>
+                        {{ presenceLabel(conv.otherUser) }}
+                      </div>
                     </div>
-                    <div class="chat-presence" :class="presenceClass(conv.otherUser)">
-                      <span class="chat-presence-dot"></span>
-                      {{ presenceLabel(conv.otherUser) }}
+                    <div class="chat-conversation-preview">{{ conv.lastMessage || 'Démarrer la conversation' }}</div>
+                  </div>
+
+                  <template #append>
+                    <div class="chat-conversation-time">
+                      {{ formatDate(conv.updatedAt) }}
+                      <span v-if="lastMessageMap[conv.id]" class="chat-unread-dot"></span>
+                    </div>
+                  </template>
+                </v-list-item>
+              </v-list>
+
+              <v-sheet v-else class="chat-empty" rounded="xl">
+                Aucune conversation pour le moment.
+              </v-sheet>
+            </v-sheet>
+
+            <v-sheet class="chat-sidebar-section" rounded="xl">
+              <div class="chat-contact-header">
+                <div>
+                  <div class="chat-sidebar-title">Contacts {{ contactRole === 'coach' ? 'coachs' : 'apprenants' }}</div>
+                  <div class="chat-sidebar-subtitle">Démarrez rapidement un nouvel échange.</div>
+                </div>
+                <v-text-field
+                  v-model="searchQuery"
+                  density="compact"
+                  placeholder="Rechercher un contact"
+                  variant="outlined"
+                  hide-details
+                  prepend-inner-icon="mdi-magnify"
+                />
+              </div>
+
+              <v-list class="chat-contact-list" bg-color="transparent">
+                <v-list-item
+                  v-for="contact in filteredContacts"
+                  :key="contact.uid"
+                  class="chat-contact"
+                  rounded="xl"
+                  @click="startConversation(contact)"
+                >
+                  <template #prepend>
+                    <v-avatar size="42" class="chat-avatar light">
+                      <img
+                        v-if="contact.profilePhoto"
+                        :src="contact.profilePhoto"
+                        alt="Photo"
+                        class="chat-avatar-img"
+                      />
+                      <v-icon v-else size="22">mdi-account-circle</v-icon>
+                    </v-avatar>
+                  </template>
+
+                  <div class="chat-contact-info">
+                    <div class="chat-contact-name">{{ contact.firstname || contact.email }}</div>
+                    <div class="chat-contact-meta">
+                      {{ contact.role }}
+                      <span class="chat-contact-separator">•</span>
+                      <span class="chat-presence" :class="presenceClass(contact)">
+                        <span class="chat-presence-dot"></span>
+                        {{ presenceLabel(contact) }}
+                      </span>
                     </div>
                   </div>
-                  <div class="chat-conversation-preview">{{ conv.lastMessage || 'Démarrer la conversation' }}</div>
-                </div>
-                <div class="chat-conversation-time">
-                  {{ formatDate(conv.updatedAt) }}
-                  <span v-if="lastMessageMap[conv.id]" class="chat-unread-dot"></span>
-                </div>
-              </button>
-            </div>
 
-            <div v-else class="chat-empty">Aucune conversation pour le moment.</div>
+                  <template #append>
+                    <v-icon size="18" class="chat-contact-arrow">mdi-arrow-up-left</v-icon>
+                  </template>
+                </v-list-item>
+              </v-list>
+            </v-sheet>
+          </v-sheet>
 
-            <div class="chat-contact-header">
-              <div class="chat-sidebar-title">Contacts {{ contactRole === 'coach' ? 'coachs' : 'apprenants' }}</div>
-              <v-text-field
-                v-model="searchQuery"
-                density="compact"
-                placeholder="Rechercher"
-                variant="outlined"
-                hide-details
-              />
-            </div>
-
-            <div class="chat-contact-list">
-              <button
-                v-for="contact in filteredContacts"
-                :key="contact.uid"
-                class="chat-contact"
-                @click="startConversation(contact)"
-              >
-                <div class="chat-avatar light">
-                  <img
-                    v-if="contact.profilePhoto"
-                    :src="contact.profilePhoto"
-                    alt="Photo"
-                    class="chat-avatar-img"
-                  />
-                  <v-icon v-else size="22">mdi-account-circle</v-icon>
-                </div>
-                <div class="chat-contact-info">
-                  <div class="chat-contact-name">{{ contact.firstname || contact.email }}</div>
-                  <div class="chat-contact-meta">
-                    {{ contact.role }}
-                    <span class="chat-contact-separator">•</span>
-                    <span class="chat-presence" :class="presenceClass(contact)">
-                      <span class="chat-presence-dot"></span>
-                      {{ presenceLabel(contact) }}
-                    </span>
-                  </div>
-                </div>
-              </button>
-            </div>
-          </aside>
-
-          <section class="chat-main">
-            <div class="chat-main-header" v-if="selectedOtherUser">
+          <v-sheet class="chat-main" rounded="xl">
+            <div v-if="selectedOtherUser" class="chat-main-header">
               <div class="chat-main-user">
-                <div class="chat-avatar">
+                <v-avatar size="52" class="chat-avatar">
                   <img
                     v-if="selectedOtherUser?.profilePhoto"
                     :src="selectedOtherUser.profilePhoto"
@@ -645,7 +682,7 @@ onBeforeUnmount(() => {
                     class="chat-avatar-img"
                   />
                   <v-icon v-else size="22">mdi-account</v-icon>
-                </div>
+                </v-avatar>
                 <div>
                   <div class="chat-main-name">
                     {{ selectedOtherUser.firstname || selectedOtherUser.email || 'Utilisateur' }}
@@ -660,11 +697,24 @@ onBeforeUnmount(() => {
                   </div>
                 </div>
               </div>
+
+              <div class="chat-main-header__stats">
+                <v-chip class="chat-chip" size="small" variant="flat">
+                  {{ currentMessageCount }} message(s)
+                </v-chip>
+                <v-chip class="chat-chip" size="small" variant="flat">
+                  {{ selectedConversation?.lastMessage ? 'Conversation active' : 'Nouveau fil' }}
+                </v-chip>
+              </div>
             </div>
 
-            <div class="chat-placeholder" v-else>
-              Sélectionnez une conversation ou un contact pour commencer.
-            </div>
+            <v-sheet v-else class="chat-placeholder" rounded="xl">
+              <v-icon size="28" class="mb-3">mdi-message-outline</v-icon>
+              <div class="chat-placeholder__title">Sélectionnez une conversation</div>
+              <div class="chat-placeholder__text">
+                Choisissez un échange existant ou démarrez une discussion depuis la liste des contacts.
+              </div>
+            </v-sheet>
 
             <div v-if="selectedConversationId" class="chat-messages">
               <div
@@ -673,7 +723,7 @@ onBeforeUnmount(() => {
                 class="chat-message"
                 :class="{ mine: message.senderId === profile?.uid }"
               >
-                <div class="chat-message-avatar" v-if="message.senderId !== profile?.uid">
+                <v-avatar size="30" class="chat-message-avatar" v-if="message.senderId !== profile?.uid">
                   <img
                     v-if="selectedOtherUser?.profilePhoto"
                     :src="selectedOtherUser.profilePhoto"
@@ -681,8 +731,8 @@ onBeforeUnmount(() => {
                     class="chat-avatar-img"
                   />
                   <v-icon v-else size="16">mdi-account</v-icon>
-                </div>
-                <div class="chat-message-avatar mine" v-else>
+                </v-avatar>
+                <v-avatar size="30" class="chat-message-avatar mine" v-else>
                   <img
                     v-if="profile?.profilePhoto"
                     :src="profile.profilePhoto"
@@ -690,38 +740,44 @@ onBeforeUnmount(() => {
                     class="chat-avatar-img"
                   />
                   <v-icon v-else size="16">mdi-account</v-icon>
-                </div>
-                <div class="chat-message-bubble">
-                  <div v-if="message.text">{{ message.text }}</div>
-                  <div v-if="message.attachment" class="chat-attachment">
-                    <img
-                      v-if="message.attachment.dataUrl && message.attachment.mime?.startsWith('image')"
-                      :src="message.attachment.dataUrl"
-                      alt="Pièce jointe"
-                    />
-                    <a
-                      v-else-if="message.attachment.dataUrl"
-                      :href="message.attachment.dataUrl"
-                      :download="message.attachment.name || 'fichier'"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {{ message.attachment.name || 'Télécharger le fichier' }}
-                    </a>
-                    <a
-                      v-else-if="message.attachment.url"
-                      :href="message.attachment.url"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {{ message.attachment.name || 'Ouvrir la pièce jointe' }}
-                    </a>
+                </v-avatar>
+                <div class="chat-message-stack">
+                  <v-sheet class="chat-message-bubble" :class="{ 'chat-message-bubble--mine': message.senderId === profile?.uid }" rounded="xl">
+                    <div v-if="message.text">{{ message.text }}</div>
+                    <div v-if="message.attachment" class="chat-attachment">
+                      <img
+                        v-if="message.attachment.dataUrl && message.attachment.mime?.startsWith('image')"
+                        :src="message.attachment.dataUrl"
+                        alt="Pièce jointe"
+                      />
+                      <a
+                        v-else-if="message.attachment.dataUrl"
+                        :href="message.attachment.dataUrl"
+                        :download="message.attachment.name || 'fichier'"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {{ message.attachment.name || 'Télécharger le fichier' }}
+                      </a>
+                      <a
+                        v-else-if="message.attachment.url"
+                        :href="message.attachment.url"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {{ message.attachment.name || 'Ouvrir la pièce jointe' }}
+                      </a>
+                    </div>
+                  </v-sheet>
+                  <div class="chat-message-time">
+                    {{ formatTimestamp(message.createdAt) }}
                   </div>
                 </div>
-                <div class="chat-message-time">
-                  {{ formatTimestamp(message.createdAt) }}
-                </div>
               </div>
+
+              <v-sheet v-if="selectedConversationEmpty" class="chat-empty chat-empty--messages" rounded="xl">
+                Aucun message pour le moment. Envoyez le premier.
+              </v-sheet>
             </div>
 
             <div v-if="selectedConversationId" class="chat-input">
@@ -735,12 +791,12 @@ onBeforeUnmount(() => {
                   variant="outlined"
                   hide-details
                 />
-                <div v-if="attachment" class="chat-attachment-preview">
+                <v-sheet v-if="attachment" class="chat-attachment-preview" rounded="xl">
                   <div class="chat-attachment-name">
                     {{ attachment.name || 'Pièce jointe' }}
                   </div>
                   <v-btn size="small" variant="text" @click="clearAttachment">Retirer</v-btn>
-                </div>
+                </v-sheet>
               </div>
               <div class="chat-input-actions">
                 <v-file-input
@@ -749,13 +805,14 @@ onBeforeUnmount(() => {
                   variant="outlined"
                   hide-details
                   prepend-icon=""
+                  prepend-inner-icon="mdi-paperclip"
                   label="Pièce jointe"
                   @update:modelValue="handleFileSelected"
                 />
                 <v-btn class="chat-send" :loading="sending" @click="sendMessage">Envoyer</v-btn>
               </div>
             </div>
-          </section>
+          </v-sheet>
         </div>
       </v-col>
     </v-row>
@@ -767,25 +824,35 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
 .chat-container {
+  --chat-bg: #ffffff;
+  --chat-surface: rgba(255, 250, 243, 0.92);
+  --chat-surface-strong: #fff9f1;
+  --chat-line: rgba(28, 26, 22, 0.1);
+  --chat-ink: #1c1a16;
+  --chat-muted: #625b53;
+  --chat-accent: #b55d3f;
+  --chat-accent-soft: rgba(181, 93, 63, 0.12);
+  --chat-forest: #2e4b40;
+  --chat-forest-soft: rgba(46, 75, 64, 0.1);
   position: relative;
   min-height: 100vh;
   padding: 40px 16px 72px;
-  background: #f6f2ea;
+  background: var(--chat-bg);
   overflow: hidden;
+  font-family: 'Avenir Next', 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
 .chat-backdrop {
   position: absolute;
   inset: -25% -15% auto -15%;
   height: 55%;
-  background: radial-gradient(120% 120% at 10% 15%, rgba(22, 130, 132, 0.2), transparent 60%),
-    radial-gradient(80% 80% at 85% 5%, rgba(245, 191, 71, 0.18), transparent 55%),
-    linear-gradient(120deg, rgba(14, 82, 84, 0.08), rgba(245, 191, 71, 0.08));
-  filter: blur(12px);
+  background:
+    radial-gradient(120% 120% at 10% 15%, rgba(46, 75, 64, 0.08), transparent 60%),
+    radial-gradient(80% 80% at 85% 5%, rgba(181, 93, 63, 0.08), transparent 55%);
+  filter: blur(18px);
   z-index: 0;
+  pointer-events: none;
 }
 
 .chat-hero,
@@ -797,79 +864,85 @@ onBeforeUnmount(() => {
 .chat-hero-card {
   border-radius: 28px;
   padding: 24px;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(19, 58, 59, 0.1);
-  box-shadow: 0 20px 45px rgba(12, 31, 32, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 241, 233, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  box-shadow: 0 24px 56px rgba(21, 18, 14, 0.1);
 }
 
 .chat-hero-content {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
 }
 
-.chat-brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 12px;
+.chat-hero-copy {
+  max-width: 42rem;
 }
 
-.chat-logo {
-  border-radius: 20px;
-  background: #fff;
-  padding: 8px;
-  box-shadow: 0 14px 26px rgba(12, 31, 32, 0.18);
-}
-
-.chat-brand-text {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 18px;
-  font-weight: 600;
-  color: #133a3b;
-  letter-spacing: 0.02em;
+.chat-hero-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--chat-accent);
 }
 
 .chat-hero-title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 26px;
+  margin-top: 8px;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+  font-size: clamp(2rem, 3vw, 2.8rem);
   font-weight: 700;
-  color: #133a3b;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--chat-ink);
 }
 
 .chat-hero-subtitle {
-  margin-top: 6px;
-  font-family: 'DM Sans', sans-serif;
+  margin-top: 10px;
   font-size: 15px;
-  color: rgba(19, 58, 59, 0.7);
+  line-height: 1.7;
+  color: var(--chat-muted);
 }
 
-.chat-hero-info {
-  text-align: right;
-  display: grid;
-  justify-items: end;
-  gap: 6px;
+.chat-hero-stats {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.chat-hero-stat-card {
+  min-width: 136px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid var(--chat-line);
 }
 
 .chat-hero-stat {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 30px;
   font-weight: 700;
-  color: #133a3b;
+  color: var(--chat-ink);
 }
 
 .chat-hero-label {
   font-size: 12px;
-  color: rgba(19, 58, 59, 0.6);
+  color: var(--chat-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
 .chat-notify {
   text-transform: none;
-  font-weight: 600;
+  font-weight: 700;
+  min-height: 100%;
+  background: var(--chat-forest);
+  color: #fff8f2;
+  border-radius: 18px;
 }
 
 .chat-grid {
@@ -878,21 +951,30 @@ onBeforeUnmount(() => {
 
 .chat-shell {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) 1fr;
+  grid-template-columns: minmax(280px, 340px) 1fr;
   gap: 24px;
 }
 
 .chat-sidebar {
-  background: rgba(255, 255, 255, 0.95);
+  background: transparent;
   border-radius: 24px;
-  border: 1px solid rgba(19, 58, 59, 0.08);
-  box-shadow: 0 18px 35px rgba(12, 31, 32, 0.12);
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.chat-sidebar-section {
   padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-height: 640px;
-  overflow: hidden;
+  border-radius: 24px;
+  background: var(--chat-surface);
+  border: 1px solid var(--chat-line);
+  box-shadow: 0 18px 44px rgba(44, 29, 16, 0.08);
+}
+
+.chat-sidebar-section--highlight {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 241, 233, 0.92));
 }
 
 .chat-sidebar-header {
@@ -903,62 +985,72 @@ onBeforeUnmount(() => {
 }
 
 .chat-sidebar-title {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 16px;
   font-weight: 600;
-  color: #133a3b;
+  color: var(--chat-ink);
 }
 
 .chat-sidebar-subtitle {
   font-size: 12px;
-  color: rgba(19, 58, 59, 0.6);
+  color: var(--chat-muted);
 }
 
 .chat-refresh {
   text-transform: none;
-  font-weight: 600;
+  font-weight: 700;
+}
+
+.chat-sidebar-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 14px 0 12px;
+}
+
+.chat-chip {
+  background: var(--chat-forest-soft);
+  color: var(--chat-forest);
+  font-weight: 700;
+}
+
+.chat-chip--accent {
+  background: var(--chat-accent-soft);
+  color: var(--chat-accent);
 }
 
 .chat-conversation-list {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   overflow: auto;
   padding-right: 4px;
+  max-height: 320px;
 }
 
 .chat-conversation {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 10px;
-  align-items: center;
-  padding: 10px;
-  border-radius: 16px;
+  margin-bottom: 0 !important;
+  padding: 10px 12px;
+  border-radius: 18px;
   border: 1px solid transparent;
-  background: rgba(19, 58, 59, 0.04);
-  text-align: left;
-  cursor: pointer;
+  background: rgba(46, 75, 64, 0.04);
 }
 
 .chat-conversation.active {
-  border-color: rgba(28, 124, 125, 0.4);
-  background: rgba(28, 124, 125, 0.12);
+  border-color: rgba(181, 93, 63, 0.2);
+  background: rgba(181, 93, 63, 0.09);
 }
 
 .chat-avatar {
-  width: 38px;
-  height: 38px;
   border-radius: 12px;
-  background: rgba(28, 124, 125, 0.15);
-  color: #1c7c7d;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: rgba(46, 75, 64, 0.12);
+  color: var(--chat-forest);
   overflow: hidden;
 }
 
 .chat-avatar.light {
-  background: rgba(245, 177, 63, 0.2);
-  color: #a96014;
+  background: rgba(181, 93, 63, 0.12);
+  color: var(--chat-accent);
 }
 
 .chat-avatar-img {
@@ -983,18 +1075,19 @@ onBeforeUnmount(() => {
 .chat-conversation-name {
   font-size: 13px;
   font-weight: 600;
-  color: #133a3b;
+  color: var(--chat-ink);
 }
 
 .chat-conversation-preview {
   font-size: 12px;
-  color: rgba(19, 58, 59, 0.6);
+  color: var(--chat-muted);
 }
 
 .chat-conversation-time {
   font-size: 11px;
-  color: rgba(19, 58, 59, 0.45);
+  color: rgba(28, 26, 22, 0.45);
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   gap: 6px;
 }
@@ -1008,8 +1101,10 @@ onBeforeUnmount(() => {
 }
 
 .chat-empty {
+  padding: 14px 16px;
+  background: rgba(46, 75, 64, 0.04);
   font-size: 12px;
-  color: rgba(19, 58, 59, 0.6);
+  color: var(--chat-muted);
 }
 
 .chat-contact-header {
@@ -1022,45 +1117,45 @@ onBeforeUnmount(() => {
   gap: 10px;
   overflow: auto;
   padding-right: 4px;
+  max-height: 260px;
 }
 
 .chat-contact {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 10px;
-  align-items: center;
-  padding: 10px;
-  border-radius: 14px;
-  background: rgba(19, 58, 59, 0.04);
+  margin-bottom: 0 !important;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(46, 75, 64, 0.04);
   border: 1px solid transparent;
-  text-align: left;
-  cursor: pointer;
 }
 
 .chat-contact:hover {
-  border-color: rgba(245, 177, 63, 0.4);
+  border-color: rgba(181, 93, 63, 0.2);
 }
 
 .chat-contact-name {
   font-size: 13px;
   font-weight: 600;
-  color: #133a3b;
+  color: var(--chat-ink);
 }
 
 .chat-contact-meta {
   font-size: 11px;
-  color: rgba(19, 58, 59, 0.6);
+  color: var(--chat-muted);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
 }
 
+.chat-contact-arrow {
+  color: rgba(28, 26, 22, 0.42);
+}
+
 .chat-main {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--chat-surface);
   border-radius: 24px;
-  border: 1px solid rgba(19, 58, 59, 0.08);
-  box-shadow: 0 18px 35px rgba(12, 31, 32, 0.12);
+  border: 1px solid var(--chat-line);
+  box-shadow: 0 18px 44px rgba(44, 29, 16, 0.08);
   padding: 18px;
   min-height: 520px;
   display: flex;
@@ -1072,7 +1167,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   align-items: center;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(19, 58, 59, 0.08);
+  border-bottom: 1px solid var(--chat-line);
 }
 
 .chat-main-user {
@@ -1084,20 +1179,27 @@ onBeforeUnmount(() => {
 .chat-main-name {
   font-size: 16px;
   font-weight: 600;
-  color: #133a3b;
+  color: var(--chat-ink);
 }
 
 .chat-main-meta {
   font-size: 12px;
-  color: rgba(19, 58, 59, 0.6);
+  color: var(--chat-muted);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
 }
 
+.chat-main-header__stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .chat-contact-separator {
-  color: rgba(19, 58, 59, 0.35);
+  color: rgba(28, 26, 22, 0.35);
 }
 
 .chat-presence {
@@ -1118,21 +1220,38 @@ onBeforeUnmount(() => {
 }
 
 .chat-presence--online {
-  color: #1f8f57;
+  color: #2e7d4d;
 }
 
 .chat-presence--away {
-  color: #ba7b11;
+  color: #9a6f19;
 }
 
 .chat-presence--offline {
-  color: rgba(19, 58, 59, 0.48);
+  color: rgba(28, 26, 22, 0.45);
 }
 
 .chat-placeholder {
   margin-top: 24px;
+  padding: 36px 24px;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  background: rgba(46, 75, 64, 0.04);
+  color: var(--chat-muted);
+}
+
+.chat-placeholder__title {
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+  font-size: 1.5rem;
+  color: var(--chat-ink);
+}
+
+.chat-placeholder__text {
+  margin-top: 8px;
+  max-width: 28rem;
   font-size: 13px;
-  color: rgba(19, 58, 59, 0.6);
+  line-height: 1.6;
 }
 
 .chat-messages {
@@ -1155,34 +1274,34 @@ onBeforeUnmount(() => {
   flex-direction: row-reverse;
 }
 
+.chat-message-stack {
+  display: grid;
+  gap: 6px;
+}
+
 .chat-message-bubble {
-  background: rgba(19, 58, 59, 0.08);
+  background: rgba(46, 75, 64, 0.08);
   padding: 10px 14px;
-  border-radius: 14px;
+  border-radius: 16px;
   font-size: 14px;
-  color: #133a3b;
+  color: var(--chat-ink);
   max-width: 70%;
 }
 
 .chat-message-avatar {
-  width: 28px;
-  height: 28px;
   border-radius: 10px;
-  background: rgba(28, 124, 125, 0.18);
-  color: #1c7c7d;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: rgba(46, 75, 64, 0.12);
+  color: var(--chat-forest);
   overflow: hidden;
   margin-top: 2px;
 }
 
 .chat-message-avatar.mine {
-  background: rgba(19, 58, 59, 0.18);
+  background: rgba(181, 93, 63, 0.12);
 }
 
-.chat-message.mine .chat-message-bubble {
-  background: rgba(28, 124, 125, 0.16);
+.chat-message-bubble--mine {
+  background: rgba(181, 93, 63, 0.12);
 }
 
 .chat-attachment img {
@@ -1193,7 +1312,7 @@ onBeforeUnmount(() => {
 
 .chat-message-time {
   font-size: 11px;
-  color: rgba(19, 58, 59, 0.5);
+  color: rgba(28, 26, 22, 0.46);
 }
 
 .chat-input {
@@ -1202,7 +1321,7 @@ onBeforeUnmount(() => {
   gap: 12px;
   align-items: end;
   padding-top: 12px;
-  border-top: 1px solid rgba(19, 58, 59, 0.08);
+  border-top: 1px solid var(--chat-line);
 }
 
 .chat-input-stack {
@@ -1221,20 +1340,25 @@ onBeforeUnmount(() => {
   gap: 12px;
   padding: 8px 12px;
   border-radius: 12px;
-  background: rgba(19, 58, 59, 0.06);
+  background: rgba(46, 75, 64, 0.06);
 }
 
 .chat-attachment-name {
   font-size: 12px;
   font-weight: 600;
-  color: #133a3b;
+  color: var(--chat-ink);
 }
 
 .chat-send {
   text-transform: none;
-  font-weight: 600;
-  background: linear-gradient(120deg, #1c7c7d, #2d9a7b);
-  color: #fff;
+  font-weight: 700;
+  background: var(--chat-forest);
+  color: #fff8f2;
+}
+
+.chat-empty--messages {
+  justify-self: center;
+  width: fit-content;
 }
 
 @media (max-width: 960px) {
@@ -1242,8 +1366,14 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 
-  .chat-sidebar {
-    max-height: none;
+  .chat-hero-stats,
+  .chat-main-header,
+  .chat-main-header__stats {
+    justify-content: flex-start;
+  }
+
+  .chat-input {
+    grid-template-columns: 1fr;
   }
 }
 </style>

@@ -4,6 +4,9 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ROUTE_PATHS } from '@/router/paths'
 import AppNewsCarousel from '@/components/AppNewsCarousel.vue'
+import DashboardMetricTile from '@/components/dashboard/DashboardMetricTile.vue'
+import DashboardSectionCard from '@/components/dashboard/DashboardSectionCard.vue'
+import DashboardSurfaceItem from '@/components/dashboard/DashboardSurfaceItem.vue'
 import api from '@/services/api'
 import { db } from '@/services/firebase'
 import { getUserProfile } from '@/services/userService'
@@ -635,6 +638,7 @@ const learnerQuickViewPriority = computed(() => {
     return {
       label: 'Priorité du moment',
       value: acceptedLearnerCourses.value[0]?.courseTitle || 'Cours particulier actif',
+      route: null,
     }
   }
 
@@ -642,6 +646,7 @@ const learnerQuickViewPriority = computed(() => {
     return {
       label: 'Session à préparer',
       value: nextRegisteredMasterclass.value?.masterclassTitle || 'Masterclass confirmée',
+      route: null,
     }
   }
 
@@ -649,12 +654,17 @@ const learnerQuickViewPriority = computed(() => {
     return {
       label: 'En attente',
       value: `${pendingCourseRequests.value.length + pendingRegistrations.value.length} validation(s) en cours`,
+      route: null,
     }
   }
 
   return {
     label: 'À lancer',
     value: latestLibraryCourse.value?.title || 'Votre premier parcours d’apprentissage',
+    route: {
+      path: ROUTE_PATHS.courses,
+      query: { autoplay: 'first' },
+    },
   }
 })
 
@@ -679,7 +689,7 @@ const coachQuickViewNextStep = computed(() => {
   }
 })
 
-const quickViewTitle = computed(() => (isCoach.value ? 'Vue rapide coach' : 'Vue rapide apprenant'))
+const quickViewTitle = computed(() => (isCoach.value ? 'Tableau de bord coach' : 'Tableau de bord'))
 const quickViewSubtitle = computed(() =>
   isCoach.value
     ? 'Gardez sous les yeux vos apprenants, les priorités de suivi et les prochaines sessions.'
@@ -1017,7 +1027,6 @@ onMounted(async () => {
     profileError.value = 'Impossible de charger une partie du tableau de bord.'
     console.error(error)
   }
-
   loadingProfile.value = false
 })
 
@@ -1046,7 +1055,7 @@ watch(
 
     <v-row class="home-top-grid" align="stretch" justify="center">
       <v-col cols="12" md="10">
-        <div class="home-hero-panel home-hero-panel--top">
+        <v-sheet class="home-hero-panel home-hero-panel--top" rounded="xl">
           <div class="home-hero-panel__header">
             <div>
               <div class="home-hero-panel__eyebrow">Vue rapide</div>
@@ -1059,21 +1068,20 @@ watch(
           </div>
 
           <div class="home-hero-signal-grid home-hero-signal-grid--wide">
-            <div
+            <DashboardMetricTile
               v-for="signal in quickViewStats"
               :key="signal.label"
-              class="home-hero-signal"
-              :class="`home-hero-signal--${signal.tone}`"
-            >
-              <div class="home-hero-signal__label">{{ signal.label }}</div>
-              <div class="home-hero-signal__value">{{ signal.value }}</div>
-              <div class="home-hero-signal__detail">{{ signal.detail }}</div>
-            </div>
+              :label="signal.label"
+              :value="signal.value"
+              :detail="signal.detail"
+              :tone="signal.tone"
+              :icon="signal.icon"
+            />
           </div>
 
           <div class="home-quickview-grid">
             <div class="home-quickview-list">
-              <div v-for="item in quickViewPrimaryItems" :key="item.label" class="home-quickview-item">
+              <v-sheet v-for="item in quickViewPrimaryItems" :key="item.label" class="home-quickview-item" rounded="xl">
                 <div class="home-quickview-item__icon">
                   <v-icon size="18">{{ item.icon }}</v-icon>
                 </div>
@@ -1081,23 +1089,32 @@ watch(
                   <div class="home-quickview-item__label">{{ item.label }}</div>
                   <div class="home-quickview-item__value">{{ item.state }}</div>
                 </div>
-              </div>
+              </v-sheet>
 
-              <div class="home-quickview-item home-quickview-item--priority">
+              <v-sheet
+                class="home-quickview-item home-quickview-item--priority"
+                :class="{ 'home-quickview-item--interactive': !isCoach && learnerQuickViewPriority.route }"
+                rounded="xl"
+                :tag="!isCoach && learnerQuickViewPriority.route ? 'button' : 'div'"
+                @click="!isCoach && learnerQuickViewPriority.route ? router.push(learnerQuickViewPriority.route) : null"
+              >
                 <div class="home-quickview-item__icon">
                   <v-icon size="18">{{ isCoach ? 'mdi-bullseye-arrow' : 'mdi-flag-checkered' }}</v-icon>
                 </div>
                 <div class="home-quickview-item__content">
-                  <div class="home-quickview-item__label">
+                  <div
+                    class="home-quickview-item__label"
+                    :class="{ 'home-quickview-item__label--strong': !isCoach && learnerQuickViewPriority.label === 'À lancer' }"
+                  >
                     {{ isCoach ? coachQuickViewNextStep.title : learnerQuickViewPriority.label }}
                   </div>
                   <div class="home-quickview-item__value">
                     {{ isCoach ? coachQuickViewNextStep.detail : learnerQuickViewPriority.value }}
                   </div>
                 </div>
-              </div>
+              </v-sheet>
 
-              <div v-if="!isCoach" class="home-quickview-item home-quickview-item--priority">
+              <v-sheet v-if="!isCoach" class="home-quickview-item home-quickview-item--priority" rounded="xl">
                 <div class="home-quickview-item__icon">
                   <v-icon size="18">mdi-arrow-right-circle-outline</v-icon>
                 </div>
@@ -1105,7 +1122,7 @@ watch(
                   <div class="home-quickview-item__label">{{ learnerQuickViewNextStep.title }}</div>
                   <div class="home-quickview-item__value">{{ learnerQuickViewNextStep.detail }}</div>
                 </div>
-              </div>
+              </v-sheet>
             </div>
 
             <div class="home-hero-actions">
@@ -1123,7 +1140,7 @@ watch(
               </v-btn>
             </div>
           </div>
-        </div>
+        </v-sheet>
       </v-col>
     </v-row>
 
@@ -1160,45 +1177,40 @@ watch(
 
     <v-row v-if="isCoach" class="home-grid" align="center" justify="center">
       <v-col cols="12" md="10">
-        <v-card class="home-card" elevation="6">
-          <div class="home-card-header">
-            <div>
-              <div class="home-card-title">Planning coach</div>
-              <div class="home-card-subtitle">Les suivis à organiser et les prochaines sessions prévues avec vos clients.</div>
+        <DashboardSectionCard
+          title="Planning coach"
+          subtitle="Les suivis à organiser et les prochaines sessions prévues avec vos clients."
+          :chip="`${coachPlanningEntries.length} éléments`"
+        >
+          <template #default>
+            <div v-if="coachPlanningEntries.length" class="home-planning-list">
+              <DashboardSurfaceItem
+                v-for="entry in coachPlanningEntries"
+                :key="entry.id"
+                :title="entry.title"
+                :detail="`${entry.clientName} · ${entry.status}`"
+                :meta="entry.whenLabel"
+                :tone="entry.tone"
+                icon="mdi-calendar-check-outline"
+              />
             </div>
-            <v-chip class="home-chip" size="small" variant="flat">{{ coachPlanningEntries.length }} éléments</v-chip>
-          </div>
 
-          <div v-if="coachPlanningEntries.length" class="home-planning-list">
-            <div
-              v-for="entry in coachPlanningEntries"
-              :key="entry.id"
-              class="home-planning-item"
-              :class="`home-planning-item--${entry.tone}`"
-            >
-              <div class="home-planning-item__main">
-                <div class="home-planning-item__title">{{ entry.title }}</div>
-                <div class="home-planning-item__meta">{{ entry.clientName }} · {{ entry.status }}</div>
-              </div>
-              <div class="home-planning-item__when">{{ entry.whenLabel }}</div>
-            </div>
-          </div>
-
-          <div v-else class="home-empty-state">
-            Aucun élément de planning pour le moment.
-          </div>
-        </v-card>
+            <v-sheet v-else class="home-empty-state" rounded="xl">
+              Aucun élément de planning pour le moment.
+            </v-sheet>
+          </template>
+        </DashboardSectionCard>
       </v-col>
     </v-row>
 
     <v-row v-if="isCoach" class="home-grid" align="center" justify="center">
       <v-col cols="12" md="10">
-        <v-card class="home-card home-card--coach-clients" elevation="6">
-          <div class="home-card-header">
-            <div>
-              <div class="home-card-title">Suivi clients</div>
-              <div class="home-card-subtitle">Visualisez l’activité de vos apprenants, les cours validés et les sessions à venir.</div>
-            </div>
+        <DashboardSectionCard
+          title="Suivi clients"
+          subtitle="Visualisez l’activité de vos apprenants, les cours validés et les sessions à venir."
+          extra-class="home-card--coach-clients"
+        >
+          <template #header-actions>
             <div class="home-card-header-actions">
               <v-chip class="home-chip" size="small" variant="flat">
                 {{ coachClientSummaryStats?.totalClients || 0 }} clients
@@ -1210,30 +1222,25 @@ watch(
                 <v-btn value="planned" size="small">Planifiés</v-btn>
               </v-btn-toggle>
             </div>
-          </div>
+          </template>
 
           <div class="home-coach-summary-grid">
-            <div class="home-coach-summary-pill">
-              <div class="home-coach-summary-pill__label">Clients actifs</div>
-              <div class="home-coach-summary-pill__value">{{ coachClientSummaryStats?.activeClients || 0 }}</div>
-            </div>
-            <div class="home-coach-summary-pill">
-              <div class="home-coach-summary-pill__label">À relancer</div>
-              <div class="home-coach-summary-pill__value">{{ coachClientSummaryStats?.clientsNeedingReply || 0 }}</div>
-            </div>
-            <div class="home-coach-summary-pill">
-              <div class="home-coach-summary-pill__label">Sessions prévues</div>
-              <div class="home-coach-summary-pill__value">
-                {{ coachClientSummaries.reduce((total, client) => total + client.activeMasterclasses, 0) }}
-              </div>
-            </div>
+            <DashboardMetricTile label="Clients actifs" :value="coachClientSummaryStats?.activeClients || 0" tone="teal" icon="mdi-account-group-outline" />
+            <DashboardMetricTile label="À relancer" :value="coachClientSummaryStats?.clientsNeedingReply || 0" tone="coral" icon="mdi-bell-ring-outline" />
+            <DashboardMetricTile
+              label="Sessions prévues"
+              :value="coachClientSummaries.reduce((total, client) => total + client.activeMasterclasses, 0)"
+              tone="gold"
+              icon="mdi-calendar-star"
+            />
           </div>
 
           <div v-if="filteredCoachClientSummaries.length" class="home-coach-client-list">
-            <div
+            <v-sheet
               v-for="client in filteredCoachClientSummaries.slice(0, 8)"
               :key="client.key"
               class="home-coach-client-card"
+              rounded="xl"
             >
               <div class="home-coach-client-card__head">
                 <div>
@@ -1373,33 +1380,32 @@ watch(
                   @update:modelValue="updateCoachClientNote(client.key, $event)"
                 />
               </div>
-            </div>
+            </v-sheet>
           </div>
 
-          <div v-else class="home-empty-state">
+          <v-sheet v-else class="home-empty-state" rounded="xl">
             Aucun client suivi pour le moment. Les demandes de cours et inscriptions apparaîtront ici.
-          </div>
-        </v-card>
+          </v-sheet>
+        </DashboardSectionCard>
       </v-col>
     </v-row>
 
     <v-row v-if="learnerGuidedPaths.length" class="home-grid" align="center" justify="center">
       <v-col cols="12" md="10">
-        <v-card class="home-card home-card--paths home-card--feature" elevation="6">
-          <div class="home-card-header">
-            <div>
-              <div class="home-card-title">Parcours guidés</div>
-              <div class="home-card-subtitle">Commencer, continuer ou approfondir selon votre niveau actuel.</div>
-            </div>
-            <v-chip class="home-chip" size="small" variant="flat">Bibliothèque</v-chip>
-          </div>
-
+        <DashboardSectionCard
+          title="Parcours guidés"
+          subtitle="Commencer, continuer ou approfondir selon votre niveau actuel."
+          chip="Bibliothèque"
+          feature
+          extra-class="home-card--paths"
+        >
           <div class="home-path-grid">
-            <div
+            <v-sheet
               v-for="path in learnerGuidedPaths"
               :key="path.id"
               class="home-path-card"
               :class="`home-path-card--${path.tone}`"
+              rounded="xl"
             >
               <div class="home-path-card__header">
                 <div>
@@ -1426,23 +1432,20 @@ watch(
               <v-btn class="home-path-card__cta" variant="flat" :to="ROUTE_PATHS.courses">
                 Voir les cours
               </v-btn>
-            </div>
+            </v-sheet>
           </div>
-        </v-card>
+        </DashboardSectionCard>
       </v-col>
     </v-row>
 
     <v-row v-if="!isCoach" class="home-grid" align="center" justify="center">
       <v-col cols="12" md="10">
-        <v-card class="home-card home-card--feature" elevation="6">
-          <div class="home-card-header">
-            <div>
-              <div class="home-card-title">Demande de suivi approfondi</div>
-              <div class="home-card-subtitle">Connectez-vous à un coach pour un accompagnement plus poussé et personnalisé.</div>
-            </div>
-            <v-chip class="home-chip" size="small" variant="flat">{{ followupRequests.length }} demande(s)</v-chip>
-          </div>
-
+        <DashboardSectionCard
+          title="Demande de suivi approfondi"
+          subtitle="Connectez-vous à un coach pour un accompagnement plus poussé et personnalisé."
+          :chip="`${followupRequests.length} demande(s)`"
+          feature
+        >
           <div class="home-followup-grid">
             <v-select
               v-model="selectedCoachId"
@@ -1517,15 +1520,17 @@ watch(
           </div>
 
           <div v-if="followupRequests.length" class="home-followup-list">
-            <div v-for="request in followupRequests" :key="request.id" class="home-followup-item">
-              <div>
-                <div class="home-followup-item__title">{{ request.coachName || 'Coach' }}</div>
-                <div class="home-followup-item__meta">{{ request.message || 'Demande de suivi approfondi' }}</div>
-              </div>
-              <v-chip size="small" class="home-chip" variant="flat">{{ request.status }}</v-chip>
-            </div>
+            <DashboardSurfaceItem
+              v-for="request in followupRequests"
+              :key="request.id"
+              :title="request.coachName || 'Coach'"
+              :detail="request.message || 'Demande de suivi approfondi'"
+              :meta="request.status"
+              icon="mdi-account-voice"
+              tone="teal"
+            />
           </div>
-        </v-card>
+        </DashboardSectionCard>
       </v-col>
     </v-row>
 
@@ -1601,52 +1606,42 @@ watch(
 
     <v-row class="home-grid home-grid--balanced" align="stretch" justify="center">
       <v-col cols="12" md="5">
-        <v-card class="home-card home-card--side" elevation="6">
-          <div class="home-card-header">
-            <div>
-              <div class="home-card-title">Activité récente</div>
-              <div class="home-card-subtitle">Ce qui s’est passé sur votre compte</div>
-            </div>
-            <v-chip class="home-chip" size="small" variant="flat">
-              {{ loadingProfile ? 'Synchronisation…' : 'À jour' }}
-            </v-chip>
-          </div>
-
+        <DashboardSectionCard
+          title="Activité récente"
+          subtitle="Ce qui s’est passé sur votre compte"
+          :chip="loadingProfile ? 'Synchronisation…' : 'À jour'"
+          side
+        >
           <div class="home-activity-list">
-            <div class="home-activity-item" v-for="activity in activities" :key="activity.title">
-              <div class="home-activity-icon">
-                <v-icon size="20">{{ activity.icon }}</v-icon>
-              </div>
-              <div class="home-activity-content">
-                <div class="home-activity-title">{{ activity.title }}</div>
-                <div class="home-activity-detail">{{ activity.detail }}</div>
-              </div>
-              <div class="home-activity-time">{{ activity.time }}</div>
-            </div>
+            <DashboardSurfaceItem
+              v-for="activity in activities"
+              :key="activity.title"
+              :title="activity.title"
+              :detail="activity.detail"
+              :meta="activity.time"
+              :icon="activity.icon"
+              tone="teal"
+            />
           </div>
-        </v-card>
+        </DashboardSectionCard>
       </v-col>
 
       <v-col cols="12" md="5">
-        <v-card class="home-card home-card--side" elevation="6">
-          <div class="home-card-header">
-            <div>
-              <div class="home-card-title">Focus du moment</div>
-              <div class="home-card-subtitle">L’essentiel à garder sous les yeux</div>
-            </div>
-            <v-chip class="home-chip" size="small" variant="flat">{{ accountStatusLabel }}</v-chip>
-          </div>
-
+        <DashboardSectionCard
+          title="Focus du moment"
+          subtitle="L’essentiel à garder sous les yeux"
+          :chip="accountStatusLabel"
+          side
+        >
           <div class="home-focus-list">
-            <div class="home-focus-item" v-for="item in focusItems" :key="item.label">
-              <div class="home-focus-icon">
-                <v-icon size="18">{{ item.icon }}</v-icon>
-              </div>
-              <div class="home-focus-content">
-                <div class="home-focus-title">{{ item.label }}</div>
-                <div class="home-focus-state">{{ item.state }}</div>
-              </div>
-            </div>
+            <DashboardSurfaceItem
+              v-for="item in focusItems"
+              :key="item.label"
+              :title="item.label"
+              :detail="item.state"
+              :icon="item.icon"
+              tone="gold"
+            />
           </div>
 
           <div class="home-action-grid">
@@ -1665,23 +1660,20 @@ watch(
           <div v-if="profileError" class="home-error">
             {{ profileError }}
           </div>
-        </v-card>
+        </DashboardSectionCard>
       </v-col>
     </v-row>
 
     <v-row v-if="isCoach" class="home-grid" align="center" justify="center">
       <v-col cols="12" md="10">
-        <v-card class="home-card home-card--feature" elevation="6">
-          <div class="home-card-header">
-            <div>
-              <div class="home-card-title">Demandes de suivi reçues</div>
-              <div class="home-card-subtitle">Les clients peuvent vous demander un accompagnement approfondi et partager leur progression une fois acceptés.</div>
-            </div>
-            <v-chip class="home-chip" size="small" variant="flat">{{ coachFollowupPending.length }} en attente</v-chip>
-          </div>
-
+        <DashboardSectionCard
+          title="Demandes de suivi reçues"
+          subtitle="Les clients peuvent vous demander un accompagnement approfondi et partager leur progression une fois acceptés."
+          :chip="`${coachFollowupPending.length} en attente`"
+          feature
+        >
           <div v-if="followupRequests.length" class="home-followup-list">
-            <div v-for="request in followupRequests" :key="request.id" class="home-followup-item">
+            <v-sheet v-for="request in followupRequests" :key="request.id" class="home-followup-item" rounded="xl">
               <div>
                 <div class="home-followup-item__title">{{ request.clientName || 'Client' }}</div>
                 <div class="home-followup-item__meta">{{ request.message || 'Demande de suivi approfondi' }}</div>
@@ -1709,38 +1701,50 @@ watch(
                   Refuser
                 </v-btn>
               </div>
-            </div>
+            </v-sheet>
           </div>
 
-          <div v-else class="home-empty-state">
+          <v-sheet v-else class="home-empty-state" rounded="xl">
             Aucune demande de suivi pour le moment.
-          </div>
-        </v-card>
+          </v-sheet>
+        </DashboardSectionCard>
       </v-col>
     </v-row>
   </v-container>
 </template>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
 .home-container {
+  --home-bg: #f5efe6;
+  --home-bg-soft: #ebdfd1;
+  --home-surface: rgba(255, 250, 243, 0.92);
+  --home-surface-strong: #fff9f1;
+  --home-line: rgba(28, 26, 22, 0.1);
+  --home-ink: #1c1a16;
+  --home-muted: #625b53;
+  --home-accent: #b55d3f;
+  --home-accent-soft: rgba(181, 93, 63, 0.12);
+  --home-forest: #2e4b40;
+  --home-forest-soft: rgba(46, 75, 64, 0.1);
+  --home-gold-soft: rgba(196, 146, 55, 0.12);
   position: relative;
   min-height: 100vh;
   padding: 40px 16px 72px;
-  background: #f6f2ea;
+  background: #ffffff;
   overflow: hidden;
+  font-family: 'Avenir Next', 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
 .home-backdrop {
   position: absolute;
   inset: -25% -15% auto -15%;
   height: 55%;
-  background: radial-gradient(120% 120% at 10% 15%, rgba(22, 130, 132, 0.2), transparent 60%),
-    radial-gradient(80% 80% at 85% 5%, rgba(245, 191, 71, 0.18), transparent 55%),
-    linear-gradient(120deg, rgba(14, 82, 84, 0.08), rgba(245, 191, 71, 0.08));
-  filter: blur(12px);
+  background:
+    radial-gradient(120% 120% at 10% 15%, rgba(46, 75, 64, 0.08), transparent 60%),
+    radial-gradient(80% 80% at 85% 5%, rgba(181, 93, 63, 0.08), transparent 55%);
+  filter: blur(18px);
   z-index: 0;
+  pointer-events: none;
 }
 
 .home-top-grid,
@@ -1757,11 +1761,9 @@ watch(
   padding: 22px 24px;
   border-radius: 32px;
   background:
-    linear-gradient(170deg, rgba(19, 58, 59, 0.98), rgba(27, 79, 81, 0.96));
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 28px 44px rgba(12, 31, 32, 0.16);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 242, 234, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  box-shadow: 0 28px 64px rgba(21, 18, 14, 0.12);
   display: grid;
   gap: 16px;
 }
@@ -1783,14 +1785,15 @@ watch(
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(245, 239, 230, 0.62);
+  color: var(--home-accent);
 }
 
 .home-hero-panel__title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 22px;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+  font-size: 2rem;
   font-weight: 700;
-  color: #fffaf2;
+  color: var(--home-ink);
+  letter-spacing: -0.04em;
 }
 
 .home-hero-panel__subtitle {
@@ -1798,7 +1801,7 @@ watch(
   max-width: 720px;
   font-size: 13px;
   line-height: 1.45;
-  color: rgba(245, 239, 230, 0.78);
+  color: var(--home-muted);
 }
 
 .home-hero-actions {
@@ -1813,7 +1816,7 @@ watch(
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(245, 239, 230, 0.58);
+  color: rgba(28, 26, 22, 0.5);
 }
 
 .home-hero-action-btn {
@@ -1823,18 +1826,18 @@ watch(
 }
 
 .home-hero-action-btn--teal {
-  background: rgba(67, 196, 175, 0.18);
-  color: #dbfff8;
+  background: var(--home-forest-soft);
+  color: var(--home-forest);
 }
 
 .home-hero-action-btn--gold {
-  background: rgba(245, 191, 71, 0.18);
-  color: #fff0c9;
+  background: var(--home-gold-soft);
+  color: #986a16;
 }
 
 .home-hero-action-btn--coral {
-  background: rgba(240, 90, 40, 0.18);
-  color: #ffe1d5;
+  background: var(--home-accent-soft);
+  color: var(--home-accent);
 }
 
 .home-hero-signal-grid {
@@ -1851,16 +1854,16 @@ watch(
   min-height: 92px;
   padding: 12px 12px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(28, 26, 22, 0.08);
 }
 
 .home-hero-signal--gold {
-  background: rgba(245, 191, 71, 0.12);
+  background: rgba(196, 146, 55, 0.1);
 }
 
 .home-hero-signal--coral {
-  background: rgba(240, 90, 40, 0.12);
+  background: rgba(181, 93, 63, 0.1);
 }
 
 .home-hero-signal__label {
@@ -1868,21 +1871,21 @@ watch(
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(245, 239, 230, 0.58);
+  color: rgba(28, 26, 22, 0.52);
 }
 
 .home-hero-signal__value {
   margin-top: 6px;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 24px;
   font-weight: 700;
-  color: #fffaf2;
+  color: var(--home-ink);
 }
 
 .home-hero-signal__detail {
   margin-top: 4px;
   font-size: 11px;
-  color: rgba(245, 239, 230, 0.7);
+  color: var(--home-muted);
 }
 
 .home-quickview-grid {
@@ -1903,13 +1906,26 @@ watch(
   align-items: center;
   padding: 12px 14px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(28, 26, 22, 0.08);
 }
 
 .home-quickview-item--priority {
-  background: linear-gradient(135deg, rgba(245, 191, 71, 0.14), rgba(255, 255, 255, 0.08));
-  border-color: rgba(245, 191, 71, 0.22);
+  background: linear-gradient(135deg, rgba(181, 93, 63, 0.09), rgba(255, 255, 255, 0.65));
+  border-color: rgba(181, 93, 63, 0.18);
+}
+
+.home-quickview-item--interactive {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.home-quickview-item--interactive:hover {
+  transform: translateY(-1px);
+  border-color: rgba(28, 124, 125, 0.2);
+  box-shadow: 0 14px 26px rgba(12, 31, 32, 0.08);
 }
 
 .home-quickview-item__icon {
@@ -1919,8 +1935,8 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(245, 191, 71, 0.16);
-  color: #ffe2a0;
+  background: rgba(46, 75, 64, 0.1);
+  color: var(--home-forest);
 }
 
 .home-quickview-item__label {
@@ -1928,14 +1944,19 @@ watch(
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(245, 239, 230, 0.55);
+  color: rgba(28, 26, 22, 0.5);
+}
+
+.home-quickview-item__label--strong {
+  font-weight: 800;
+  color: var(--home-ink);
 }
 
 .home-quickview-item__value {
   margin-top: 2px;
   font-size: 13px;
   line-height: 1.35;
-  color: #fffaf2;
+  color: var(--home-ink);
 }
 
 .home-grid {
@@ -1960,15 +1981,16 @@ watch(
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(19, 58, 59, 0.52);
+  color: var(--home-accent);
 }
 
 .home-section-heading__title {
   margin-top: 6px;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 24px;
   font-weight: 700;
-  color: #133a3b;
+  color: var(--home-ink);
+  letter-spacing: -0.04em;
 }
 
 .home-news-shell {
@@ -1979,15 +2001,15 @@ watch(
 .home-card {
   border-radius: 24px;
   padding: 24px 26px;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(19, 58, 59, 0.08);
-  box-shadow: 0 18px 35px rgba(12, 31, 32, 0.12);
+  background: var(--home-surface);
+  border: 1px solid var(--home-line);
+  box-shadow: 0 18px 44px rgba(44, 29, 16, 0.08);
 }
 
 .home-card--feature {
   border-radius: 28px;
   padding: 28px;
-  box-shadow: 0 24px 44px rgba(12, 31, 32, 0.14);
+  box-shadow: 0 24px 52px rgba(44, 29, 16, 0.1);
 }
 
 .home-card--side {
@@ -2017,33 +2039,34 @@ watch(
 }
 
 .home-card-title {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 23px;
   font-weight: 600;
-  color: #133a3b;
+  color: var(--home-ink);
+  letter-spacing: -0.03em;
 }
 
 .home-card-subtitle {
   margin-top: 4px;
   font-size: 14px;
-  color: rgba(19, 58, 59, 0.6);
+  color: var(--home-muted);
 }
 
 .home-chip {
-  background: rgba(28, 124, 125, 0.12);
-  color: #1c7c7d;
+  background: var(--home-forest-soft);
+  color: var(--home-forest);
   font-weight: 600;
 }
 
 .home-chip--panel {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff4df;
+  background: rgba(181, 93, 63, 0.08);
+  color: var(--home-accent);
 }
 
 .home-filter-toggle {
   border-radius: 14px;
   overflow: hidden;
-  background: rgba(19, 58, 59, 0.05);
+  background: rgba(28, 26, 22, 0.04);
 }
 
 .home-followup-grid {
@@ -2056,8 +2079,8 @@ watch(
   margin-top: 16px;
   padding: 16px;
   border-radius: 20px;
-  background: rgba(19, 58, 59, 0.04);
-  border: 1px solid rgba(19, 58, 59, 0.08);
+  background: rgba(46, 75, 64, 0.04);
+  border: 1px solid var(--home-line);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2071,8 +2094,8 @@ watch(
 }
 
 .home-selected-coach__avatar {
-  background: rgba(19, 58, 59, 0.08);
-  color: #133a3b;
+  background: rgba(46, 75, 64, 0.08);
+  color: var(--home-forest);
 }
 
 .home-selected-coach__content {
@@ -2082,13 +2105,13 @@ watch(
 .home-selected-coach__name {
   font-size: 16px;
   font-weight: 700;
-  color: #133a3b;
+  color: var(--home-ink);
 }
 
 .home-selected-coach__headline {
   margin-top: 4px;
   font-size: 13px;
-  color: rgba(19, 58, 59, 0.68);
+  color: var(--home-muted);
 }
 
 .home-selected-coach__chips {
@@ -2100,8 +2123,8 @@ watch(
 }
 
 .home-selected-coach__chip {
-  background: rgba(19, 58, 59, 0.08);
-  color: #133a3b;
+  background: rgba(46, 75, 64, 0.08);
+  color: var(--home-forest);
 }
 
 .home-coach-preview-dialog {
@@ -2125,7 +2148,7 @@ watch(
 .home-coach-preview-dialog__block {
   padding: 14px 16px;
   border-radius: 18px;
-  background: rgba(19, 58, 59, 0.04);
+  background: rgba(46, 75, 64, 0.04);
 }
 
 .home-coach-preview-dialog__label {
@@ -2133,14 +2156,14 @@ watch(
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(19, 58, 59, 0.52);
+  color: rgba(28, 26, 22, 0.5);
 }
 
 .home-coach-preview-dialog__text {
   margin-top: 6px;
   font-size: 14px;
   line-height: 1.6;
-  color: rgba(19, 58, 59, 0.74);
+  color: var(--home-muted);
 }
 
 .home-coach-preview-dialog__footer {
@@ -2170,19 +2193,19 @@ watch(
   gap: 14px;
   padding: 14px 16px;
   border-radius: 16px;
-  background: rgba(19, 58, 59, 0.04);
+  background: rgba(46, 75, 64, 0.05);
 }
 
 .home-followup-item__title {
   font-size: 14px;
   font-weight: 700;
-  color: #133a3b;
+  color: var(--home-ink);
 }
 
 .home-followup-item__meta {
   margin-top: 4px;
   font-size: 12px;
-  color: rgba(19, 58, 59, 0.6);
+  color: var(--home-muted);
 }
 
 .home-followup-item__actions {
@@ -2203,21 +2226,21 @@ watch(
   min-height: 100%;
   padding: 22px;
   border-radius: 22px;
-  border: 1px solid rgba(19, 58, 59, 0.08);
+  border: 1px solid var(--home-line);
   display: grid;
   gap: 16px;
 }
 
 .home-path-card--teal {
-  background: linear-gradient(180deg, rgba(228, 245, 243, 0.92), rgba(255, 255, 255, 0.98));
+  background: linear-gradient(180deg, rgba(241, 247, 243, 0.96), rgba(255, 255, 255, 0.98));
 }
 
 .home-path-card--gold {
-  background: linear-gradient(180deg, rgba(255, 243, 218, 0.94), rgba(255, 255, 255, 0.98));
+  background: linear-gradient(180deg, rgba(251, 244, 231, 0.96), rgba(255, 255, 255, 0.98));
 }
 
 .home-path-card--coral {
-  background: linear-gradient(180deg, rgba(255, 235, 228, 0.94), rgba(255, 255, 255, 0.98));
+  background: linear-gradient(180deg, rgba(252, 240, 235, 0.96), rgba(255, 255, 255, 0.98));
 }
 
 .home-path-card__header {
@@ -2232,23 +2255,23 @@ watch(
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(19, 58, 59, 0.56);
+  color: var(--home-accent);
 }
 
 .home-path-card__title {
   margin-top: 6px;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 18px;
   font-weight: 700;
   line-height: 1.25;
-  color: #133a3b;
+  color: var(--home-ink);
 }
 
 .home-path-card__subtitle {
   margin-top: 6px;
   font-size: 13px;
   line-height: 1.55;
-  color: rgba(19, 58, 59, 0.66);
+  color: var(--home-muted);
 }
 
 .home-path-card__count {
@@ -2258,8 +2281,8 @@ watch(
   display: grid;
   place-items: center;
   background: rgba(255, 255, 255, 0.74);
-  color: #133a3b;
-  font-family: 'Space Grotesk', sans-serif;
+  color: var(--home-ink);
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 20px;
   font-weight: 700;
 }
@@ -2278,7 +2301,7 @@ watch(
   background: rgba(255, 255, 255, 0.72);
   font-size: 12px;
   font-weight: 600;
-  color: #133a3b;
+  color: var(--home-ink);
 }
 
 .home-path-card__list {
@@ -2314,20 +2337,20 @@ watch(
   text-transform: none;
   font-weight: 700;
   border-radius: 14px;
-  background: #133a3b;
-  color: #fffaf2;
+  background: var(--home-forest);
+  color: #fff8f2;
 }
 
 .home-review-alert {
   border-radius: 22px;
-  background: linear-gradient(145deg, rgba(28, 124, 125, 0.12), rgba(245, 191, 71, 0.12));
-  border-color: rgba(28, 124, 125, 0.22);
-  color: #133a3b;
-  box-shadow: 0 18px 35px rgba(12, 31, 32, 0.08);
+  background: linear-gradient(145deg, rgba(46, 75, 64, 0.08), rgba(181, 93, 63, 0.08));
+  border-color: rgba(46, 75, 64, 0.18);
+  color: var(--home-ink);
+  box-shadow: 0 18px 35px rgba(44, 29, 16, 0.08);
 }
 
 .home-review-alert__title {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 18px;
   font-weight: 700;
 }
@@ -2336,7 +2359,7 @@ watch(
   margin-top: 8px;
   font-size: 14px;
   line-height: 1.6;
-  color: rgba(19, 58, 59, 0.82);
+  color: var(--home-muted);
 }
 
 .home-card--coach-clients {
@@ -2353,8 +2376,8 @@ watch(
 .home-coach-summary-pill {
   padding: 14px 16px;
   border-radius: 18px;
-  background: rgba(19, 58, 59, 0.04);
-  border: 1px solid rgba(19, 58, 59, 0.08);
+  background: rgba(46, 75, 64, 0.05);
+  border: 1px solid var(--home-line);
 }
 
 .home-coach-summary-pill__label {
@@ -2362,15 +2385,15 @@ watch(
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(19, 58, 59, 0.52);
+  color: rgba(28, 26, 22, 0.5);
 }
 
 .home-coach-summary-pill__value {
   margin-top: 8px;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 28px;
   font-weight: 700;
-  color: #133a3b;
+  color: var(--home-ink);
 }
 
 .home-coach-client-list {
@@ -2385,9 +2408,9 @@ watch(
   padding: 16px;
   border-radius: 22px;
   background:
-    radial-gradient(circle at top right, rgba(28, 124, 125, 0.14), transparent 32%),
+    radial-gradient(circle at top right, rgba(46, 75, 64, 0.08), transparent 32%),
     linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(247, 244, 238, 0.98));
-  border: 1px solid rgba(19, 58, 59, 0.08);
+  border: 1px solid var(--home-line);
 }
 
 .home-coach-client-card__head {
@@ -2406,22 +2429,22 @@ watch(
 }
 
 .home-coach-client-card__name {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 18px;
   font-weight: 700;
-  color: #133a3b;
+  color: var(--home-ink);
 }
 
 .home-coach-client-card__meta {
   margin-top: 4px;
   font-size: 12px;
-  color: rgba(19, 58, 59, 0.58);
+  color: rgba(28, 26, 22, 0.5);
 }
 
 .home-coach-client-card__cta {
   text-transform: none;
   font-weight: 700;
-  color: #1c7c7d;
+  color: var(--home-forest);
 }
 
 .home-coach-status-chip {
@@ -2429,23 +2452,23 @@ watch(
 }
 
 .home-coach-status-chip--teal {
-  background: rgba(28, 124, 125, 0.12);
-  color: #1c7c7d;
+  background: rgba(46, 75, 64, 0.12);
+  color: var(--home-forest);
 }
 
 .home-coach-status-chip--gold {
-  background: rgba(245, 191, 71, 0.18);
-  color: #a56e08;
+  background: rgba(196, 146, 55, 0.16);
+  color: #8a6418;
 }
 
 .home-coach-status-chip--coral {
-  background: rgba(240, 90, 40, 0.16);
-  color: #cc5a30;
+  background: rgba(181, 93, 63, 0.14);
+  color: var(--home-accent);
 }
 
 .home-coach-status-chip--slate {
-  background: rgba(19, 58, 59, 0.1);
-  color: #50686a;
+  background: rgba(28, 26, 22, 0.08);
+  color: #615850;
 }
 
 .home-coach-client-card__stats {
@@ -2457,21 +2480,21 @@ watch(
 .home-coach-client-card__stat {
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(19, 58, 59, 0.04);
+  background: rgba(46, 75, 64, 0.05);
   display: grid;
   gap: 6px;
 }
 
 .home-coach-client-card__stat-value {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 20px;
   font-weight: 700;
-  color: #133a3b;
+  color: var(--home-ink);
 }
 
 .home-coach-client-card__stat-label {
   font-size: 11px;
-  color: rgba(19, 58, 59, 0.58);
+  color: var(--home-muted);
 }
 
 .home-coach-client-card__body,
@@ -2487,7 +2510,7 @@ watch(
 
 .home-coach-client-card__line {
   font-size: 13px;
-  color: rgba(19, 58, 59, 0.76);
+  color: var(--home-muted);
 }
 
 .home-coach-client-card__section {
@@ -2500,7 +2523,7 @@ watch(
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(19, 58, 59, 0.52);
+  color: rgba(28, 26, 22, 0.5);
 }
 
 .home-coach-client-card__tag-list {
@@ -2512,8 +2535,8 @@ watch(
 .home-coach-client-card__tag {
   padding: 8px 10px;
   border-radius: 999px;
-  background: rgba(28, 124, 125, 0.08);
-  color: #1c7c7d;
+  background: rgba(46, 75, 64, 0.08);
+  color: var(--home-forest);
   font-size: 12px;
   font-weight: 600;
 }
@@ -2525,9 +2548,9 @@ watch(
   gap: 10px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(19, 58, 59, 0.04);
+  background: rgba(46, 75, 64, 0.05);
   font-size: 12px;
-  color: rgba(19, 58, 59, 0.72);
+  color: var(--home-muted);
 }
 
 .home-coach-client-card__timeline-item {
@@ -2535,26 +2558,26 @@ watch(
   gap: 2px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(245, 191, 71, 0.1);
+  background: rgba(196, 146, 55, 0.1);
 }
 
 .home-coach-client-card__timeline-title {
   font-size: 12px;
   font-weight: 700;
-  color: #7f5b11;
+  color: #815d1d;
 }
 
 .home-coach-client-card__timeline-detail {
   font-size: 12px;
-  color: rgba(19, 58, 59, 0.64);
+  color: var(--home-muted);
 }
 
 .home-empty-state {
   padding: 20px 22px;
   border-radius: 18px;
-  background: rgba(19, 58, 59, 0.04);
+  background: rgba(46, 75, 64, 0.05);
   font-size: 14px;
-  color: rgba(19, 58, 59, 0.6);
+  color: var(--home-muted);
 }
 
 .home-planning-list {
@@ -2569,33 +2592,33 @@ watch(
   gap: 14px;
   padding: 14px 16px;
   border-radius: 16px;
-  border: 1px solid rgba(19, 58, 59, 0.08);
+  border: 1px solid var(--home-line);
 }
 
 .home-planning-item--teal {
-  background: rgba(28, 124, 125, 0.06);
+  background: rgba(46, 75, 64, 0.06);
 }
 
 .home-planning-item--gold {
-  background: rgba(245, 191, 71, 0.1);
+  background: rgba(196, 146, 55, 0.1);
 }
 
 .home-planning-item__title {
   font-size: 14px;
   font-weight: 700;
-  color: #133a3b;
+  color: var(--home-ink);
 }
 
 .home-planning-item__meta {
   margin-top: 4px;
   font-size: 12px;
-  color: rgba(19, 58, 59, 0.6);
+  color: var(--home-muted);
 }
 
 .home-planning-item__when {
   font-size: 12px;
   font-weight: 700;
-  color: #133a3b;
+  color: var(--home-ink);
   white-space: nowrap;
 }
 
@@ -2611,15 +2634,15 @@ watch(
   align-items: center;
   padding: 14px 16px;
   border-radius: 18px;
-  background: rgba(19, 58, 59, 0.04);
+  background: rgba(46, 75, 64, 0.05);
 }
 
 .home-activity-icon {
   width: 36px;
   height: 36px;
   border-radius: 12px;
-  background: rgba(245, 177, 63, 0.18);
-  color: #a96014;
+  background: rgba(181, 93, 63, 0.12);
+  color: var(--home-accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2628,17 +2651,17 @@ watch(
 .home-activity-title {
   font-size: 14px;
   font-weight: 600;
-  color: #133a3b;
+  color: var(--home-ink);
 }
 
 .home-activity-detail {
   font-size: 12px;
-  color: rgba(19, 58, 59, 0.6);
+  color: var(--home-muted);
 }
 
 .home-activity-time {
   font-size: 11px;
-  color: rgba(19, 58, 59, 0.5);
+  color: rgba(28, 26, 22, 0.48);
 }
 
 .home-focus-list {
@@ -2653,7 +2676,7 @@ watch(
   gap: 14px;
   padding: 15px 16px;
   border-radius: 18px;
-  background: rgba(19, 58, 59, 0.05);
+  background: rgba(46, 75, 64, 0.05);
 }
 
 .home-focus-icon {
@@ -2663,8 +2686,8 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(28, 124, 125, 0.12);
-  color: #1c7c7d;
+  background: rgba(46, 75, 64, 0.1);
+  color: var(--home-forest);
 }
 
 .home-focus-title {
@@ -2672,13 +2695,13 @@ watch(
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: rgba(19, 58, 59, 0.56);
+  color: rgba(28, 26, 22, 0.5);
 }
 
 .home-focus-state {
   margin-top: 4px;
   font-size: 14px;
-  color: #133a3b;
+  color: var(--home-ink);
 }
 
 .home-action-grid {
@@ -2695,15 +2718,15 @@ watch(
 }
 
 .home-action-btn--teal {
-  color: #1c7c7d;
+  color: var(--home-forest);
 }
 
 .home-action-btn--gold {
-  color: #c78812;
+  color: #8a6418;
 }
 
 .home-action-btn--coral {
-  color: #d45a30;
+  color: var(--home-accent);
 }
 
 .home-error {

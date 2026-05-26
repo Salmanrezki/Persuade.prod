@@ -309,369 +309,43 @@ onBeforeUnmount(() => {
       <section class="practical-hero">
         <div>
           <div class="practical-eyebrow">Exercices Pratiques</div>
-          <h1 class="practical-title">Exercices lies a vos cours et mises en situation</h1>
-          <p class="practical-subtitle">
-            Travaillez directement sur la plateforme avec des exercices de consolidation lies aux cours consultes et des cas de negociation en situation.
-          </p>
+          <h1 class="practical-title">Exercices pratiques</h1>
         </div>
 
         <div class="practical-hero-stats">
-          <div class="practical-stat">
-            <span class="practical-stat__value">{{ linkedExercises.length }}</span>
-            <span class="practical-stat__label">lies a vos cours</span>
-          </div>
-          <div class="practical-stat">
-            <span class="practical-stat__value">{{ allQuizExercises.length }}</span>
-            <span class="practical-stat__label">quiz</span>
-          </div>
-          <div class="practical-stat">
-            <span class="practical-stat__value">{{ situationalExercises.length }}</span>
-            <span class="practical-stat__label">mises en situation</span>
-          </div>
+          <v-sheet class="practical-stat practical-stat--forest" rounded="xl">
+            <span class="practical-stat__value practical-stat__value--text">Co-construction</span>
+            <span class="practical-stat__label">avec nos coachs</span>
+          </v-sheet>
+          <v-sheet class="practical-stat practical-stat--gold" rounded="xl">
+            <span class="practical-stat__value practical-stat__value--text">Niveaux</span>
+            <span class="practical-stat__label">débutant à avancé</span>
+          </v-sheet>
+          <v-sheet class="practical-stat practical-stat--coral" rounded="xl">
+            <span class="practical-stat__value practical-stat__value--text">Bientôt</span>
+            <span class="practical-stat__label">disponible</span>
+          </v-sheet>
         </div>
       </section>
 
-      <div class="practical-insights">
-        <v-card class="practical-insight-card" elevation="4">
-          <div class="practical-insight-card__label">Score global quiz</div>
-          <div class="practical-insight-card__value">{{ globalQuizAverage }}%</div>
-          <div class="practical-insight-card__detail">Moyenne de vos meilleurs scores sur les quiz completes.</div>
-        </v-card>
-
-        <v-card class="practical-insight-card" elevation="4">
-          <div class="practical-insight-card__label">Badge actuel</div>
-          <div class="practical-insight-card__value">{{ masteryBadge }}</div>
-          <div class="practical-insight-card__detail">
-            {{ completedCount }}/{{ totalExercisesCount }} exercices completes sur la plateforme.
+      <div class="practical-disabled-area" aria-disabled="true">
+        <v-card class="practical-soon-card" elevation="6">
+          <div class="practical-soon-card__eyebrow">Bientôt disponible</div>
+          <div class="practical-soon-card__title">Nous préparons un vrai système d’exercices à niveaux</div>
+          <div class="practical-soon-card__text">
+            Nous travaillons actuellement avec des coachs experts pour mettre en place un système
+            d’exercices structuré, avec plusieurs niveaux, des mises en situation, des parcours progressifs
+            et des objectifs pédagogiques plus précis.
+          </div>
+          <div class="practical-soon-card__points">
+            <span>Exercices par niveau</span>
+            <span>Mises en situation guidées</span>
+            <span>Progression plus claire</span>
+            <span>Conçu avec des coachs experts</span>
           </div>
         </v-card>
-
-        <v-card class="practical-insight-card" elevation="4">
-          <div class="practical-insight-card__label">Prochain exercice recommande</div>
-          <div class="practical-insight-card__value">
-            {{ nextRecommendedExercise?.title || 'Parcours termine' }}
-          </div>
-          <div class="practical-insight-card__detail">
-            {{
-              nextRecommendedExercise
-                ? `${nextRecommendedExercise.difficulty} · ${nextRecommendedExercise.category}`
-                : 'Vous avez deja traite tous les exercices disponibles.'
-            }}
-          </div>
-        </v-card>
-      </div>
-
-      <div class="practical-dashboard">
-        <v-card class="practical-dashboard-card" elevation="4">
-          <div class="practical-dashboard-card__title">Evolution recente</div>
-          <div v-if="scoreTrend.length" class="practical-trend-chart">
-            <div
-              v-for="item in scoreTrend"
-              :key="`${item.exerciseId}-${item.updatedAt}`"
-              class="practical-trend-chart__item"
-            >
-              <div class="practical-trend-chart__bar-wrap">
-                <div class="practical-trend-chart__bar" :style="{ height: `${item.barHeight}%` }"></div>
-              </div>
-              <div class="practical-trend-chart__value">{{ item.percentage }}%</div>
-              <div class="practical-trend-chart__label">{{ item.shortLabel }}</div>
-            </div>
-          </div>
-          <div v-else class="practical-dashboard-empty">
-            Completez vos premiers quiz pour voir votre evolution.
-          </div>
-        </v-card>
-
-        <v-card class="practical-dashboard-card" elevation="4">
-          <div class="practical-dashboard-card__title">Objectif hebdomadaire</div>
-          <div class="practical-goal">
-            <div class="practical-goal__headline">
-              {{ weeklyCompletedCount }}/{{ weeklyGoalTarget }} quiz completes cette semaine
-            </div>
-            <v-progress-linear
-              :model-value="weeklyGoalProgress"
-              color="#1c7c7d"
-              bg-color="rgba(19, 58, 59, 0.12)"
-              rounded
-              height="12"
-            />
-            <div class="practical-goal__detail">
-              {{ weeklyGoalProgress }}% de l objectif atteint.
-            </div>
-          </div>
-        </v-card>
-
-        <v-card class="practical-dashboard-card" elevation="4">
-          <div class="practical-dashboard-card__title">Historique des scores</div>
-          <div v-if="scoreHistory.length" class="practical-score-history">
-            <div
-              v-for="entry in scoreHistory.slice(0, 5)"
-              :key="`${entry.exerciseId}-${entry.updatedAt}`"
-              class="practical-score-history__item"
-            >
-              <div>
-                <div class="practical-score-history__title">{{ entry.title }}</div>
-                <div class="practical-score-history__date">
-                  {{ new Date(entry.updatedAt).toLocaleDateString('fr-FR') }}
-                </div>
-              </div>
-              <div class="practical-score-history__score">{{ entry.percentage }}%</div>
-            </div>
-          </div>
-          <div v-else class="practical-dashboard-empty">
-            Aucun score enregistre pour le moment.
-          </div>
-        </v-card>
-      </div>
-
-      <v-card class="practical-toolbar" elevation="6">
-        <div class="practical-toolbar__tabs">
-          <v-btn-toggle v-model="selectedTab" mandatory density="comfortable">
-            <v-btn value="linked">Liés a mes cours</v-btn>
-            <v-btn value="quiz">Quiz</v-btn>
-            <v-btn value="situational">Mise en situation</v-btn>
-            <v-btn value="all">Tous</v-btn>
-          </v-btn-toggle>
-        </div>
-
-        <div class="practical-toolbar__filters">
-          <v-text-field
-            v-model="searchQuery"
-            label="Rechercher un exercice"
-            variant="outlined"
-            density="comfortable"
-            hide-details
-          />
-          <v-select
-            v-model="difficultyFilter"
-            :items="difficultyOptions"
-            label="Niveau"
-            variant="outlined"
-            density="comfortable"
-            hide-details
-          />
-        </div>
-      </v-card>
-
-      <div class="practical-paths">
-        <v-card
-          v-for="path in learningPaths"
-          :key="path.id"
-          class="practical-path-card"
-          elevation="4"
-        >
-          <div class="practical-path-card__title">{{ path.title }}</div>
-          <div class="practical-path-card__description">{{ path.description }}</div>
-          <div class="practical-path-card__list">
-            <div
-              v-for="item in path.items"
-              :key="`${path.id}-${item.id}`"
-              class="practical-path-card__item"
-            >
-              <span>{{ item.title }}</span>
-              <span>{{ item.type === 'quiz' ? 'Quiz' : 'Pratique' }}</span>
-            </div>
-          </div>
-        </v-card>
-      </div>
-
-      <div v-if="loading" class="practical-state">Chargement des exercices...</div>
-
-      <div v-else-if="filteredExercises.length" class="practical-grid">
-        <v-card
-          v-for="exercise in filteredExercises"
-          :key="exercise.id"
-          class="practical-card"
-          :class="`practical-card--${exercise.tone}`"
-          elevation="6"
-        >
-          <div class="practical-card__top">
-            <div class="practical-card__pill">
-              {{
-                exercise.type === 'linked'
-                  ? 'Cours consulte'
-                  : exercise.type === 'quiz'
-                  ? 'Quiz'
-                  : 'Scenario'
-              }}
-            </div>
-            <v-checkbox-btn
-              :model-value="Boolean(progress.completed?.[exercise.id])"
-              color="#1c7c7d"
-              @update:modelValue="toggleComplete(exercise.id, $event)"
-            />
-          </div>
-
-          <div class="practical-card__title">{{ exercise.title }}</div>
-          <div class="practical-card__meta">
-            <span>{{ exercise.difficulty }}</span>
-            <span>{{ exercise.duration }}</span>
-            <span>{{ exercise.category }}</span>
-          </div>
-
-          <div class="practical-card__context">{{ exercise.context }}</div>
-
-          <div v-if="exercise.linkedCourseTitle" class="practical-card__linked">
-            Lie au cours: {{ exercise.linkedCourseTitle }}
-          </div>
-
-          <div v-if="exercise.questions?.length" class="practical-card__linked">
-            {{ exercise.questions.length }} question(s) a traiter
-          </div>
-
-          <div class="practical-card__criteria">
-            <div v-for="criterion in exercise.successCriteria.slice(0, 2)" :key="criterion" class="practical-card__criterion">
-              {{ criterion }}
-            </div>
-          </div>
-
-          <v-btn class="practical-card__cta" variant="flat" @click="openExercise(exercise)">
-            Ouvrir l exercice
-          </v-btn>
-        </v-card>
-      </div>
-
-      <div v-else class="practical-state">
-        <template v-if="selectedTab === 'linked'">
-          Consultez d abord un ou plusieurs cours pour debloquer des exercices lies a vos apprentissages.
-        </template>
-        <template v-else>
-          Aucun exercice ne correspond a vos filtres actuels.
-        </template>
       </div>
     </div>
-
-    <v-dialog v-model="dialog" max-width="860">
-      <v-card v-if="activeExercise" class="practical-dialog">
-        <div class="practical-dialog__header">
-          <div>
-            <div class="practical-dialog__eyebrow">
-              {{ activeExercise.type === 'linked' ? 'Exercice d apprentissage' : 'Exercice de situation' }}
-            </div>
-            <div class="practical-dialog__title">{{ activeExercise.title }}</div>
-            <div class="practical-dialog__meta">
-              {{ activeExercise.difficulty }} · {{ activeExercise.duration }} · {{ activeExercise.category }}
-            </div>
-          </div>
-          <v-btn icon="mdi-close" variant="text" @click="dialog = false" />
-        </div>
-
-        <div class="practical-dialog__section">
-          <div class="practical-dialog__section-title">Objectif</div>
-          <p>{{ activeExercise.objective }}</p>
-        </div>
-
-        <div class="practical-dialog__section">
-          <div class="practical-dialog__section-title">Contexte</div>
-          <p>{{ activeExercise.context }}</p>
-        </div>
-
-        <div v-if="activeExercise.questions?.length" class="practical-dialog__section">
-          <div class="practical-dialog__section-title">Quiz</div>
-          <div class="practical-dialog__quiz-score">
-            {{ quizAnsweredCount }}/{{ activeExercise.questions.length }} repondues · score actuel {{ quizScore }}/{{ activeExercise.questions.length }}
-          </div>
-          <div v-if="activeExercise.timeboxSeconds" class="practical-dialog__quiz-timer">
-            Chrono recommande : {{ timedQuizLabel }}
-          </div>
-          <div v-if="quizAnsweredCount === activeExercise.questions.length" class="practical-dialog__quiz-score">
-            Resultat : {{ quizPercentage }}%
-          </div>
-          <div class="practical-dialog__quiz-list">
-            <div
-              v-for="question in activeExercise.questions"
-              :key="question.id"
-              class="practical-dialog__quiz-item"
-            >
-              <div class="practical-dialog__quiz-prompt">{{ question.prompt }}</div>
-              <v-radio-group
-                :model-value="quizResponses[question.id]"
-                density="comfortable"
-                hide-details
-                @update:modelValue="setQuizResponse(question.id, $event)"
-              >
-                <v-radio
-                  v-for="(choice, choiceIndex) in question.choices"
-                  :key="`${question.id}-${choiceIndex}`"
-                  :label="choice"
-                  :value="choiceIndex"
-                />
-              </v-radio-group>
-              <div
-                v-if="quizResponses[question.id] !== undefined"
-                class="practical-dialog__quiz-feedback"
-                :class="isQuizAnswerCorrect(question) ? 'success' : 'warning'"
-              >
-                <strong>{{ isQuizAnswerCorrect(question) ? 'Bonne reponse.' : 'A revoir.' }}</strong>
-                {{ question.explanation }}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div v-else class="practical-dialog__columns">
-          <div class="practical-dialog__section">
-            <div class="practical-dialog__section-title">Consignes</div>
-            <div class="practical-dialog__list">
-              <div v-for="prompt in activeExercise.prompts" :key="prompt" class="practical-dialog__item">
-                {{ prompt }}
-              </div>
-            </div>
-          </div>
-
-          <div class="practical-dialog__section">
-            <div class="practical-dialog__section-title">Criteres de reussite</div>
-            <div class="practical-dialog__list">
-              <div v-for="criterion in activeExercise.successCriteria" :key="criterion" class="practical-dialog__item">
-                {{ criterion }}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="activeExercise.modelResponse" class="practical-dialog__section">
-          <div class="practical-dialog__section-title">Corrige modele</div>
-          <div class="practical-dialog__item practical-dialog__item--model">
-            {{ activeExercise.modelResponse }}
-          </div>
-        </div>
-
-        <div v-if="activeExercise.debriefPoints?.length" class="practical-dialog__section">
-          <div class="practical-dialog__section-title">Debrief</div>
-          <div class="practical-dialog__list">
-            <div
-              v-for="point in activeExercise.debriefPoints"
-              :key="point"
-              class="practical-dialog__item"
-            >
-              {{ point }}
-            </div>
-          </div>
-        </div>
-
-        <div class="practical-dialog__section">
-          <div class="practical-dialog__section-title">Votre note de travail</div>
-          <v-textarea
-            :model-value="progress.notes?.[activeExercise.id] || ''"
-            variant="outlined"
-            rows="5"
-            hide-details
-            placeholder="Redigez votre reponse, vos axes d amelioration ou votre plan d action."
-            @update:modelValue="updateNote(activeExercise.id, $event)"
-          />
-        </div>
-
-        <div class="practical-dialog__footer">
-          <v-checkbox
-            :model-value="Boolean(progress.completed?.[activeExercise.id])"
-            label="Marquer comme complete"
-            hide-details
-            @update:modelValue="toggleComplete(activeExercise.id, $event)"
-          />
-          <v-btn class="practical-card__cta" variant="flat" @click="dialog = false">Fermer</v-btn>
-        </div>
-      </v-card>
-    </v-dialog>
   </v-container>
 </template>
 
@@ -710,17 +384,18 @@ onBeforeUnmount(() => {
 .practical-card,
 .practical-dialog {
   border-radius: 28px;
-  border: 1px solid rgba(19, 58, 59, 0.08);
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 18px 35px rgba(12, 31, 32, 0.12);
+  border: 1px solid rgba(28, 26, 22, 0.08);
+  background: rgba(255, 250, 243, 0.95);
+  box-shadow: 0 18px 35px rgba(44, 29, 16, 0.08);
 }
 
 .practical-hero {
-  padding: 28px;
+  padding: 24px 28px;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 241, 233, 0.92));
 }
 
 .practical-eyebrow {
@@ -728,8 +403,8 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 8px 12px;
   border-radius: 999px;
-  background: rgba(19, 58, 59, 0.08);
-  color: #133a3b;
+  background: rgba(181, 93, 63, 0.08);
+  color: #b55d3f;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -737,24 +412,76 @@ onBeforeUnmount(() => {
 }
 
 .practical-title {
-  margin: 18px 0 12px;
-  font-size: clamp(30px, 4vw, 46px);
-  line-height: 1.05;
-  color: #102829;
-}
-
-.practical-subtitle {
-  max-width: 720px;
-  margin: 0;
-  font-size: 16px;
-  line-height: 1.7;
-  color: rgba(16, 40, 41, 0.74);
+  margin: 14px 0 0;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: #1c1a16;
 }
 
 .practical-hero-stats {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
-  min-width: 210px;
+  min-width: 320px;
+}
+
+.practical-disabled-area {
+  position: relative;
+  filter: grayscale(0.18);
+}
+
+.practical-soon-card {
+  padding: 28px;
+  border-radius: 28px;
+  border: 1px solid rgba(28, 26, 22, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 240, 233, 0.94));
+  box-shadow: 0 18px 35px rgba(44, 29, 16, 0.08);
+  display: grid;
+  gap: 14px;
+}
+
+.practical-soon-card__eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #b55d3f;
+}
+
+.practical-soon-card__title {
+  font-family: 'Space Grotesk', 'DM Sans', sans-serif;
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: #1c1a16;
+}
+
+.practical-soon-card__text {
+  max-width: 840px;
+  font-size: 15px;
+  line-height: 1.7;
+  color: #625b53;
+}
+
+.practical-soon-card__points {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.practical-soon-card__points span {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 12px;
+  border-radius: 999px;
+  background: rgba(46, 75, 64, 0.08);
+  color: #2e4b40;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .practical-insights {
@@ -766,8 +493,9 @@ onBeforeUnmount(() => {
 .practical-insight-card {
   padding: 18px;
   border-radius: 22px;
-  border: 1px solid rgba(19, 58, 59, 0.08);
+  border: 1px solid rgba(28, 26, 22, 0.08);
   background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 14px 30px rgba(44, 29, 16, 0.06);
 }
 
 .practical-insight-card__label {
@@ -775,21 +503,22 @@ onBeforeUnmount(() => {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(19, 58, 59, 0.54);
+  color: rgba(28, 26, 22, 0.48);
 }
 
 .practical-insight-card__value {
   margin-top: 10px;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 24px;
   font-weight: 700;
-  color: #133a3b;
+  color: #1c1a16;
 }
 
 .practical-insight-card__detail {
   margin-top: 8px;
   font-size: 13px;
   line-height: 1.55;
-  color: rgba(16, 40, 41, 0.68);
+  color: #625b53;
 }
 
 .practical-dashboard {
@@ -801,7 +530,7 @@ onBeforeUnmount(() => {
 .practical-dashboard-card {
   padding: 18px;
   border-radius: 22px;
-  border: 1px solid rgba(19, 58, 59, 0.08);
+  border: 1px solid rgba(28, 26, 22, 0.08);
   background: rgba(255, 255, 255, 0.92);
 }
 
@@ -810,13 +539,13 @@ onBeforeUnmount(() => {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(19, 58, 59, 0.54);
+  color: rgba(28, 26, 22, 0.48);
 }
 
 .practical-dashboard-empty {
   margin-top: 14px;
   font-size: 13px;
-  color: rgba(16, 40, 41, 0.64);
+  color: #625b53;
 }
 
 .practical-trend-chart {
@@ -843,19 +572,19 @@ onBeforeUnmount(() => {
 .practical-trend-chart__bar {
   width: 100%;
   border-radius: 999px 999px 12px 12px;
-  background: linear-gradient(180deg, #43c4af, #1c7c7d);
+  background: linear-gradient(180deg, #d28b68, #b55d3f);
 }
 
 .practical-trend-chart__value {
   font-size: 12px;
   font-weight: 700;
-  color: #133a3b;
+  color: #1c1a16;
 }
 
 .practical-trend-chart__label {
   font-size: 11px;
   text-align: center;
-  color: rgba(16, 40, 41, 0.62);
+  color: #625b53;
 }
 
 .practical-goal {
@@ -867,12 +596,12 @@ onBeforeUnmount(() => {
 .practical-goal__headline {
   font-size: 15px;
   font-weight: 700;
-  color: #133a3b;
+  color: #1c1a16;
 }
 
 .practical-goal__detail {
   font-size: 13px;
-  color: rgba(16, 40, 41, 0.68);
+  color: #625b53;
 }
 
 .practical-score-history {
@@ -888,43 +617,64 @@ onBeforeUnmount(() => {
   gap: 12px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(19, 58, 59, 0.04);
+  background: rgba(46, 75, 64, 0.05);
 }
 
 .practical-score-history__title {
   font-size: 13px;
   font-weight: 600;
-  color: #133a3b;
+  color: #1c1a16;
 }
 
 .practical-score-history__date {
   margin-top: 4px;
   font-size: 11px;
-  color: rgba(16, 40, 41, 0.58);
+  color: #625b53;
 }
 
 .practical-score-history__score {
   font-size: 18px;
   font-weight: 700;
-  color: #1c7c7d;
+  color: #b55d3f;
 }
 
 .practical-stat {
   padding: 14px 16px;
   border-radius: 18px;
-  background: rgba(19, 58, 59, 0.05);
+  min-width: 96px;
+  border: 1px solid rgba(28, 26, 22, 0.08);
+  background: rgba(255, 255, 255, 0.78);
   display: grid;
 }
 
+.practical-stat--forest {
+  background: rgba(46, 75, 64, 0.08);
+}
+
+.practical-stat--gold {
+  background: rgba(196, 146, 55, 0.1);
+}
+
+.practical-stat--coral {
+  background: rgba(181, 93, 63, 0.1);
+}
+
 .practical-stat__value {
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 28px;
   font-weight: 700;
-  color: #133a3b;
+  color: #1c1a16;
+}
+
+.practical-stat__value--text {
+  font-family: 'Space Grotesk', 'DM Sans', sans-serif;
+  font-size: 18px;
+  line-height: 1.15;
 }
 
 .practical-stat__label {
   font-size: 12px;
-  color: rgba(16, 40, 41, 0.62);
+  color: #625b53;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -950,21 +700,21 @@ onBeforeUnmount(() => {
 .practical-path-card {
   padding: 18px;
   border-radius: 22px;
-  border: 1px solid rgba(19, 58, 59, 0.08);
+  border: 1px solid rgba(28, 26, 22, 0.08);
   background: rgba(255, 255, 255, 0.92);
 }
 
 .practical-path-card__title {
   font-size: 18px;
   font-weight: 700;
-  color: #133a3b;
+  color: #1c1a16;
 }
 
 .practical-path-card__description {
   margin-top: 6px;
   font-size: 13px;
   line-height: 1.55;
-  color: rgba(16, 40, 41, 0.68);
+  color: #625b53;
 }
 
 .practical-path-card__list {
@@ -980,9 +730,9 @@ onBeforeUnmount(() => {
   gap: 10px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(19, 58, 59, 0.04);
+  background: rgba(46, 75, 64, 0.05);
   font-size: 12px;
-  color: rgba(16, 40, 41, 0.76);
+  color: #625b53;
 }
 
 .practical-grid {
@@ -998,15 +748,15 @@ onBeforeUnmount(() => {
 }
 
 .practical-card--teal {
-  background: linear-gradient(180deg, rgba(228, 245, 243, 0.92), rgba(255, 255, 255, 0.98));
+  background: linear-gradient(180deg, rgba(241, 247, 243, 0.96), rgba(255, 255, 255, 0.98));
 }
 
 .practical-card--gold {
-  background: linear-gradient(180deg, rgba(255, 243, 218, 0.94), rgba(255, 255, 255, 0.98));
+  background: linear-gradient(180deg, rgba(251, 244, 231, 0.96), rgba(255, 255, 255, 0.98));
 }
 
 .practical-card--coral {
-  background: linear-gradient(180deg, rgba(255, 235, 228, 0.94), rgba(255, 255, 255, 0.98));
+  background: linear-gradient(180deg, rgba(252, 240, 235, 0.96), rgba(255, 255, 255, 0.98));
 }
 
 .practical-card__top {
@@ -1021,7 +771,7 @@ onBeforeUnmount(() => {
   padding: 7px 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.72);
-  color: #133a3b;
+  color: #1c1a16;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1040,7 +790,7 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: 8px;
   font-size: 12px;
-  color: rgba(19, 58, 59, 0.62);
+  color: #625b53;
 }
 
 .practical-card__meta span {
@@ -1053,7 +803,7 @@ onBeforeUnmount(() => {
 .practical-card__linked {
   font-size: 14px;
   line-height: 1.6;
-  color: rgba(16, 40, 41, 0.74);
+  color: #625b53;
 }
 
 .practical-card__criteria {
@@ -1065,7 +815,7 @@ onBeforeUnmount(() => {
   padding-left: 16px;
   position: relative;
   font-size: 13px;
-  color: rgba(16, 40, 41, 0.74);
+  color: #625b53;
 }
 
 .practical-card__criterion::before {
@@ -1076,7 +826,7 @@ onBeforeUnmount(() => {
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: #1c7c7d;
+  background: #b55d3f;
 }
 
 .practical-card__cta {
@@ -1084,8 +834,8 @@ onBeforeUnmount(() => {
   text-transform: none;
   font-weight: 700;
   border-radius: 14px;
-  background: #133a3b;
-  color: #fffaf2;
+  background: #2e4b40;
+  color: #fff8f2;
 }
 
 .practical-state {
@@ -1231,6 +981,10 @@ onBeforeUnmount(() => {
   .practical-dialog__footer {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .practical-hero-stats {
+    min-width: 0;
   }
 
   .practical-toolbar__filters,

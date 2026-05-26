@@ -1,9 +1,9 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import api from '@/services/api'
-import logoUrl from '@/assets/logo.png'
 import { useAuthStore } from '@/stores/auth'
 import { getUserProfile } from '@/services/userService'
+import { curatedMasterclasses } from '@/data/curatedMasterclasses'
 import {
   getMasterclasses,
   getMasterclassRegistrationSummary,
@@ -68,6 +68,17 @@ const sortOptions = [
   { title: 'Titre A-Z', value: 'title_asc' },
 ]
 const pageSizeOptions = [6, 9, 12]
+const externalMasterclasses = curatedMasterclasses
+
+const externalMasterclassOpenId = ref(externalMasterclasses[0]?.id || '')
+const featuredExternalMasterclasses = computed(() => externalMasterclasses.filter((item) => item.featured))
+const upcomingExternalMasterclasses = computed(() => externalMasterclasses)
+
+const toggleExternalMasterclass = (id) => {
+  externalMasterclassOpenId.value = externalMasterclassOpenId.value === id ? '' : id
+}
+
+const isExternalMasterclassOpen = (id) => externalMasterclassOpenId.value === id
 
 function createEmptyMasterclass() {
   return {
@@ -814,23 +825,13 @@ onMounted(async () => {
   loading.value = true
   errorMessage.value = ''
 
-  const [profileResult, masterclassesResult] = await Promise.allSettled([
-    loadProfile(),
-    loadMasterclasses(),
-  ])
-
-  if (profileResult.status === 'rejected') {
-    console.error(profileResult.reason)
+  try {
+    await loadProfile()
+  } catch (error) {
+    console.error(error)
+  } finally {
+    loading.value = false
   }
-
-  if (masterclassesResult.status === 'rejected') {
-    errorMessage.value = 'Impossible de charger les masterclass.'
-    console.error(masterclassesResult.reason)
-  }
-
-  loading.value = false
-
-  void loadRegistrations()
 })
 </script>
 
@@ -843,24 +844,17 @@ onMounted(async () => {
         <v-card class="masterclass-hero-card" elevation="8">
           <div class="masterclass-hero-content">
             <div class="masterclass-hero-left">
-              <div class="masterclass-brand">
-                <v-img :src="logoUrl" alt="Logo Persuade" width="72" height="72" class="masterclass-logo" />
-                <div class="masterclass-brand-text">Persuade</div>
-              </div>
-              <div class="masterclass-hero-title">{{ isCoach ? 'Mes masterclass' : 'Masterclass' }}</div>
-              <div class="masterclass-hero-subtitle">
-                {{ isCoach ? 'Mettez en avant vos propres masterclass, gérez vos sessions et créez de nouveaux formats experts.' : 'Explorez des masterclass plus complètes avec programme, image et modalités claires.' }}
-              </div>
+              <div class="masterclass-hero-title">Masterclass</div>
             </div>
 
             <div class="masterclass-hero-stats">
               <div class="masterclass-hero-stat-card">
-                <div class="masterclass-hero-stat">{{ isCoach ? scheduledList.length : scheduledMasterclasses.length }}</div>
+                <div class="masterclass-hero-stat">{{ upcomingExternalMasterclasses.length }}</div>
                 <div class="masterclass-hero-label">planifiées</div>
               </div>
               <div class="masterclass-hero-stat-card">
-              <div class="masterclass-hero-stat">{{ featuredDisplayMasterclasses.length }}</div>
-                <div class="masterclass-hero-label">mises en avant</div>
+                <div class="masterclass-hero-stat">{{ featuredExternalMasterclasses.length }}</div>
+                <div class="masterclass-hero-label">sélectionnées</div>
               </div>
             </div>
           </div>
@@ -876,96 +870,27 @@ onMounted(async () => {
           {{ errorMessage }}
         </v-alert>
 
-        <div v-if="!loading" class="masterclass-filters">
-          <v-text-field
-            v-model="searchQuery"
-            :label="isCoach ? 'Rechercher dans mes masterclass' : 'Rechercher une masterclass'"
-            variant="outlined"
-            density="comfortable"
-            hide-details
-          />
-          <v-select
-            v-model="filterLevel"
-            :items="filterLevelOptions"
-            :item-title="filterLevelLabel"
-            :item-value="(item) => item"
-            label="Niveau"
-            variant="outlined"
-            density="comfortable"
-            hide-details
-          />
-          <v-select
-            v-model="filterFormat"
-            :items="filterFormatOptions"
-            :item-title="filterFormatLabel"
-            :item-value="(item) => item"
-            label="Format"
-            variant="outlined"
-            density="comfortable"
-            hide-details
-          />
-          <v-select
-            v-model="filterStatus"
-            :items="filterStatusOptions"
-            :item-title="filterStatusLabel"
-            :item-value="(item) => item"
-            label="Statut"
-            variant="outlined"
-            density="comfortable"
-            hide-details
-          />
-          <v-select
-            v-model="sortOption"
-            :items="sortOptions"
-            item-title="title"
-            item-value="value"
-            label="Tri"
-            variant="outlined"
-            density="comfortable"
-            hide-details
-          />
-          <v-select
-            v-model="pageSize"
-            :items="pageSizeOptions"
-            :item-title="pageSizeLabel"
-            :item-value="(item) => item"
-            label="Pagination"
-            variant="outlined"
-            density="comfortable"
-            hide-details
-          />
+        <div v-if="!loading && upcomingExternalMasterclasses.length" class="masterclass-section">
+          <div class="masterclass-section-title">Masterclass retenues</div>
         </div>
 
-        <div v-if="!loading && featuredDisplayMasterclasses.length" class="masterclass-section">
-          <div class="masterclass-section-title">{{ isCoach ? 'Mes masterclass mises en avant' : 'Sélection du moment' }}</div>
-          <div class="masterclass-section-subtitle">
-            {{ isCoach ? 'Les masterclass que vous avez choisies de mettre en avant.' : 'Les masterclass les plus visibles et les plus complètes.' }}
-          </div>
-        </div>
-
-        <v-row v-if="!loading && featuredDisplayMasterclasses.length" class="masterclass-list">
-          <v-col cols="12" md="6" v-for="item in featuredDisplayMasterclasses" :key="`featured-${item.id}`">
+        <v-row v-if="!loading && upcomingExternalMasterclasses.length" class="masterclass-list">
+          <v-col cols="12" md="6" v-for="item in upcomingExternalMasterclasses" :key="`featured-${item.id}`">
             <v-card class="masterclass-card masterclass-card--featured" elevation="6">
-              <div class="masterclass-card-cover" :style="coverStyle(item)">
-                <div class="masterclass-card-cover-top">
-                  <div class="masterclass-card-pill">{{ item.level || 'Tous niveaux' }}</div>
-                  <div class="masterclass-card-pill masterclass-card-pill--ghost">
-                    {{ formatMasterclassStatus(item.status) }}
-                  </div>
-                </div>
-                <div class="masterclass-card-cover-bottom">
-                  <div class="masterclass-card-badge">À la une</div>
-                  <div class="masterclass-card-cover-title">{{ item.title }}</div>
-                  <div v-if="item.subtitle" class="masterclass-card-cover-subtitle">{{ item.subtitle }}</div>
-                </div>
-              </div>
-
               <div class="masterclass-card-body">
+                <div class="masterclass-card-head">
+                  <div class="masterclass-card-head-top">
+                    <div class="masterclass-card-badge">Masterclass</div>
+                    <div class="masterclass-card-pill masterclass-card-pill--ghost">{{ item.sourceLabel }}</div>
+                  </div>
+                  <div class="masterclass-card-title">{{ item.title }}</div>
+                  <div v-if="item.subtitle" class="masterclass-card-subtitle">{{ item.subtitle }}</div>
+                </div>
+
                 <div class="masterclass-card-inline-chips">
                   <span class="masterclass-inline-chip">{{ formatMasterclassFormat(item.format) }}</span>
-                  <span class="masterclass-inline-chip">{{ item.language || 'Français' }}</span>
-                  <span class="masterclass-inline-chip" v-if="item.replayAvailable">Replay</span>
-                  <span class="masterclass-inline-chip" v-if="item.certificateAvailable">Certificat</span>
+                  <span class="masterclass-inline-chip">{{ item.language }}</span>
+                  <span class="masterclass-inline-chip">{{ item.organizer }}</span>
                 </div>
 
                 <div class="masterclass-card-description">{{ item.description }}</div>
@@ -973,668 +898,57 @@ onMounted(async () => {
                 <div class="masterclass-card-highlights">
                   <div class="masterclass-card-highlight">
                     <v-icon size="18">mdi-calendar-clock</v-icon>
-                    <span>{{ formatDateTime(item.scheduleAt) }}</span>
+                    <span>{{ item.displayDate }}</span>
                   </div>
                   <div class="masterclass-card-highlight">
                     <v-icon size="18">mdi-timer-outline</v-icon>
-                    <span>{{ item.duration || '—' }}</span>
-                  </div>
-                  <div class="masterclass-card-highlight">
-                    <v-icon size="18">mdi-seat-outline</v-icon>
-                    <span>{{ seatsLeft(item) !== null ? seatsLeft(item) : '—' }} places restantes</span>
+                    <span>{{ item.duration }}</span>
                   </div>
                   <div class="masterclass-card-highlight">
                     <v-icon size="18">mdi-map-marker-outline</v-icon>
-                    <span>{{ item.location || '—' }}</span>
+                    <span>{{ item.location }}</span>
                   </div>
-                </div>
-
-                <div v-if="item.targetAudience" class="masterclass-card-note">
-                  <strong>Pour :</strong> {{ item.targetAudience }}
-                </div>
-
-                <div v-if="item.agenda?.length" class="masterclass-card-block">
-                  <div class="masterclass-card-block-title">Programme</div>
-                  <div class="masterclass-card-list">
-                    <div v-for="entry in item.agenda.slice(0, 3)" :key="entry" class="masterclass-card-list-item">
-                      {{ entry }}
-                    </div>
-                  </div>
-                </div>
-
-                <div v-if="isCoach && isOwnedMasterclass(item)" class="masterclass-card-stats">
-                  <div class="masterclass-stat-chip">{{ getMasterclassStats(item).total }} inscrits</div>
-                  <div class="masterclass-stat-chip">{{ getMasterclassStats(item).confirmed }} confirmés</div>
-                  <div class="masterclass-stat-chip" v-if="getMasterclassStats(item).remaining !== null">
-                    {{ getMasterclassStats(item).remaining }} places libres
+                  <div class="masterclass-card-highlight">
+                    <v-icon size="18">mdi-cash</v-icon>
+                    <span>{{ item.price }}</span>
                   </div>
                 </div>
 
                 <div class="masterclass-actions">
-                  <v-chip v-if="registrationMap[item.id]" size="small" class="masterclass-chip">Inscrit</v-chip>
-                  <v-chip v-else-if="isRegistrationClosed(item)" size="small" class="masterclass-chip">Clôturée</v-chip>
-                  <v-chip v-else-if="seatsLeft(item) === 0" size="small" class="masterclass-chip">Complet</v-chip>
-
-                  <v-btn
-                    v-if="canRegister(item)"
-                    class="masterclass-btn"
-                    size="large"
-                    :loading="registerLoadingId === item.id"
-                    @click="registerToMasterclass(item)"
-                  >
-                    S’inscrire
-                  </v-btn>
-
-                  <v-btn
-                    v-else-if="registrationMap[item.id] && item.meetingLink"
-                    class="masterclass-btn"
-                    size="large"
-                    :href="item.meetingLink"
-                    target="_blank"
-                  >
-                    Rejoindre
-                  </v-btn>
-                </div>
-
-                <div v-if="isCoach && isOwnedMasterclass(item)" class="masterclass-owner-actions">
                   <v-btn
                     class="masterclass-action-btn-outline"
                     size="small"
-                    :loading="duplicateLoadingId === item.id"
-                    @click="duplicateMasterclass(item)"
+                    @click="toggleExternalMasterclass(item.id)"
                   >
-                    Dupliquer
+                    {{ isExternalMasterclassOpen(item.id) ? 'Fermer détails' : 'Voir détails' }}
                   </v-btn>
-                  <v-btn class="masterclass-action-btn-outline" size="small" @click="startEditMasterclass(item)">
-                    Modifier
-                  </v-btn>
-                  <v-btn
-                    class="masterclass-action-btn-danger"
-                    size="small"
-                    :loading="deleteLoadingId === item.id"
-                    @click="deleteMasterclass(item)"
-                  >
-                    Supprimer
+                  <v-btn class="masterclass-btn" size="small" :href="item.sourceUrl" target="_blank">
+                    Voir la fiche
                   </v-btn>
                 </div>
-              </div>
-            </v-card>
-          </v-col>
-        </v-row>
 
-        <div v-if="!loading" class="masterclass-section">
-          <div class="masterclass-section-title">
-            {{ isCoach ? 'Mes masterclass planifiées' : 'Masterclass planifiées' }}
-          </div>
-          <div class="masterclass-section-subtitle">
-            {{ isCoach ? 'Suivez vos sessions à venir et leur niveau de remplissage.' : 'Retrouvez les prochaines sessions ouvertes aux inscriptions.' }}
-          </div>
-        </div>
-
-        <v-row v-if="!loading" class="masterclass-list">
-          <v-col cols="12" md="4" v-for="item in paginatedScheduledMasterclasses" :key="item.id">
-            <v-card class="masterclass-card" elevation="6">
-              <div class="masterclass-card-cover masterclass-card-cover--compact" :style="coverStyle(item)">
-                <div class="masterclass-card-cover-top">
-                  <div class="masterclass-card-pill">{{ formatMasterclassFormat(item.format) }}</div>
-                  <div class="masterclass-card-pill masterclass-card-pill--ghost">
-                    {{ formatMasterclassStatus(item.status) }}
+                <div v-if="isExternalMasterclassOpen(item.id)" class="masterclass-card-block masterclass-card-block--expanded">
+                  <div v-if="item.targetAudience" class="masterclass-card-note">
+                    <strong>Pour :</strong> {{ item.targetAudience }}
                   </div>
-                </div>
-                <div class="masterclass-card-cover-bottom">
-                  <div class="masterclass-card-cover-title">{{ item.title }}</div>
-                  <div v-if="item.subtitle" class="masterclass-card-cover-subtitle">{{ item.subtitle }}</div>
-                </div>
-              </div>
-
-              <div class="masterclass-card-body">
-                <div class="masterclass-card-description">{{ item.description }}</div>
-
-                <div class="masterclass-card-meta">
-                  <div class="masterclass-card-line">
-                    <v-icon size="18">mdi-calendar-clock</v-icon>
-                    <span>{{ formatDateTime(item.scheduleAt) }}</span>
+                  <div v-if="item.tags?.length" class="masterclass-tags">
+                    <v-chip v-for="tag in item.tags" :key="tag" size="small" class="masterclass-chip">
+                      {{ tag }}
+                    </v-chip>
                   </div>
-                  <div class="masterclass-card-line">
-                    <v-icon size="18">mdi-timer-outline</v-icon>
-                    <span>{{ item.duration || '—' }}</span>
-                  </div>
-                  <div class="masterclass-card-line">
-                    <v-icon size="18">mdi-account-group-outline</v-icon>
-                    <span>{{ item.capacity || '—' }} places</span>
-                  </div>
-                  <div class="masterclass-card-line" v-if="item.capacity">
-                    <v-icon size="18">mdi-seat-outline</v-icon>
-                    <span>{{ seatsLeft(item) !== null ? seatsLeft(item) : '—' }} restantes</span>
-                  </div>
-                  <div class="masterclass-card-line">
-                    <v-icon size="18">mdi-map-marker-outline</v-icon>
-                    <span>{{ item.location || '—' }}</span>
-                  </div>
-                  <div class="masterclass-card-line">
-                    <v-icon size="18">mdi-cash</v-icon>
-                    <span>{{ item.price || '—' }}</span>
-                  </div>
-                  <div class="masterclass-card-line">
-                    <v-icon size="18">mdi-translate</v-icon>
-                    <span>{{ item.language || '—' }}</span>
-                  </div>
-                  <div class="masterclass-card-line">
-                    <v-icon size="18">mdi-account-circle</v-icon>
-                    <span>{{ item.coachName || 'Coach' }}</span>
-                  </div>
-                  <div class="masterclass-card-line" v-if="item.registrationDeadline">
-                    <v-icon size="18">mdi-clock-check-outline</v-icon>
-                    <span>Clôture: {{ formatShortDateTime(item.registrationDeadline) }}</span>
-                  </div>
-                </div>
-
-                <div v-if="item.tags?.length" class="masterclass-tags">
-                  <v-chip v-for="tag in item.tags" :key="tag" size="small" class="masterclass-chip">
-                    {{ tag }}
-                  </v-chip>
-                </div>
-
-                <div v-if="item.takeaways?.length" class="masterclass-card-block">
-                  <div class="masterclass-card-block-title">Vous repartez avec</div>
-                  <div class="masterclass-card-list">
-                    <div v-for="entry in item.takeaways.slice(0, 3)" :key="entry" class="masterclass-card-list-item">
-                      {{ entry }}
+                  <div v-if="item.takeaways?.length" class="masterclass-card-block">
+                    <div class="masterclass-card-block-title">Points forts</div>
+                    <div class="masterclass-card-list">
+                      <div v-for="entry in item.takeaways" :key="entry" class="masterclass-card-list-item">
+                        {{ entry }}
+                      </div>
                     </div>
                   </div>
                 </div>
-
-                <div v-if="isCoach && isOwnedMasterclass(item)" class="masterclass-card-stats">
-                  <div class="masterclass-stat-chip">{{ getMasterclassStats(item).total }} inscrits</div>
-                  <div class="masterclass-stat-chip">{{ getMasterclassStats(item).pending }} en attente</div>
-                  <div class="masterclass-stat-chip">{{ getMasterclassStats(item).confirmed }} confirmés</div>
-                </div>
-
-                <div class="masterclass-actions">
-                  <v-chip v-if="registrationMap[item.id]" size="small" class="masterclass-chip">Inscrit</v-chip>
-                  <v-chip v-else-if="isRegistrationClosed(item)" size="small" class="masterclass-chip">Clôturée</v-chip>
-                  <v-chip v-else-if="seatsLeft(item) === 0" size="small" class="masterclass-chip">Complet</v-chip>
-
-                  <v-btn
-                    v-if="canRegister(item)"
-                    class="masterclass-btn"
-                    size="large"
-                    :loading="registerLoadingId === item.id"
-                    @click="registerToMasterclass(item)"
-                  >
-                    S’inscrire
-                  </v-btn>
-
-                  <v-btn
-                    v-else-if="registrationMap[item.id] && item.meetingLink"
-                    class="masterclass-btn"
-                    size="large"
-                    :href="item.meetingLink"
-                    target="_blank"
-                  >
-                    Rejoindre
-                  </v-btn>
-                </div>
-
-                <div v-if="isCoach && isOwnedMasterclass(item)" class="masterclass-owner-actions">
-                  <v-btn
-                    class="masterclass-action-btn-outline"
-                    size="small"
-                    :loading="duplicateLoadingId === item.id"
-                    @click="duplicateMasterclass(item)"
-                  >
-                    Dupliquer
-                  </v-btn>
-                  <v-btn class="masterclass-action-btn-outline" size="small" @click="startEditMasterclass(item)">
-                    Modifier
-                  </v-btn>
-                  <v-btn
-                    class="masterclass-action-btn-danger"
-                    size="small"
-                    :loading="deleteLoadingId === item.id"
-                    @click="deleteMasterclass(item)"
-                  >
-                    Supprimer
-                  </v-btn>
-                </div>
               </div>
             </v-card>
           </v-col>
         </v-row>
-
-        <div v-if="!loading && scheduledPageCount > 1" class="masterclass-pagination">
-          <div class="masterclass-pagination-label">
-            {{ scheduledList.length }} résultat(s) · tri {{ sortLabel(sortOption).toLowerCase() }}
-          </div>
-          <v-pagination
-            v-model="scheduledPage"
-            :length="scheduledPageCount"
-            rounded="circle"
-            density="comfortable"
-          />
-        </div>
-
-        <div v-if="!loading" class="masterclass-section">
-          <div class="masterclass-section-title">{{ isCoach ? 'Toutes mes masterclass' : 'Toutes les masterclass' }}</div>
-          <div class="masterclass-section-subtitle">
-            {{ isCoach ? 'Retrouvez toutes vos masterclass, y compris brouillons, passées ou annulées.' : 'Catalogue complet des sessions, y compris brouillons, passées ou annulées.' }}
-          </div>
-        </div>
-
-        <v-row v-if="!loading" class="masterclass-list">
-          <v-col cols="12" md="4" v-for="item in paginatedAllMasterclasses" :key="`all-${item.id}`">
-            <v-card class="masterclass-card" elevation="6">
-              <div class="masterclass-card-cover masterclass-card-cover--compact" :style="coverStyle(item)">
-                <div class="masterclass-card-cover-top">
-                  <div class="masterclass-card-pill">{{ item.level || 'Tous niveaux' }}</div>
-                  <div class="masterclass-card-pill masterclass-card-pill--ghost">
-                    {{ formatMasterclassStatus(item.status) }}
-                  </div>
-                </div>
-                <div class="masterclass-card-cover-bottom">
-                  <div class="masterclass-card-cover-title">{{ item.title }}</div>
-                </div>
-              </div>
-
-              <div class="masterclass-card-body">
-                <div class="masterclass-card-inline-chips">
-                  <span class="masterclass-inline-chip">{{ formatMasterclassFormat(item.format) }}</span>
-                  <span class="masterclass-inline-chip">{{ item.language || 'Français' }}</span>
-                  <span class="masterclass-inline-chip" v-if="item.supportIncluded">Supports inclus</span>
-                </div>
-
-                <div class="masterclass-card-description">{{ item.description }}</div>
-
-                <div class="masterclass-card-meta">
-                  <div class="masterclass-card-line">
-                    <v-icon size="18">mdi-calendar-clock</v-icon>
-                    <span>{{ formatDateTime(item.scheduleAt) }}</span>
-                  </div>
-                  <div class="masterclass-card-line">
-                    <v-icon size="18">mdi-map-marker-outline</v-icon>
-                    <span>{{ item.location || '—' }}</span>
-                  </div>
-                  <div class="masterclass-card-line">
-                    <v-icon size="18">mdi-cash</v-icon>
-                    <span>{{ item.price || '—' }}</span>
-                  </div>
-                </div>
-
-                <div v-if="item.prerequisites?.length" class="masterclass-card-block">
-                  <div class="masterclass-card-block-title">Pré-requis</div>
-                  <div class="masterclass-card-list">
-                    <div
-                      v-for="entry in item.prerequisites.slice(0, 2)"
-                      :key="entry"
-                      class="masterclass-card-list-item"
-                    >
-                      {{ entry }}
-                    </div>
-                  </div>
-                </div>
-
-                <div v-if="isCoach && isOwnedMasterclass(item)" class="masterclass-card-stats">
-                  <div class="masterclass-stat-chip">{{ getMasterclassStats(item).total }} inscrits</div>
-                  <div class="masterclass-stat-chip">{{ getMasterclassStats(item).declined }} refusés</div>
-                  <div class="masterclass-stat-chip">{{ formatMasterclassStatus(item.status) }}</div>
-                </div>
-
-                <div v-if="isCoach && isOwnedMasterclass(item)" class="masterclass-owner-actions">
-                  <v-btn
-                    class="masterclass-action-btn-outline"
-                    size="small"
-                    :loading="duplicateLoadingId === item.id"
-                    @click="duplicateMasterclass(item)"
-                  >
-                    Dupliquer
-                  </v-btn>
-                  <v-btn class="masterclass-action-btn-outline" size="small" @click="startEditMasterclass(item)">
-                    Modifier
-                  </v-btn>
-                  <v-btn
-                    class="masterclass-action-btn-danger"
-                    size="small"
-                    :loading="deleteLoadingId === item.id"
-                    @click="deleteMasterclass(item)"
-                  >
-                    Supprimer
-                  </v-btn>
-                </div>
-              </div>
-            </v-card>
-          </v-col>
-        </v-row>
-
-        <div v-if="!loading && allPageCount > 1" class="masterclass-pagination">
-          <div class="masterclass-pagination-label">
-            {{ sortedAllMasterclasses.length }} masterclass au total
-          </div>
-          <v-pagination
-            v-model="allPage"
-            :length="allPageCount"
-            rounded="circle"
-            density="comfortable"
-          />
-        </div>
-
-        <div v-if="isLearner" class="masterclass-panel">
-          <div class="masterclass-panel-title">Mes inscriptions</div>
-          <div class="masterclass-panel-subtitle">Retrouvez vos masterclass réservées.</div>
-
-          <div v-if="registerError" class="masterclass-error">{{ registerError }}</div>
-
-          <div v-if="registrations.length === 0" class="masterclass-empty">
-            Aucune inscription pour le moment.
-          </div>
-
-          <div v-else class="masterclass-registration-list">
-            <div class="masterclass-registration-item" v-for="registration in registrations" :key="registration.id">
-              <div>
-                <div class="masterclass-registration-title">{{ registration.masterclassTitle }}</div>
-                <div class="masterclass-registration-subtitle">
-                  {{ formatDateTime(registration.scheduleAt) }} · Coach: {{ registration.coachName }}
-                </div>
-              </div>
-              <div class="masterclass-registration-actions">
-                <v-chip size="small" class="masterclass-chip" :class="registrationStatusClass(registration.status)">
-                  {{ registration.status === 'confirmed' ? 'Confirmé' : 'Inscrit' }}
-                </v-chip>
-                <v-btn
-                  class="masterclass-action-btn-outline"
-                  size="small"
-                  :loading="cancelLoadingId === registration.id"
-                  @click="cancelRegistration(registration)"
-                >
-                  Annuler
-                </v-btn>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="isCoach" class="masterclass-panel">
-          <div class="masterclass-panel-title">Inscriptions reçues</div>
-          <div class="masterclass-panel-subtitle">Liste des apprenants inscrits.</div>
-
-          <div v-if="coachRegistrations.length === 0" class="masterclass-empty">
-            Aucune inscription reçue.
-          </div>
-
-          <div v-else class="masterclass-registration-list">
-            <div class="masterclass-registration-item" v-for="registration in coachRegistrations" :key="registration.id">
-              <div>
-                <div class="masterclass-registration-title">{{ registration.masterclassTitle }}</div>
-                <div class="masterclass-registration-subtitle">
-                  {{ registration.studentName }} · {{ formatDateTime(registration.scheduleAt) }}
-                </div>
-              </div>
-              <div class="masterclass-registration-actions">
-                <v-chip
-                  size="small"
-                  class="masterclass-chip"
-                  :class="registrationStatusClass(registration.status)"
-                >
-                  {{ registration.status === 'confirmed' ? 'Confirmé' : registration.status === 'declined' ? 'Refusé' : 'En attente' }}
-                </v-chip>
-                <v-btn
-                  v-if="registration.status === 'registered'"
-                  class="masterclass-action-btn"
-                  size="small"
-                  :loading="coachDecisionId === registration.id"
-                  @click="updateRegistrationStatus(registration, 'confirmed')"
-                >
-                  Confirmer
-                </v-btn>
-                <v-btn
-                  v-if="registration.status === 'registered'"
-                  class="masterclass-action-btn-outline"
-                  size="small"
-                  :loading="coachDecisionId === registration.id"
-                  @click="updateRegistrationStatus(registration, 'declined')"
-                >
-                  Refuser
-                </v-btn>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="isCoach" class="masterclass-panel">
-          <div class="masterclass-panel-header">
-            <div>
-              <div class="masterclass-panel-title">Réordonner la mise en avant</div>
-              <div class="masterclass-panel-subtitle">
-                Glissez vos masterclass mises en avant pour changer leur ordre d’affichage.
-              </div>
-            </div>
-            <v-btn
-              class="masterclass-action-btn"
-              size="small"
-              :disabled="orderedOwnedFeaturedMasterclasses.length < 2 || !hasFeaturedReorderChanges"
-              :loading="reorderLoading"
-              @click="saveFeaturedOrder"
-            >
-              Enregistrer l’ordre
-            </v-btn>
-          </div>
-
-          <div v-if="orderedOwnedFeaturedMasterclasses.length < 2" class="masterclass-empty">
-            Ajoutez au moins deux masterclass à la une pour les réordonner.
-          </div>
-
-          <div v-else class="masterclass-reorder-list">
-            <div
-              v-for="(item, index) in orderedOwnedFeaturedMasterclasses"
-              :key="`reorder-${item.id}`"
-              class="masterclass-reorder-item"
-              draggable="true"
-              @dragstart="handleFeaturedDragStart(item.id)"
-              @dragover.prevent
-              @drop="handleFeaturedDrop(item.id)"
-            >
-              <div class="masterclass-reorder-rank">{{ index + 1 }}</div>
-              <div class="masterclass-reorder-main">
-                <div class="masterclass-reorder-title">{{ item.title }}</div>
-                <div class="masterclass-reorder-subtitle">
-                  {{ formatDateTime(item.scheduleAt) }} · {{ getMasterclassStats(item).total }} inscrits
-                </div>
-              </div>
-              <v-icon size="20">mdi-drag</v-icon>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="isCoach" class="masterclass-panel">
-          <div class="masterclass-panel-header">
-            <div>
-              <div class="masterclass-panel-title">{{ formTitle }}</div>
-              <div class="masterclass-panel-subtitle">{{ formSubtitle }}</div>
-            </div>
-            <v-btn
-              v-if="isEditingMasterclass"
-              class="masterclass-action-btn-outline"
-              size="small"
-              @click="cancelEditMasterclass"
-            >
-              Annuler l’édition
-            </v-btn>
-          </div>
-
-          <div class="masterclass-form-cover">
-            <div class="masterclass-form-cover-preview" :style="coverStyle({ coverImage: coverPreview || '' })">
-              <div class="masterclass-form-cover-overlay">
-                <div class="masterclass-form-cover-label">Aperçu couverture</div>
-                <div class="masterclass-form-cover-title">
-                  {{ newMasterclass.title || 'Titre de la future masterclass' }}
-                </div>
-                <div class="masterclass-form-cover-subtitle">
-                  {{ newMasterclass.subtitle || 'Sous-titre, angle ou promesse de la session.' }}
-                </div>
-              </div>
-            </div>
-
-            <div class="masterclass-form-cover-actions">
-              <v-file-input
-                label="Téléverser une image"
-                accept="image/*"
-                variant="outlined"
-                hide-details
-                @update:modelValue="handleCoverImageSelected"
-              />
-              <v-text-field
-                v-model="newMasterclass.coverImage"
-                label="Ou coller une URL d’image"
-                variant="outlined"
-                hide-details
-              />
-              <v-btn variant="text" @click="clearCoverImage">Retirer l’image</v-btn>
-            </div>
-          </div>
-
-          <v-row class="masterclass-form">
-            <v-col cols="12" md="7">
-              <v-text-field v-model="newMasterclass.title" label="Titre" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="5">
-              <v-select v-model="newMasterclass.status" :items="statusOptions" label="Statut" variant="outlined" />
-            </v-col>
-            <v-col cols="12">
-              <v-text-field v-model="newMasterclass.subtitle" label="Sous-titre / promesse" variant="outlined" />
-            </v-col>
-            <v-col cols="12">
-              <v-textarea v-model="newMasterclass.description" label="Description complète" variant="outlined" />
-            </v-col>
-
-            <v-col cols="12" md="3">
-              <v-select v-model="newMasterclass.level" :items="levelOptions" label="Niveau" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="3">
-              <v-select v-model="newMasterclass.format" :items="formatOptions" label="Format" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="3">
-              <v-select v-model="newMasterclass.language" :items="languageOptions" label="Langue" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="3">
-              <v-text-field v-model="newMasterclass.duration" label="Durée" variant="outlined" />
-            </v-col>
-
-            <v-col cols="12" md="6">
-              <v-text-field
-                v-model="newMasterclass.scheduleAt"
-                label="Date et heure"
-                type="datetime-local"
-                variant="outlined"
-              />
-            </v-col>
-            <v-col cols="12" md="6">
-              <v-text-field
-                v-model="newMasterclass.registrationDeadline"
-                label="Date limite d’inscription"
-                type="datetime-local"
-                variant="outlined"
-              />
-            </v-col>
-
-            <v-col cols="12" md="4">
-              <v-text-field v-model="newMasterclass.capacity" label="Capacité" type="number" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="4">
-              <v-text-field v-model="newMasterclass.price" label="Prix" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="4">
-              <v-text-field v-model="newMasterclass.tags" label="Tags (séparés par virgule)" variant="outlined" />
-            </v-col>
-
-            <v-col cols="12">
-              <v-text-field v-model="newMasterclass.targetAudience" label="Public cible" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="6">
-              <v-textarea
-                v-model="newMasterclass.prerequisites"
-                label="Pré-requis (une ligne = un point)"
-                variant="outlined"
-                rows="4"
-              />
-            </v-col>
-            <v-col cols="12" md="6">
-              <v-textarea
-                v-model="newMasterclass.agenda"
-                label="Programme (une ligne = une étape)"
-                variant="outlined"
-                rows="4"
-              />
-            </v-col>
-            <v-col cols="12">
-              <v-textarea
-                v-model="newMasterclass.takeaways"
-                label="Ce que les participants retiendront (une ligne = un bénéfice)"
-                variant="outlined"
-                rows="4"
-              />
-            </v-col>
-
-            <v-col cols="12" md="6">
-              <v-text-field
-                v-model="newMasterclass.location"
-                label="Lieu affiché"
-                variant="outlined"
-                :placeholder="newMasterclass.format === 'online' ? 'En ligne' : 'Paris, salle, campus...'"
-              />
-            </v-col>
-            <v-col cols="12" md="6">
-              <v-text-field
-                v-model="newMasterclass.city"
-                label="Ville"
-                variant="outlined"
-                :disabled="!needsAddress"
-              />
-            </v-col>
-            <v-col cols="12" v-if="needsAddress">
-              <v-text-field v-model="newMasterclass.address" label="Adresse détaillée" variant="outlined" />
-            </v-col>
-            <v-col cols="12" v-if="needsMeetingLink">
-              <v-text-field v-model="newMasterclass.meetingLink" label="Lien de session" variant="outlined" />
-            </v-col>
-
-            <v-col cols="12">
-              <v-textarea
-                v-model="newMasterclass.speakerBio"
-                label="Bio intervenant / coach"
-                variant="outlined"
-                rows="3"
-              />
-            </v-col>
-
-            <v-col cols="12" md="3">
-              <v-checkbox v-model="newMasterclass.replayAvailable" label="Replay disponible" hide-details />
-            </v-col>
-            <v-col cols="12" md="3">
-              <v-checkbox v-model="newMasterclass.certificateAvailable" label="Certificat disponible" hide-details />
-            </v-col>
-            <v-col cols="12" md="3">
-              <v-checkbox v-model="newMasterclass.supportIncluded" label="Supports inclus" hide-details />
-            </v-col>
-            <v-col cols="12" md="3">
-              <v-checkbox v-model="newMasterclass.featured" label="Mettre en avant" hide-details />
-            </v-col>
-          </v-row>
-
-          <div v-if="formError" class="masterclass-error">{{ formError }}</div>
-
-          <div class="masterclass-form-footer">
-            <v-btn
-              v-if="isEditingMasterclass"
-              class="masterclass-action-btn-outline"
-              size="large"
-              @click="cancelEditMasterclass"
-            >
-              Annuler
-            </v-btn>
-            <v-btn class="masterclass-btn" size="large" :loading="formLoading" @click="handleSubmitMasterclass">
-              {{ isEditingMasterclass ? 'Enregistrer les modifications' : 'Planifier la masterclass' }}
-            </v-btn>
-          </div>
-        </div>
       </v-col>
     </v-row>
   </v-container>
@@ -1670,10 +984,10 @@ onMounted(async () => {
 
 .masterclass-hero-card {
   border-radius: 28px;
-  padding: 24px;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(19, 58, 59, 0.1);
-  box-shadow: 0 20px 45px rgba(12, 31, 32, 0.16);
+  padding: 20px 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 241, 233, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  box-shadow: 0 24px 56px rgba(21, 18, 14, 0.1);
 }
 
 .masterclass-hero-content {
@@ -1684,41 +998,13 @@ onMounted(async () => {
   gap: 24px;
 }
 
-.masterclass-brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 12px;
-}
-
-.masterclass-logo {
-  border-radius: 20px;
-  background: #fff;
-  padding: 8px;
-  box-shadow: 0 14px 26px rgba(12, 31, 32, 0.18);
-}
-
-.masterclass-brand-text {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 18px;
-  font-weight: 600;
-  color: #133a3b;
-  letter-spacing: 0.02em;
-}
-
 .masterclass-hero-title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 26px;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+  font-size: clamp(2rem, 3vw, 2.8rem);
   font-weight: 700;
-  color: #133a3b;
-}
-
-.masterclass-hero-subtitle {
-  margin-top: 6px;
-  max-width: 720px;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 15px;
-  color: rgba(19, 58, 59, 0.7);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: #1c1a16;
 }
 
 .masterclass-hero-stats {
@@ -1731,20 +1017,20 @@ onMounted(async () => {
   min-width: 120px;
   padding: 14px 16px;
   border-radius: 18px;
-  background: rgba(19, 58, 59, 0.05);
-  border: 1px solid rgba(19, 58, 59, 0.08);
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(28, 26, 22, 0.08);
 }
 
 .masterclass-hero-stat {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 30px;
   font-weight: 700;
-  color: #133a3b;
+  color: #1c1a16;
 }
 
 .masterclass-hero-label {
   font-size: 12px;
-  color: rgba(19, 58, 59, 0.6);
+  color: #625b53;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -1792,7 +1078,11 @@ onMounted(async () => {
 }
 
 .masterclass-card--featured {
-  border-color: rgba(245, 177, 63, 0.24);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(246, 250, 248, 0.98)),
+    #ffffff;
+  border-color: rgba(19, 58, 59, 0.08);
+  box-shadow: 0 22px 44px rgba(12, 31, 32, 0.12);
 }
 
 .masterclass-card-cover {
@@ -1827,14 +1117,14 @@ onMounted(async () => {
   align-items: center;
   padding: 7px 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(10px);
+  background: rgba(19, 58, 59, 0.07);
+  color: #133a3b;
   font-size: 12px;
   font-weight: 700;
 }
 
 .masterclass-card-pill--ghost {
-  background: rgba(8, 23, 23, 0.26);
+  background: rgba(19, 58, 59, 0.1);
 }
 
 .masterclass-card-badge {
@@ -1842,10 +1132,43 @@ onMounted(async () => {
   align-items: center;
   padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(245, 177, 63, 0.9);
-  color: #3e2200;
+  background: rgba(19, 58, 59, 0.08);
+  color: #133a3b;
   font-size: 12px;
   font-weight: 700;
+}
+
+.masterclass-card-head {
+  display: grid;
+  gap: 10px;
+  padding: 0 0 2px;
+}
+
+.masterclass-card-head--compact {
+  gap: 8px;
+}
+
+.masterclass-card-head-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.masterclass-card-title {
+  color: #133a3b;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.masterclass-card-subtitle {
+  color: rgba(19, 58, 59, 0.62);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .masterclass-card-cover-title {
@@ -1886,7 +1209,8 @@ onMounted(async () => {
 }
 
 .masterclass-card-description {
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.7;
   color: rgba(19, 58, 59, 0.74);
 }
 
@@ -1918,6 +1242,11 @@ onMounted(async () => {
 .masterclass-card-block {
   display: grid;
   gap: 8px;
+}
+
+.masterclass-card-block--expanded {
+  padding-top: 6px;
+  border-top: 1px solid rgba(19, 58, 59, 0.08);
 }
 
 .masterclass-card-stats {
@@ -2129,11 +1458,8 @@ onMounted(async () => {
   min-height: 220px;
   border-radius: 22px;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(8, 23, 23, 0.08), rgba(8, 23, 23, 0.52)),
-    linear-gradient(130deg, #1c7c7d, #133a3b 55%, #f2b03f);
-  background-size: cover;
-  background-position: center;
+  background: #f8fbfb;
+  border: 1px solid rgba(19, 58, 59, 0.08);
   display: flex;
 }
 
@@ -2144,7 +1470,7 @@ onMounted(async () => {
   flex-direction: column;
   justify-content: flex-end;
   gap: 8px;
-  color: #fff;
+  color: #133a3b;
 }
 
 .masterclass-form-cover-label {
@@ -2152,7 +1478,7 @@ onMounted(async () => {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(19, 58, 59, 0.58);
 }
 
 .masterclass-form-cover-title {
@@ -2163,7 +1489,7 @@ onMounted(async () => {
 
 .masterclass-form-cover-subtitle {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.88);
+  color: rgba(19, 58, 59, 0.72);
 }
 
 .masterclass-form-cover-actions {

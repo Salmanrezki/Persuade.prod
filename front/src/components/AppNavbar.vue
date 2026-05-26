@@ -6,14 +6,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 import api from '@/services/api'
 import { collection, getDocs, query, where } from 'firebase/firestore'
-import logoUrl from '@/assets/logo.png'
 import navDashboardUrl from '@/assets/nav-dashboard.svg'
 import navLibraryUrl from '@/assets/nav-library.svg'
 import navCoachUrl from '@/assets/nav-coach.svg'
 import navMasterclassUrl from '@/assets/nav-masterclass.svg'
 import navExercisesUrl from '@/assets/nav-exercises.svg'
 import navChatUrl from '@/assets/nav-chat.svg'
-import navPreferencesUrl from '@/assets/nav-preferences.svg'
 import { db } from '@/services/firebase'
 
 const auth = useAuthStore()
@@ -41,6 +39,7 @@ const SECTION_KEYS = {
   chat: ROUTE_PATHS.chat,
 }
 const isCoach = computed(() => auth.profile?.role === 'coach')
+const workspaceLabel = computed(() => (isCoach.value ? 'Espace coach' : 'Espace personnel'))
 
 const getStorageKey = (uid) => `${SECTION_STORAGE_PREFIX}.${uid}`
 
@@ -64,7 +63,7 @@ const navItems = computed(() => [
     tone: 'coral',
   },
   {
-    title: isCoach.value ? 'Mes cours particuliers' : 'Cours avec coach',
+    title: 'Cours particuliers',
     subtitle: isCoach.value ? 'Offres et suivi client' : 'Sessions guidees',
     path: ROUTE_PATHS.coachCourses,
     icon: 'mdi-account-tie-outline',
@@ -92,11 +91,13 @@ const navItems = computed(() => [
   },
   {
     title: 'Exercices pratiques',
-    subtitle: 'Mise en pratique',
+    subtitle: 'Bientôt disponible',
     path: ROUTE_PATHS.practicalExercises,
     icon: 'mdi-dumbbell',
     image: navExercisesUrl,
     showNotification: shouldShowNotification('practicalExercises'),
+    statusLabel: 'Bientôt',
+    statusVariant: 'soon',
     tone: 'teal',
   },
 ])
@@ -107,6 +108,9 @@ const displayName = computed(() => {
   if (auth.user?.email) return auth.user.email.split('@')[0]
   return 'Utilisateur'
 })
+
+const activeNavItem = computed(() => navItems.value.find((item) => item.path === route.path) || navItems.value[0])
+const accountRoleLabel = computed(() => (isCoach.value ? 'Coach' : 'Apprenant'))
 
 const profilePhoto = computed(() => auth.profile?.profilePhoto || '')
 const userInitials = computed(() => {
@@ -126,6 +130,7 @@ const isTourTarget = (target) => tourSpotlightActive.value && tourSpotlightTarge
 const hasUnreadBadge = (item) => Number(item.badge || 0) > 0
 const navStatusLabel = (item) => {
   if (hasUnreadBadge(item)) return String(item.badge)
+  if (item.statusLabel) return item.statusLabel
   if (item.showNotification) return 'Nouveau'
   return ''
 }
@@ -377,20 +382,12 @@ onBeforeUnmount(() => {
       class="app-mobile-bar"
     >
       <div class="app-mobile-bar__inner">
-        <button type="button" class="app-mobile-brand" @click="goTo(ROUTE_PATHS.home)">
-          <div class="app-mobile-brand__mark">
-            <v-img
-              :src="logoUrl"
-              alt="Logo Persuade"
-              width="42"
-              height="42"
-              class="app-sidebar-logo"
-            />
-          </div>
+        <v-btn variant="text" class="app-mobile-brand" @click="goTo(ROUTE_PATHS.home)">
           <div class="app-mobile-brand__copy">
+            <div class="app-mobile-brand__eyebrow">{{ workspaceLabel }}</div>
             <div class="app-mobile-brand__title">Persuade</div>
           </div>
-        </button>
+        </v-btn>
 
         <div class="app-mobile-bar__spacer" aria-hidden="true"></div>
       </div>
@@ -406,22 +403,14 @@ onBeforeUnmount(() => {
       class="app-sidebar app-sidebar--mobile"
     >
       <div class="app-sidebar-shell app-sidebar-shell--mobile">
-        <div class="app-sidebar-hero app-sidebar-hero--mobile">
+        <v-sheet class="app-sidebar-panel app-sidebar-panel--mobile" rounded="xl">
           <div class="app-sidebar-top app-sidebar-top--mobile">
-            <button type="button" class="app-sidebar-brand" @click="goTo(ROUTE_PATHS.home)">
-              <div class="app-sidebar-logo-wrap">
-                <v-img
-                  :src="logoUrl"
-                  alt="Logo Persuade"
-                  width="42"
-                  height="42"
-                  class="app-sidebar-logo"
-                />
-              </div>
+            <v-btn variant="text" class="app-sidebar-brand" @click="goTo(ROUTE_PATHS.home)">
               <div>
+                <div class="app-sidebar-kicker">{{ workspaceLabel }}</div>
                 <div class="app-sidebar-title">Persuade</div>
               </div>
-            </button>
+            </v-btn>
 
             <v-btn
               icon="mdi-close"
@@ -431,15 +420,7 @@ onBeforeUnmount(() => {
             />
           </div>
 
-          <button
-            type="button"
-            class="app-sidebar-hero__action"
-            :class="[
-              { 'app-sidebar-hero__action--active': isActive(ROUTE_PATHS.profile) },
-              isTourTarget('profile') ? `app-tour-spotlight app-tour-spotlight--${tourSpotlightTone}` : '',
-            ]"
-            @click="goTo(ROUTE_PATHS.profile)"
-          >
+          <div class="app-sidebar-account">
             <div class="app-profile-card__avatar-wrap">
               <v-avatar size="52" class="app-profile-card__avatar">
                 <v-img v-if="profilePhoto" :src="profilePhoto" alt="Photo de profil" />
@@ -448,14 +429,17 @@ onBeforeUnmount(() => {
               <span class="app-profile-card__status"></span>
             </div>
 
-            <div class="app-sidebar-hero__action-copy">
-              <div class="app-sidebar-hero__action-title">Mon profil</div>
-              <div class="app-sidebar-hero__action-subtitle">Voir et gérer mes informations</div>
+            <div class="app-sidebar-account__copy">
+              <div class="app-sidebar-account__name">{{ displayName }}</div>
+              <div class="app-sidebar-account__meta">
+                <v-chip size="small" rounded="pill" class="app-sidebar-account__chip">
+                  {{ accountRoleLabel }}
+                </v-chip>
+                <span class="app-sidebar-account__route">{{ activeNavItem?.title }}</span>
+              </div>
             </div>
-
-            <v-icon size="18" class="app-sidebar-hero__action-arrow">mdi-chevron-right</v-icon>
-          </button>
-        </div>
+          </div>
+        </v-sheet>
 
         <div class="app-sidebar-nav-wrap">
           <div class="app-sidebar-nav-stack">
@@ -498,7 +482,10 @@ onBeforeUnmount(() => {
                 <template v-if="navStatusLabel(item)" #append>
                   <span
                     class="app-sidebar-item__status-pill"
-                    :class="{ 'app-sidebar-item__status-pill--badge': hasUnreadBadge(item) }"
+                    :class="{
+                      'app-sidebar-item__status-pill--badge': hasUnreadBadge(item),
+                      'app-sidebar-item__status-pill--soon': item.statusVariant === 'soon',
+                    }"
                   >
                     {{ navStatusLabel(item) }}
                   </span>
@@ -510,32 +497,6 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="app-sidebar-bottom">
-          <button
-            type="button"
-            class="app-sidebar-utility-card app-sidebar-utility-card--mobile app-sidebar-utility-card--preferences"
-            :class="[
-              { 'app-sidebar-utility-card--active': isActive(ROUTE_PATHS.preferences) },
-              isTourTarget(ROUTE_PATHS.preferences) ? `app-tour-spotlight app-tour-spotlight--${tourSpotlightTone}` : '',
-            ]"
-            @click="goTo(ROUTE_PATHS.preferences)"
-          >
-            <span class="app-sidebar-utility-card__icon">
-              <v-img
-                :src="navPreferencesUrl"
-                alt="Illustration Préférences"
-                contain
-                class="app-sidebar-utility-card__illustration"
-              />
-            </span>
-
-            <span class="app-sidebar-utility-card__content">
-              <span class="app-sidebar-utility-card__title">Préférences</span>
-              <span class="app-sidebar-utility-card__subtitle">Rythme et format</span>
-            </span>
-
-            <v-icon size="18" class="app-sidebar-utility-card__arrow">mdi-chevron-right</v-icon>
-          </button>
-
           <v-btn
             block
             class="app-profile-card__logout"
@@ -557,38 +518,21 @@ onBeforeUnmount(() => {
       class="app-sidebar"
     >
       <div class="app-sidebar-shell">
-        <div class="app-sidebar-hero">
+        <v-sheet class="app-sidebar-panel" rounded="xl">
           <div class="app-sidebar-top">
-            <button
-              type="button"
+            <v-btn
+              variant="text"
               class="app-sidebar-brand"
               @click="goTo(ROUTE_PATHS.home)"
             >
-              <div class="app-sidebar-logo-wrap">
-                <v-img
-                  :src="logoUrl"
-                  alt="Logo Persuade"
-                  width="42"
-                  height="42"
-                  class="app-sidebar-logo"
-                />
-              </div>
-
               <div>
+                <div class="app-sidebar-kicker">{{ workspaceLabel }}</div>
                 <div class="app-sidebar-title">Persuade</div>
               </div>
-            </button>
+            </v-btn>
           </div>
 
-          <button
-            type="button"
-            class="app-sidebar-hero__action"
-            :class="[
-              { 'app-sidebar-hero__action--active': isActive(ROUTE_PATHS.profile) },
-              isTourTarget('profile') ? `app-tour-spotlight app-tour-spotlight--${tourSpotlightTone}` : '',
-            ]"
-            @click="goTo(ROUTE_PATHS.profile)"
-          >
+          <div class="app-sidebar-account">
             <div class="app-profile-card__avatar-wrap">
               <v-avatar size="52" class="app-profile-card__avatar">
                 <v-img v-if="profilePhoto" :src="profilePhoto" alt="Photo de profil" />
@@ -597,14 +541,17 @@ onBeforeUnmount(() => {
               <span class="app-profile-card__status"></span>
             </div>
 
-            <div class="app-sidebar-hero__action-copy">
-              <div class="app-sidebar-hero__action-title">Mon profil</div>
-              <div class="app-sidebar-hero__action-subtitle">Voir et gérer mes informations</div>
+            <div class="app-sidebar-account__copy">
+              <div class="app-sidebar-account__name">{{ displayName }}</div>
+              <div class="app-sidebar-account__meta">
+                <v-chip size="small" rounded="pill" class="app-sidebar-account__chip">
+                  {{ accountRoleLabel }}
+                </v-chip>
+                <span class="app-sidebar-account__route">{{ activeNavItem?.title }}</span>
+              </div>
             </div>
-
-            <v-icon size="18" class="app-sidebar-hero__action-arrow">mdi-chevron-right</v-icon>
-          </button>
-        </div>
+          </div>
+        </v-sheet>
 
         <div class="app-sidebar-nav-wrap">
           <div class="app-sidebar-nav-stack">
@@ -649,7 +596,10 @@ onBeforeUnmount(() => {
                 <template v-if="navStatusLabel(item)" #append>
                   <span
                     class="app-sidebar-item__status-pill"
-                    :class="{ 'app-sidebar-item__status-pill--badge': hasUnreadBadge(item) }"
+                    :class="{
+                      'app-sidebar-item__status-pill--badge': hasUnreadBadge(item),
+                      'app-sidebar-item__status-pill--soon': item.statusVariant === 'soon',
+                    }"
                   >
                     {{ navStatusLabel(item) }}
                   </span>
@@ -661,32 +611,6 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="app-sidebar-bottom">
-          <button
-            type="button"
-            class="app-sidebar-utility-card app-sidebar-utility-card--preferences"
-            :class="[
-              { 'app-sidebar-utility-card--active': isActive(ROUTE_PATHS.preferences) },
-              isTourTarget(ROUTE_PATHS.preferences) ? `app-tour-spotlight app-tour-spotlight--${tourSpotlightTone}` : '',
-            ]"
-            @click="goTo(ROUTE_PATHS.preferences)"
-          >
-            <span class="app-sidebar-utility-card__icon">
-              <v-img
-                :src="navPreferencesUrl"
-                alt="Illustration Préférences"
-                contain
-                class="app-sidebar-utility-card__illustration"
-              />
-            </span>
-
-            <span class="app-sidebar-utility-card__content">
-              <span class="app-sidebar-utility-card__title">Préférences</span>
-              <span class="app-sidebar-utility-card__subtitle">Rythme et format</span>
-            </span>
-
-            <v-icon size="18" class="app-sidebar-utility-card__arrow">mdi-chevron-right</v-icon>
-          </button>
-
           <v-btn
             block
             class="app-profile-card__logout"
@@ -710,28 +634,23 @@ onBeforeUnmount(() => {
   min-width: 146px;
   min-height: 58px;
   padding: 10px 14px 10px 10px;
-  border: 0;
+  border: 1px solid rgba(42, 36, 29, 0.08);
   border-radius: 22px;
   display: flex;
   align-items: center;
   gap: 12px;
   background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.18), transparent 34%),
-    linear-gradient(135deg, rgba(245, 191, 71, 0.96), rgba(28, 124, 125, 0.94)),
-    rgba(19, 58, 59, 0.96);
-  color: #fff8f0;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 18px 34px rgba(8, 24, 28, 0.24);
-  transition:
-    transform 0.24s ease,
-    box-shadow 0.24s ease,
-    border-radius 0.24s ease,
-    background-color 0.24s ease;
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.42), transparent 34%),
+    linear-gradient(135deg, rgba(246, 214, 133, 0.96), rgba(190, 228, 220, 0.96)),
+    rgba(255, 250, 244, 0.96);
+  color: #2a241d;
+  box-shadow: 0 18px 34px rgba(73, 53, 31, 0.14);
+  transition: transform 0.24s ease, box-shadow 0.24s ease;
 }
 
 .app-mobile-drawer-trigger:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 22px 36px rgba(8, 24, 28, 0.28);
+  transform: translateY(-2px);
+  box-shadow: 0 22px 36px rgba(73, 53, 31, 0.18);
 }
 
 .app-mobile-drawer-trigger__icon {
@@ -740,8 +659,8 @@ onBeforeUnmount(() => {
   border-radius: 14px;
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.64);
+  border: 1px solid rgba(42, 36, 29, 0.08);
   flex-shrink: 0;
 }
 
@@ -754,22 +673,22 @@ onBeforeUnmount(() => {
 .app-mobile-drawer-trigger__label {
   font-size: 14px;
   font-weight: 800;
-  letter-spacing: 0.01em;
-  color: #fffaf3;
+  color: #2a241d;
 }
 
 .app-mobile-drawer-trigger__hint {
   margin-top: 3px;
   font-size: 11px;
-  color: rgba(255, 248, 240, 0.82);
+  color: rgba(42, 36, 29, 0.62);
 }
 
 .app-mobile-bar {
   background:
-    radial-gradient(circle at left top, rgba(67, 196, 175, 0.14), transparent 38%),
-    linear-gradient(135deg, rgba(8, 24, 28, 0.98), rgba(17, 50, 54, 0.96));
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  color: #f8f4ee;
+    radial-gradient(circle at left top, rgba(246, 214, 133, 0.18), transparent 38%),
+    radial-gradient(circle at right top, rgba(190, 228, 220, 0.18), transparent 34%),
+    rgba(255, 250, 244, 0.88);
+  border-bottom: 1px solid rgba(42, 36, 29, 0.08);
+  color: #2a241d;
   backdrop-filter: blur(22px);
   z-index: 1200;
 }
@@ -789,36 +708,33 @@ onBeforeUnmount(() => {
   gap: 12px;
   min-width: 0;
   padding: 10px 14px 10px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(42, 36, 29, 0.08);
   border-radius: 24px;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.52);
   color: inherit;
   text-align: left;
-}
-
-.app-mobile-brand__mark {
-  width: 50px;
-  height: 50px;
-  border-radius: 18px;
-  display: grid;
-  place-items: center;
-  background:
-    linear-gradient(135deg, rgba(245, 191, 71, 0.26), rgba(28, 124, 125, 0.34)),
-    rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  flex-shrink: 0;
+  justify-content: flex-start;
 }
 
 .app-mobile-brand__copy {
   min-width: 0;
 }
 
-.app-mobile-brand__title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 19px;
+.app-mobile-brand__eyebrow,
+.app-sidebar-kicker {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #b55d3f;
+}
+
+.app-mobile-brand__title,
+.app-sidebar-title {
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: #101314;
+  color: #2a241d;
 }
 
 .app-mobile-bar__spacer {
@@ -829,12 +745,12 @@ onBeforeUnmount(() => {
 
 .app-sidebar {
   background:
-    radial-gradient(circle at top left, rgba(65, 191, 171, 0.14), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(245, 191, 71, 0.12), transparent 26%),
-    linear-gradient(180deg, rgba(8, 24, 28, 0.99), rgba(14, 40, 44, 0.98)),
-    #102e2f;
-  color: #f5efe6;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+    radial-gradient(circle at top left, rgba(246, 214, 133, 0.22), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(190, 228, 220, 0.22), transparent 26%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.98), rgba(245, 238, 228, 0.96)),
+    #f8f1e8;
+  color: #2a241d;
+  border-right: 1px solid rgba(42, 36, 29, 0.08);
 }
 
 .app-sidebar--mobile {
@@ -849,7 +765,6 @@ onBeforeUnmount(() => {
   gap: 16px;
   padding: 20px 18px 18px;
   overflow: hidden;
-  transform-origin: left center;
   backdrop-filter: blur(20px);
 }
 
@@ -857,38 +772,23 @@ onBeforeUnmount(() => {
   padding: 18px 14px 16px;
 }
 
-.app-sidebar-nav-wrap {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 4px;
+.app-sidebar-panel,
+.app-sidebar-nav-stack,
+.app-sidebar-item {
+  border: 1px solid rgba(42, 36, 29, 0.08);
+  background: rgba(255, 252, 247, 0.82);
+  box-shadow: 0 18px 44px rgba(60, 43, 24, 0.08);
+  backdrop-filter: blur(16px);
 }
 
-.app-sidebar-nav-stack {
+.app-sidebar-panel {
+  padding: 16px;
   display: grid;
-  gap: 14px;
-  align-content: start;
+  gap: 16px;
+}
+
+.app-sidebar-panel--mobile {
   padding: 14px;
-  border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
-    rgba(255, 255, 255, 0.02);
-}
-
-.app-sidebar-nav-wrap::-webkit-scrollbar {
-  width: 6px;
-}
-
-.app-sidebar-nav-wrap::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
-}
-
-.app-sidebar-bottom {
-  display: grid;
-  gap: 14px;
-  flex-shrink: 0;
 }
 
 .app-sidebar-top {
@@ -898,722 +798,45 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
-.app-sidebar-top--mobile {
-  margin-bottom: 0;
-}
-
 .app-sidebar-brand {
   display: flex;
   align-items: center;
   gap: 12px;
   flex: 1;
   min-width: 0;
-  border: 0;
+  color: inherit;
+  text-align: left;
+  justify-content: flex-start;
   padding: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-}
-
-.app-sidebar-hero {
-  padding: 16px;
-  border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
-    rgba(255, 255, 255, 0.02);
-  box-shadow: 0 18px 32px rgba(5, 16, 20, 0.18);
-}
-
-.app-sidebar-hero--mobile {
-  padding: 14px;
-}
-
-.app-sidebar-hero__action {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  margin-top: 16px;
-  padding: 16px 0 0;
-  border: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  transition:
-    transform 0.2s ease,
-    color 0.2s ease;
-}
-
-.app-sidebar-hero__action--active {
-  color: #ffffff;
-}
-
-.app-sidebar-hero__action:hover {
-  transform: translateX(2px);
-}
-
-.app-sidebar-hero__action-copy {
-  min-width: 0;
-  flex: 1;
-}
-
-.app-sidebar-hero__action-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: #fffaf4;
-}
-
-.app-sidebar-hero__action-subtitle {
-  margin-top: 4px;
-  font-size: 12px;
-  color: rgba(245, 239, 230, 0.62);
-}
-
-.app-sidebar-hero__action-arrow {
-  color: rgba(245, 239, 230, 0.72);
-}
-
-.app-sidebar-hero__action--active .app-sidebar-hero__action-arrow {
-  color: #f5bf47;
-}
-
-.app-sidebar-logo-wrap {
-  width: 48px;
-  height: 48px;
-  border-radius: 16px;
-  display: grid;
-  place-items: center;
-  background:
-    linear-gradient(135deg, rgba(245, 191, 71, 0.22), rgba(28, 124, 125, 0.4)),
-    rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: none;
-  flex-shrink: 0;
-}
-
-.app-sidebar-logo-wrap--compact {
-  width: 52px;
-  height: 52px;
-  border-radius: 18px;
-}
-
-.app-sidebar-logo {
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.96);
-  padding: 4px;
-}
-
-.app-sidebar-title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: #fff9f2;
-}
-
-.app-sidebar-title--compact {
-  font-size: 16px;
 }
 
 .app-sidebar-toggle {
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.06);
-  color: #f5efe6;
-  flex-shrink: 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition:
-    transform 0.24s ease,
-    background-color 0.24s ease,
-    border-color 0.24s ease,
-    box-shadow 0.24s ease;
+  background: rgba(255, 255, 255, 0.64);
+  color: #2a241d;
+  border: 1px solid rgba(42, 36, 29, 0.08);
 }
 
-.app-sidebar-toggle:hover,
-.app-sidebar-compact-toggle:hover {
-  transform: translateY(-1px) scale(1.03);
-}
-
-.app-sidebar-toggle--close {
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04)),
-    rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 12px 20px rgba(8, 24, 28, 0.12);
-}
-
-.app-sidebar-toggle--close :deep(.v-icon) {
-  transition: transform 0.24s ease;
-}
-
-.app-sidebar-toggle--close:hover :deep(.v-icon) {
-  transform: translateX(-2px);
-}
-
-.app-sidebar-section-label {
-  margin-top: 2px;
-  padding: 0 12px 10px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(245, 239, 230, 0.46);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.app-sidebar-nav {
-  display: grid;
-  gap: 8px;
-  padding: 0;
-}
-
-.app-sidebar-brand--compact {
-  gap: 10px;
-}
-
-.app-sidebar-compact-brand-copy {
-  min-width: 0;
-}
-
-.app-sidebar-compact-brand-label {
-  margin-top: 3px;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(245, 239, 230, 0.52);
-}
-
-.app-sidebar-compact-shell {
-  height: 100%;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 16px;
-  padding: 16px 12px 14px;
-}
-
-.app-sidebar-compact-top {
-  display: grid;
-  gap: 14px;
-}
-
-.app-sidebar-compact-brand-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.app-sidebar-compact-toggle {
-  width: 40px;
-  height: 40px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #f5efe6;
-  flex-shrink: 0;
-  transition:
-    transform 0.24s ease,
-    background-color 0.24s ease,
-    border-color 0.24s ease,
-    box-shadow 0.24s ease;
-}
-
-.app-sidebar-compact-toggle--open {
-  background:
-    linear-gradient(135deg, rgba(67, 196, 175, 0.18), rgba(255, 255, 255, 0.06)),
-    rgba(255, 255, 255, 0.04);
-  border-color: rgba(67, 196, 175, 0.24);
-  box-shadow: 0 12px 20px rgba(8, 24, 28, 0.12);
-}
-
-.app-sidebar-compact-toggle--open :deep(.v-icon) {
-  transition: transform 0.24s ease;
-}
-
-.app-sidebar-compact-toggle--open:hover :deep(.v-icon) {
-  transform: translateX(2px);
-}
-
-.app-sidebar-compact-current {
-  padding: 12px;
-  border-radius: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    linear-gradient(155deg, rgba(67, 196, 175, 0.14), rgba(255, 255, 255, 0.04)),
-    rgba(255, 255, 255, 0.04);
-}
-
-.app-sidebar-compact-current--gold {
-  background:
-    linear-gradient(155deg, rgba(245, 191, 71, 0.16), rgba(255, 255, 255, 0.04)),
-    rgba(255, 255, 255, 0.04);
-}
-
-.app-sidebar-compact-current--coral {
-  background:
-    linear-gradient(155deg, rgba(240, 90, 40, 0.14), rgba(255, 255, 255, 0.04)),
-    rgba(255, 255, 255, 0.04);
-}
-
-.app-sidebar-compact-current__eyebrow {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(245, 239, 230, 0.48);
-}
-
-.app-sidebar-compact-current__title {
-  margin-top: 6px;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: #fff8f0;
-}
-
-.app-sidebar-compact-nav-wrap {
-  min-height: 0;
-}
-
-.app-sidebar-compact-nav {
-  display: grid;
-  gap: 10px;
-  min-height: 100%;
-  padding: 12px 8px;
-  border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03)),
-    rgba(255, 255, 255, 0.03);
-}
-
-.app-sidebar-compact-item {
-  --compact-accent: rgba(67, 196, 175, 0.18);
-  --compact-accent-strong: #43c4af;
-  position: relative;
-  width: 100%;
-  min-height: 64px;
-  padding: 10px 12px;
-  border: 1px solid transparent;
-  border-radius: 20px;
+.app-sidebar-account {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: transparent;
-  color: rgba(245, 239, 230, 0.82);
-  text-align: left;
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    transform 0.2s ease,
-    color 0.2s ease;
-}
-
-.app-sidebar-compact-item--gold {
-  --compact-accent: rgba(245, 191, 71, 0.18);
-  --compact-accent-strong: #f5bf47;
-}
-
-.app-sidebar-compact-item--coral {
-  --compact-accent: rgba(240, 90, 40, 0.18);
-  --compact-accent-strong: #f05a28;
-}
-
-.app-sidebar-compact-item:hover {
-  transform: translateX(2px);
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.1);
-  color: #fff9f2;
-}
-
-.app-sidebar-compact-item--active {
-  background:
-    linear-gradient(145deg, var(--compact-accent), rgba(255, 255, 255, 0.05)),
-    rgba(255, 255, 255, 0.06);
-  border-color: var(--compact-accent);
-  color: #fffaf2;
-}
-
-.app-sidebar-compact-item__icon-wrap {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: var(--compact-accent-strong);
-  flex-shrink: 0;
-}
-
-.app-sidebar-compact-item--active .app-sidebar-compact-item__icon-wrap {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.16);
-}
-
-.app-sidebar-compact-item__body {
-  min-width: 0;
-  flex: 1;
-}
-
-.app-sidebar-compact-item__title {
-  display: block;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.app-sidebar-compact-item__subtitle {
-  display: block;
-  margin-top: 3px;
-  font-size: 11px;
-  color: rgba(245, 239, 230, 0.52);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.app-sidebar-compact-item--active .app-sidebar-compact-item__subtitle {
-  color: rgba(255, 249, 242, 0.72);
-}
-
-.app-sidebar-compact-item__badge {
-  min-width: 22px;
-  height: 22px;
-  padding: 0 6px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #f05a28;
-  color: #fff9f1;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-  border: 2px solid #102e2f;
-  flex-shrink: 0;
-}
-
-.app-sidebar-compact-item__badge--dot {
-  min-width: 12px;
-  width: 12px;
-  height: 12px;
-  padding: 0;
-  background: var(--compact-accent-strong);
-}
-
-.app-sidebar-compact-bottom {
-  display: grid;
-  gap: 12px;
-}
-
-.app-sidebar-compact-action {
   width: 100%;
-  min-height: 50px;
-  padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 14px 16px;
+  border: 1px solid rgba(42, 36, 29, 0.08);
   border-radius: 22px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
-    rgba(255, 255, 255, 0.02);
-  color: #fffaf2;
-  text-align: left;
-  transition:
-    transform 0.2s ease,
-    background-color 0.2s ease,
-    border-color 0.2s ease;
-}
-
-.app-sidebar-compact-action--active {
-  border-color: rgba(245, 191, 71, 0.34);
-  background:
-    linear-gradient(135deg, rgba(245, 191, 71, 0.18), rgba(255, 255, 255, 0.05)),
-    rgba(255, 255, 255, 0.05);
-  color: #ffffff;
-}
-
-.app-sidebar-compact-action:hover {
-  transform: translateX(2px);
-}
-
-.app-sidebar-compact-action__icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  background: rgba(255, 255, 255, 0.08);
-  color: #43c4af;
-  flex-shrink: 0;
-}
-
-.app-sidebar-compact-action__label {
-  font-size: 13px;
-  font-weight: 700;
-  color: inherit;
-}
-
-.app-profile-card__logout--compact {
-  margin-top: 0;
-}
-
-.app-sidebar-item {
-  --nav-accent: rgba(67, 196, 175, 0.22);
-  --nav-accent-strong: #43c4af;
-  position: relative;
-  min-height: 72px;
-  padding: 10px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 22px;
-  color: rgba(245, 239, 230, 0.74);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015)),
-    rgba(255, 255, 255, 0.02);
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease,
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.app-sidebar-item--gold {
-  --nav-accent: rgba(245, 191, 71, 0.22);
-  --nav-accent-strong: #f5bf47;
-}
-
-.app-sidebar-item--coral {
-  --nav-accent: rgba(240, 90, 40, 0.2);
-  --nav-accent-strong: #f05a28;
+  background: rgba(255, 255, 255, 0.58);
+  color: #2a241d;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
 .app-sidebar-item:hover {
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03)),
-    rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
-  transform: translateX(3px);
-  box-shadow: 0 14px 24px rgba(6, 18, 22, 0.18);
+  transform: translateX(2px);
 }
 
 .app-sidebar-item--active {
-  background:
-    linear-gradient(135deg, var(--nav-accent), rgba(255, 255, 255, 0.04)),
-    rgba(255, 255, 255, 0.06);
-  border-color: var(--nav-accent);
-  color: #fffaf3;
-  box-shadow: 0 16px 28px rgba(6, 18, 22, 0.2);
-}
-
-.app-sidebar-item__icon-wrap {
-  position: relative;
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--nav-accent-strong);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.app-sidebar-item__icon-illustration {
-  width: 28px;
-  height: 28px;
-  opacity: 0.98;
-  filter: saturate(1.02);
-}
-
-.app-sidebar-item--active .app-sidebar-item__icon-wrap {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.12);
-}
-
-.app-sidebar-item__body {
-  min-width: 0;
-}
-
-.app-sidebar-item__title {
-  display: block;
-  min-width: 0;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
-
-.app-sidebar-item__title-text {
-  display: block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.app-sidebar-item__subtitle {
-  margin-top: 4px;
-  font-size: 12px;
-  color: rgba(245, 239, 230, 0.54);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.app-sidebar-item--active .app-sidebar-item__subtitle {
-  color: rgba(255, 249, 242, 0.72);
-}
-
-.app-sidebar-item__status-pill {
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #fff9f2;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.app-sidebar-item__status-pill--badge {
-  min-width: 26px;
-  padding: 0 8px;
-  background: rgba(240, 90, 40, 0.18);
-  border-color: rgba(240, 90, 40, 0.24);
-  color: #ffd8cc;
-}
-
-.app-sidebar-item__notice-dot {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--nav-accent-strong);
-  border: 2px solid #102e2f;
-  box-shadow: none;
-}
-
-.app-sidebar-item :deep(.v-list-item__prepend) {
-  margin-inline-end: 12px;
-  align-self: center;
-}
-
-.app-sidebar-item :deep(.v-list-item__append) {
-  margin-inline-start: 12px;
-}
-
-.app-sidebar-item :deep(.v-list-item__content) {
-  opacity: 1;
-  min-width: 0;
-}
-
-.app-tour-spotlight {
-  position: relative;
-  isolation: isolate;
-}
-
-.app-tour-spotlight::after {
-  content: '';
-  position: absolute;
-  inset: -6px;
-  border-radius: 24px;
-  border: 2px solid rgba(28, 124, 125, 0.42);
-  box-shadow:
-    0 0 0 10px rgba(28, 124, 125, 0.08),
-    0 18px 30px rgba(6, 18, 22, 0.2);
-  pointer-events: none;
-  animation: app-tour-pulse 1.8s ease-in-out infinite;
-}
-
-.app-tour-spotlight--gold::after {
-  border-color: rgba(245, 191, 71, 0.5);
-  box-shadow:
-    0 0 0 10px rgba(245, 191, 71, 0.12),
-    0 18px 30px rgba(6, 18, 22, 0.2);
-}
-
-.app-tour-spotlight--coral::after {
-  border-color: rgba(240, 90, 40, 0.48);
-  box-shadow:
-    0 0 0 10px rgba(240, 90, 40, 0.1),
-    0 18px 30px rgba(6, 18, 22, 0.2);
-}
-
-@keyframes app-tour-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.92;
-  }
-  50% {
-    transform: scale(1.01);
-    opacity: 1;
-  }
-}
-
-.app-sidebar-utility-card {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
-    rgba(255, 255, 255, 0.02);
-  color: #fffaf3;
-  text-align: left;
-  box-shadow: none;
-  transition:
-    transform 0.2s ease,
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-  box-shadow: 0 12px 22px rgba(6, 18, 22, 0.12);
-}
-
-.app-sidebar-utility-card--active {
-  border-color: rgba(245, 191, 71, 0.32);
-  box-shadow: 0 14px 26px rgba(6, 18, 22, 0.18);
-}
-
-.app-sidebar-utility-card--mobile {
-  margin-top: 4px;
-}
-
-.app-sidebar-utility-card--preferences {
-  background:
-    linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
-    rgba(255, 255, 255, 0.02);
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow: none;
-}
-
-.app-sidebar-utility-card:hover {
-  transform: translateX(2px);
-  box-shadow: 0 16px 28px rgba(6, 18, 22, 0.18);
-}
-
-.app-sidebar-utility-card--preferences:hover {
-  border-color: rgba(255, 255, 255, 0.14);
-  box-shadow: 0 10px 20px rgba(8, 24, 28, 0.12);
+  border-color: rgba(181, 93, 63, 0.22);
+  box-shadow: 0 14px 28px rgba(73, 53, 31, 0.1);
 }
 
 .app-profile-card__avatar-wrap {
@@ -1624,7 +847,7 @@ onBeforeUnmount(() => {
 .app-profile-card__avatar {
   background:
     radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.28), transparent 55%),
-    linear-gradient(135deg, #1c7c7d, #f5bf47);
+    linear-gradient(135deg, #2e4b40, #d98b61);
   color: #fff;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -1642,91 +865,238 @@ onBeforeUnmount(() => {
   height: 12px;
   border-radius: 999px;
   background: #42d392;
-  border: 2px solid #163a3b;
+  border: 2px solid #fff7ef;
 }
 
-.app-sidebar-utility-card__icon {
-  width: 38px;
-  height: 38px;
+.app-sidebar-account__copy,
+.app-sidebar-item__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.app-sidebar-account__name,
+.app-sidebar-item__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2a241d;
+}
+
+.app-sidebar-item__subtitle {
+  margin-top: 4px;
+  font-size: 12px;
+  color: rgba(42, 36, 29, 0.58);
+}
+
+.app-sidebar-account__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.app-sidebar-account__chip {
+  background: rgba(181, 93, 63, 0.1);
+  color: #9f4e33;
+  font-weight: 700;
+}
+
+.app-sidebar-account__route {
+  font-size: 12px;
+  color: rgba(42, 36, 29, 0.58);
+}
+
+.app-sidebar-nav-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.app-sidebar-nav-wrap::-webkit-scrollbar {
+  width: 6px;
+}
+
+.app-sidebar-nav-wrap::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(42, 36, 29, 0.18);
+}
+
+.app-sidebar-nav-stack {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  padding: 14px;
+  border-radius: 28px;
+}
+
+.app-sidebar-section-label {
+  padding: 0 12px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(42, 36, 29, 0.44);
+  border-bottom: 1px solid rgba(42, 36, 29, 0.08);
+}
+
+.app-sidebar-nav {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+}
+
+.app-sidebar-item {
+  --nav-accent: rgba(67, 196, 175, 0.2);
+  --nav-accent-strong: #2e8b78;
+  min-height: 72px;
+  padding: 10px 12px;
+  border-radius: 22px;
+  color: rgba(42, 36, 29, 0.76);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.app-sidebar-item--gold {
+  --nav-accent: rgba(245, 191, 71, 0.22);
+  --nav-accent-strong: #c78c21;
+}
+
+.app-sidebar-item--coral {
+  --nav-accent: rgba(217, 139, 97, 0.22);
+  --nav-accent-strong: #b55d3f;
+}
+
+.app-sidebar-item--active {
+  background:
+    linear-gradient(135deg, var(--nav-accent), rgba(255, 255, 255, 0.62)),
+    rgba(255, 255, 255, 0.82);
+}
+
+.app-sidebar-item__icon-wrap {
+  width: 42px;
+  height: 42px;
   border-radius: 14px;
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.08);
-  color: #43c4af;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(42, 36, 29, 0.08);
+  color: var(--nav-accent-strong);
   flex-shrink: 0;
 }
 
-.app-sidebar-utility-card__illustration {
+.app-sidebar-item__icon-illustration {
   width: 28px;
   height: 28px;
-  opacity: 0.98;
 }
 
-.app-sidebar-utility-card--preferences .app-sidebar-utility-card__icon {
-  background: rgba(255, 255, 255, 0.08);
-  color: #43c4af;
-}
-
-.app-sidebar-utility-card__content {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-  text-align: left;
-}
-
-.app-sidebar-utility-card__title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #fffaf3;
+.app-sidebar-item__title-text {
+  display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.app-sidebar-utility-card__subtitle {
+.app-sidebar-item__status-pill {
+  height: 26px;
+  min-width: 26px;
+  padding: 0 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(42, 36, 29, 0.08);
+  color: #2a241d;
   font-size: 11px;
-  color: rgba(245, 239, 230, 0.54);
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
-.app-sidebar-utility-card--preferences .app-sidebar-utility-card__title {
-  color: #fffaf3;
+.app-sidebar-item__status-pill--badge {
+  background: rgba(217, 139, 97, 0.16);
+  border-color: rgba(181, 93, 63, 0.18);
+  color: #8f4228;
 }
 
-.app-sidebar-utility-card--preferences .app-sidebar-utility-card__subtitle {
-  color: rgba(245, 239, 230, 0.54);
+.app-sidebar-item__status-pill--soon {
+  background: rgba(66, 184, 131, 0.12);
+  border-color: rgba(39, 122, 89, 0.18);
+  color: #276a50;
 }
 
-.app-sidebar-utility-card__arrow {
-  color: rgba(245, 239, 230, 0.72);
-  flex-shrink: 0;
-  opacity: 0.88;
+.app-sidebar-item :deep(.v-list-item__prepend) {
+  margin-inline-end: 12px;
+  align-self: center;
+}
+
+.app-sidebar-item :deep(.v-list-item__append) {
+  margin-inline-start: 12px;
+}
+
+.app-sidebar-item :deep(.v-list-item__content) {
+  opacity: 1;
+  min-width: 0;
+}
+
+.app-sidebar-bottom {
+  display: grid;
+  gap: 10px;
 }
 
 .app-profile-card__logout {
-  margin-top: 2px;
   text-transform: none;
   font-weight: 700;
   border-radius: 20px;
   min-height: 52px;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04)),
-    rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #fff7ef;
+    linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(250, 244, 236, 0.96)),
+    rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(42, 36, 29, 0.08);
+  color: #2a241d;
+  box-shadow: 0 12px 22px rgba(73, 53, 31, 0.08);
+}
+
+.app-tour-spotlight {
+  position: relative;
+  isolation: isolate;
+}
+
+.app-tour-spotlight::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 24px;
+  border: 2px solid rgba(46, 75, 64, 0.34);
+  box-shadow: 0 0 0 10px rgba(46, 75, 64, 0.08);
+  pointer-events: none;
+  animation: app-tour-pulse 1.8s ease-in-out infinite;
+}
+
+.app-tour-spotlight--gold::after {
+  border-color: rgba(245, 191, 71, 0.48);
+  box-shadow: 0 0 0 10px rgba(245, 191, 71, 0.12);
+}
+
+.app-tour-spotlight--coral::after {
+  border-color: rgba(181, 93, 63, 0.42);
+  box-shadow: 0 0 0 10px rgba(181, 93, 63, 0.1);
+}
+
+@keyframes app-tour-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+  50% {
+    transform: scale(1.01);
+    opacity: 1;
+  }
 }
 
 @media (max-width: 959px) {
   .app-sidebar-item {
     min-height: 68px;
-  }
-
-  .app-sidebar-utility-card {
-    border-radius: 22px;
   }
 }
 
@@ -1748,8 +1118,9 @@ onBeforeUnmount(() => {
     height: 54px;
   }
 
-  .app-mobile-brand__title {
-    font-size: 18px;
+  .app-mobile-brand__title,
+  .app-sidebar-title {
+    font-size: 17px;
   }
 }
 </style>
