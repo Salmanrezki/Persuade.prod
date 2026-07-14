@@ -499,6 +499,22 @@ onBeforeUnmount(() => {
         <div class="app-sidebar-bottom">
           <v-btn
             block
+            class="app-profile-card__secondary"
+            prepend-icon="mdi-account-circle-outline"
+            @click="goTo(ROUTE_PATHS.profile)"
+          >
+            Profil
+          </v-btn>
+          <v-btn
+            block
+            class="app-profile-card__secondary"
+            prepend-icon="mdi-tune-variant"
+            @click="goTo(ROUTE_PATHS.preferences)"
+          >
+            Preferences
+          </v-btn>
+          <v-btn
+            block
             class="app-profile-card__logout"
             prepend-icon="mdi-logout"
             @click="logout"
@@ -611,6 +627,22 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="app-sidebar-bottom">
+          <v-btn
+            block
+            class="app-profile-card__secondary"
+            prepend-icon="mdi-account-circle-outline"
+            @click="goTo(ROUTE_PATHS.profile)"
+          >
+            Profil
+          </v-btn>
+          <v-btn
+            block
+            class="app-profile-card__secondary"
+            prepend-icon="mdi-tune-variant"
+            @click="goTo(ROUTE_PATHS.preferences)"
+          >
+            Preferences
+          </v-btn>
           <v-btn
             block
             class="app-profile-card__logout"
@@ -1054,6 +1086,17 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(42, 36, 29, 0.08);
   color: #2a241d;
   box-shadow: 0 12px 22px rgba(73, 53, 31, 0.08);
+}
+
+.app-profile-card__secondary {
+  text-transform: none;
+  font-weight: 700;
+  border-radius: 20px;
+  min-height: 50px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(42, 36, 29, 0.08);
+  color: #2a241d;
+  box-shadow: 0 8px 18px rgba(73, 53, 31, 0.06);
 }
 
 .app-tour-spotlight {

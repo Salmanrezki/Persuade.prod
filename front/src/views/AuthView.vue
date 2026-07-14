@@ -145,6 +145,16 @@
                   required
                 />
 
+                <v-text-field
+                  v-model="registerReferralCode"
+                  label="Code de parrainage (optionnel)"
+                  prepend-inner-icon="mdi-gift-outline"
+                  variant="outlined"
+                  density="comfortable"
+                  class="mb-6"
+                  hide-details="auto"
+                />
+
                 <v-btn
                   type="submit"
                   block
@@ -193,6 +203,7 @@ const registerEmail = ref('')
 const registerPassword = ref('')
 const registerBirthdate = ref('')
 const registerRole = ref('apprenant')
+const registerReferralCode = ref('')
 const registerError = ref('')
 const showRegisterPassword = ref(false)
 const isRegistering = ref(false)
@@ -212,6 +223,7 @@ const authErrorMessages = {
   'auth/missing-password': 'Le mot de passe est requis.',
   'auth/too-many-requests': 'Trop de tentatives. Reessaie dans quelques minutes.',
   'auth/weak-password': 'Le mot de passe doit etre plus robuste.',
+  'referral/invalid-code': 'Ce code de parrainage est invalide.',
 }
 
 const getAuthErrorMessage = (error) =>
@@ -246,7 +258,8 @@ const register = async () => {
       registerPassword.value,
       registerFirstname.value,
       registerBirthdate.value,
-      registerRole.value
+      registerRole.value,
+      registerReferralCode.value
     )
     await router.push(ROUTE_PATHS.home)
   } catch (error) {

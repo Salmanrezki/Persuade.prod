@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { getCourses } from '@/services/contentService'
 import {
+  LEARNING_PROGRESS_UPDATED_EVENT,
   getExerciseProgress,
   getViewedCourses,
   hydrateLearningProgress,
@@ -10,7 +11,12 @@ import {
   setExerciseNote,
   setExerciseScore,
 } from '@/services/learningActivityService'
-import { buildCourseLinkedExercises, quizExercises, situationalExercises } from '@/data/practicalExercises'
+import {
+  buildCourseLinkedExercises,
+  buildRecommendedVideoQuizzes,
+  quizExercises,
+  situationalExercises,
+} from '@/data/practicalExercises'
 
 const auth = useAuthStore()
 
@@ -30,9 +36,18 @@ let quizTimer = null
 const difficultyOptions = ['all', 'Debutant', 'Intermediaire', 'Avance', 'Tous niveaux']
 
 const linkedExercises = computed(() => buildCourseLinkedExercises(viewedCourses.value, courses.value))
+const recommendedVideoQuizzes = computed(() => buildRecommendedVideoQuizzes(viewedCourses.value, courses.value))
 const standaloneQuizExercises = computed(() => quizExercises)
-const allQuizExercises = computed(() => [...standaloneQuizExercises.value, ...linkedExercises.value.filter((item) => item.type === 'quiz')])
-const allExercises = computed(() => [...linkedExercises.value, ...standaloneQuizExercises.value, ...situationalExercises])
+const allQuizExercises = computed(() => [
+  ...recommendedVideoQuizzes.value,
+  ...standaloneQuizExercises.value,
+])
+const allExercises = computed(() => [
+  ...recommendedVideoQuizzes.value,
+  ...linkedExercises.value,
+  ...standaloneQuizExercises.value,
+  ...situationalExercises,
+])
 const exercisesByTab = computed(() =>
   selectedTab.value === 'quiz'
     ? allQuizExercises.value
@@ -40,7 +55,7 @@ const exercisesByTab = computed(() =>
     ? situationalExercises
     : selectedTab.value === 'all'
     ? allExercises.value
-    : linkedExercises.value
+    : [...recommendedVideoQuizzes.value, ...linkedExercises.value]
 )
 
 const filteredExercises = computed(() => {
@@ -64,6 +79,10 @@ const completedCount = computed(
   () => filteredExercises.value.filter((exercise) => progress.value.completed?.[exercise.id]).length
 )
 const totalExercisesCount = computed(() => allExercises.value.length)
+const recommendedCompletedCount = computed(
+  () => recommendedVideoQuizzes.value.filter((exercise) => progress.value.completed?.[exercise.id]).length
+)
+const viewedCoursesCount = computed(() => viewedCourses.value.length)
 
 const openExercise = (exercise) => {
   activeExercise.value = exercise
@@ -76,6 +95,8 @@ const toggleComplete = (exerciseId, completed) => {
   setExerciseCompleted(auth.user?.uid, exerciseId, completed)
   progress.value = getExerciseProgress(auth.user?.uid)
 }
+
+const isExerciseCompleted = (exerciseId) => !!progress.value.completed?.[exerciseId]
 
 const updateNote = (exerciseId, note) => {
   setExerciseNote(auth.user?.uid, exerciseId, note)
@@ -151,6 +172,13 @@ const masteryBadge = computed(() => {
 })
 
 const nextRecommendedExercise = computed(() => {
+  const recommendedPending = recommendedVideoQuizzes.value.filter(
+    (exercise) => !progress.value.completed?.[exercise.id]
+  )
+  if (recommendedPending.length) {
+    return recommendedPending[0]
+  }
+
   const uncompleted = allExercises.value.filter((exercise) => !progress.value.completed?.[exercise.id])
   if (!uncompleted.length) return null
 
@@ -250,6 +278,13 @@ const hydrateLocalState = () => {
   progress.value = getExerciseProgress(auth.user?.uid)
 }
 
+const handleLearningProgressUpdated = (event) => {
+  const updatedUid = event?.detail?.uid
+  const currentUid = auth.user?.uid || 'guest'
+  if (updatedUid && updatedUid !== currentUid) return
+  hydrateLocalState()
+}
+
 const refreshExercises = async () => {
   loading.value = !viewedCourses.value.length && !situationalExercises.length
 
@@ -278,6 +313,9 @@ watch(selectedTab, () => {
 
 onMounted(async () => {
   hydrateLocalState()
+  if (typeof window !== 'undefined') {
+    window.addEventListener(LEARNING_PROGRESS_UPDATED_EVENT, handleLearningProgressUpdated)
+  }
   await refreshExercises()
 })
 
@@ -298,7 +336,29 @@ watch(
 
 onBeforeUnmount(() => {
   stopQuizTimer()
+  if (typeof window !== 'undefined') {
+    window.removeEventListener(LEARNING_PROGRESS_UPDATED_EVENT, handleLearningProgressUpdated)
+  }
 })
+
+const activeExerciseScore = computed(() => {
+  if (!activeExercise.value?.id) return null
+  return exerciseScores.value[activeExercise.value.id] || null
+})
+
+const activeExerciseCompleted = computed(() =>
+  activeExercise.value?.id ? isExerciseCompleted(activeExercise.value.id) : false
+)
+
+const formatShortDate = (value) => {
+  if (!value) return 'recentement'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'recentement'
+  return date.toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: 'short',
+  })
+}
 </script>
 
 <template>
@@ -314,38 +374,276 @@ onBeforeUnmount(() => {
 
         <div class="practical-hero-stats">
           <v-sheet class="practical-stat practical-stat--forest" rounded="xl">
-            <span class="practical-stat__value practical-stat__value--text">Co-construction</span>
-            <span class="practical-stat__label">avec nos coachs</span>
+            <span class="practical-stat__value">{{ viewedCoursesCount }}</span>
+            <span class="practical-stat__label">videos consultees</span>
           </v-sheet>
           <v-sheet class="practical-stat practical-stat--gold" rounded="xl">
-            <span class="practical-stat__value practical-stat__value--text">Niveaux</span>
-            <span class="practical-stat__label">débutant à avancé</span>
+            <span class="practical-stat__value">{{ recommendedVideoQuizzes.length }}</span>
+            <span class="practical-stat__label">quiz recommandes</span>
           </v-sheet>
           <v-sheet class="practical-stat practical-stat--coral" rounded="xl">
-            <span class="practical-stat__value practical-stat__value--text">Bientôt</span>
-            <span class="practical-stat__label">disponible</span>
+            <span class="practical-stat__value">{{ completedCount }}</span>
+            <span class="practical-stat__label">exercices completes</span>
           </v-sheet>
         </div>
       </section>
 
-      <div class="practical-disabled-area" aria-disabled="true">
-        <v-card class="practical-soon-card" elevation="6">
-          <div class="practical-soon-card__eyebrow">Bientôt disponible</div>
-          <div class="practical-soon-card__title">Nous préparons un vrai système d’exercices à niveaux</div>
-          <div class="practical-soon-card__text">
-            Nous travaillons actuellement avec des coachs experts pour mettre en place un système
-            d’exercices structuré, avec plusieurs niveaux, des mises en situation, des parcours progressifs
-            et des objectifs pédagogiques plus précis.
+      <section class="practical-dashboard">
+        <v-card class="practical-dashboard-card" elevation="2">
+          <div class="practical-dashboard-card__title">Prochain exercice recommande</div>
+          <div v-if="nextRecommendedExercise" class="practical-score-history">
+            <div class="practical-score-history__item">
+              <div>
+                <div class="practical-score-history__title">{{ nextRecommendedExercise.title }}</div>
+                <div class="practical-score-history__date">
+                  {{ nextRecommendedExercise.linkedCourseTitle || nextRecommendedExercise.category }}
+                </div>
+              </div>
+              <v-btn class="practical-card__cta" size="small" @click="openExercise(nextRecommendedExercise)">
+                Commencer
+              </v-btn>
+            </div>
           </div>
-          <div class="practical-soon-card__points">
-            <span>Exercices par niveau</span>
-            <span>Mises en situation guidées</span>
-            <span>Progression plus claire</span>
-            <span>Conçu avec des coachs experts</span>
+          <div v-else class="practical-dashboard-empty">
+            Aucun exercice a recommander pour le moment.
           </div>
         </v-card>
-      </div>
+
+        <v-card class="practical-dashboard-card" elevation="2">
+          <div class="practical-dashboard-card__title">Dernieres videos vues</div>
+          <div v-if="viewedCourses.length" class="practical-score-history">
+            <div v-for="course in viewedCourses.slice(0, 3)" :key="course.id" class="practical-score-history__item">
+              <div>
+                <div class="practical-score-history__title">{{ course.title }}</div>
+                <div class="practical-score-history__date">{{ formatShortDate(course.viewedAt) }}</div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="practical-dashboard-empty">
+            Consulte une video dans les cours pre-enregistres pour debloquer des quiz lies au contenu vu.
+          </div>
+        </v-card>
+
+        <v-card class="practical-dashboard-card" elevation="2">
+          <div class="practical-dashboard-card__title">Progression</div>
+          <div class="practical-score-history">
+            <div class="practical-score-history__item">
+              <div>
+                <div class="practical-score-history__title">Quiz termines</div>
+                <div class="practical-score-history__date">{{ recommendedCompletedCount }} sur {{ recommendedVideoQuizzes.length }}</div>
+              </div>
+              <div class="practical-score-history__score">{{ globalQuizAverage }}%</div>
+            </div>
+          </div>
+        </v-card>
+      </section>
+
+      <section class="practical-toolbar">
+        <v-tabs v-model="selectedTab" color="#2e4b40" align-tabs="start">
+          <v-tab value="linked">Recommandes</v-tab>
+          <v-tab value="quiz">Quiz</v-tab>
+          <v-tab value="situational">Situations</v-tab>
+          <v-tab value="all">Tous</v-tab>
+        </v-tabs>
+
+        <div class="practical-toolbar__filters">
+          <v-text-field
+            v-model="searchQuery"
+            label="Rechercher un exercice"
+            variant="outlined"
+            density="comfortable"
+            hide-details
+          />
+          <v-select
+            v-model="difficultyFilter"
+            :items="difficultyOptions"
+            label="Difficulte"
+            variant="outlined"
+            density="comfortable"
+            hide-details
+          />
+        </div>
+      </section>
+
+      <section v-if="recommendedVideoQuizzes.length" class="practical-paths">
+        <v-card
+          v-for="exercise in recommendedVideoQuizzes"
+          :key="exercise.id"
+          class="practical-path-card"
+          elevation="2"
+        >
+          <div class="practical-path-card__title">{{ exercise.title }}</div>
+          <div class="practical-path-card__description">
+            Propose apres la video: {{ exercise.linkedCourseTitle }}
+          </div>
+          <div class="practical-path-card__list">
+            <div class="practical-path-card__item">
+              <span>{{ exercise.difficulty }}</span>
+              <span>{{ exercise.duration }}</span>
+            </div>
+            <div class="practical-path-card__item">
+              <span>{{ exercise.category }}</span>
+              <span>{{ progress.completed?.[exercise.id] ? 'Termine' : 'A faire' }}</span>
+            </div>
+          </div>
+        </v-card>
+      </section>
+
+      <section v-if="loading" class="practical-state">
+        Chargement des exercices pratiques...
+      </section>
+
+      <section v-else-if="!filteredExercises.length" class="practical-state">
+        Aucun exercice ne correspond a votre selection.
+      </section>
+
+      <section v-else class="practical-grid">
+        <v-card
+          v-for="exercise in filteredExercises"
+          :key="exercise.id"
+          class="practical-card"
+          :class="`practical-card--${exercise.tone || 'teal'}`"
+          elevation="3"
+        >
+          <div class="practical-card__top">
+            <div class="practical-card__pill">{{ exercise.type === 'quiz' ? 'Quiz' : 'Exercice' }}</div>
+            <div v-if="isExerciseCompleted(exercise.id)" class="practical-card__status">
+              Termine
+            </div>
+          </div>
+
+          <div class="practical-card__title">{{ exercise.title }}</div>
+
+          <div class="practical-card__meta">
+            <span>{{ exercise.difficulty }}</span>
+            <span>{{ exercise.duration }}</span>
+            <span>{{ exercise.category }}</span>
+          </div>
+
+          <div class="practical-card__linked" v-if="exercise.linkedCourseTitle">
+            Lie a la video consultee: {{ exercise.linkedCourseTitle }}
+          </div>
+
+          <div class="practical-card__context">
+            {{ exercise.context }}
+          </div>
+
+          <div class="practical-card__criteria">
+            <div v-for="criterion in exercise.successCriteria || []" :key="criterion" class="practical-card__criterion">
+              {{ criterion }}
+            </div>
+          </div>
+
+          <v-btn class="practical-card__cta" @click="openExercise(exercise)">
+            Ouvrir l exercice
+          </v-btn>
+        </v-card>
+      </section>
     </div>
+
+    <v-dialog v-model="dialog" max-width="860" scroll-strategy="none">
+      <v-card v-if="activeExercise" class="practical-dialog" elevation="8">
+        <div class="practical-dialog__header">
+          <div>
+            <div class="practical-dialog__eyebrow">
+              {{ activeExercise.type === 'quiz' ? 'Quiz pratique' : 'Exercice pratique' }}
+            </div>
+            <div class="practical-dialog__title">{{ activeExercise.title }}</div>
+            <div class="practical-dialog__meta">
+              {{ activeExercise.difficulty }} · {{ activeExercise.duration }} · {{ activeExercise.linkedCourseTitle || activeExercise.category }}
+            </div>
+          </div>
+          <v-btn icon="mdi-close" variant="text" @click="dialog = false" />
+        </div>
+
+        <div class="practical-card__context">
+          {{ activeExercise.context }}
+        </div>
+
+        <div v-if="activeExercise.type === 'quiz'">
+          <div class="practical-dialog__quiz-score">
+            Score actuel: {{ quizScore }}/{{ activeExercise.questions?.length || 0 }}
+            <span v-if="activeExerciseScore"> · meilleur score {{ activeExerciseScore.percentage }}%</span>
+          </div>
+          <div v-if="quizSecondsLeft" class="practical-dialog__quiz-timer">
+            Temps restant {{ timedQuizLabel }}
+          </div>
+          <div class="practical-dialog__quiz-list">
+            <div v-for="question in activeExercise.questions || []" :key="question.id" class="practical-dialog__quiz-item">
+              <div class="practical-dialog__quiz-prompt">{{ question.prompt }}</div>
+              <v-radio-group
+                :model-value="quizResponses[question.id]"
+                @update:model-value="setQuizResponse(question.id, $event)"
+                hide-details
+              >
+                <v-radio
+                  v-for="(choice, index) in question.choices"
+                  :key="`${question.id}-${index}`"
+                  :label="choice"
+                  :value="index"
+                />
+              </v-radio-group>
+              <div
+                v-if="quizResponses[question.id] !== undefined"
+                class="practical-dialog__quiz-feedback"
+                :class="isQuizAnswerCorrect(question) ? 'success' : 'warning'"
+              >
+                {{ question.explanation }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="practical-dialog__columns">
+          <div>
+            <div class="practical-dialog__section-title">Prompts</div>
+            <div class="practical-dialog__list">
+              <div v-for="prompt in activeExercise.prompts || []" :key="prompt" class="practical-dialog__item">
+                {{ prompt }}
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="practical-dialog__section-title">Debrief</div>
+            <div class="practical-dialog__list">
+              <div v-for="point in activeExercise.debriefPoints || []" :key="point" class="practical-dialog__item">
+                {{ point }}
+              </div>
+              <div v-if="activeExercise.modelResponse" class="practical-dialog__item practical-dialog__item--model">
+                {{ activeExercise.modelResponse }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <v-textarea
+          :model-value="progress.notes?.[activeExercise.id] || ''"
+          label="Mes notes"
+          variant="outlined"
+          rows="3"
+          hide-details
+          @update:model-value="updateNote(activeExercise.id, $event)"
+        />
+
+        <div class="practical-dialog__footer">
+          <div>
+            <template v-if="activeExercise.type === 'quiz'">
+              {{ quizAnsweredCount }} reponse(s) renseignee(s) · {{ quizPercentage }}%
+            </template>
+            <template v-else>
+              Notes et debrief sauvegardes pour cet exercice.
+            </template>
+            <span v-if="activeExerciseCompleted"> · exercice termine</span>
+          </div>
+          <v-btn
+            class="practical-card__cta"
+            @click="toggleComplete(activeExercise.id, !activeExerciseCompleted)"
+          >
+            {{ activeExerciseCompleted ? 'Marquer comme a faire' : 'Marquer comme termine' }}
+          </v-btn>
+        </div>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -763,6 +1061,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .practical-card__pill {
@@ -772,6 +1071,19 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.72);
   color: #1c1a16;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.practical-card__status {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(46, 75, 64, 0.12);
+  color: #2e4b40;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;

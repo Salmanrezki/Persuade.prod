@@ -39,6 +39,10 @@ const companySize = ref('')
 const revenue = ref('')
 const familyStatus = ref('')
 const discovery = ref('')
+const referralCode = ref('')
+const referralPoints = ref(0)
+const referralCount = ref(0)
+const referredByCode = ref('')
 
 const needsProfessionDetail = computed(() => profession.value === 'Autre')
 const needsSectorDetail = computed(() => sector.value === 'Autre')
@@ -47,6 +51,10 @@ const needsJobTitleDetail = computed(() => jobTitle.value === 'Autre')
 const displayName = computed(() => firstname.value || auth.user?.displayName || auth.user?.email?.split('@')[0] || 'Utilisateur')
 const email = computed(() => auth.user?.email || auth.profile?.email || '—')
 const roleLabel = computed(() => formatRoleLabel(auth.profile?.role))
+const referralMessage = computed(
+  () =>
+    'Partagez votre code: si une personne s inscrit avec, vous gagnez des points pour acceder gratuitement a des masterclass privees.'
+)
 const profileCompletion = computed(() => {
   const fields = [
     firstname.value,
@@ -108,6 +116,10 @@ const loadProfile = async () => {
   revenue.value = data?.revenue || ''
   familyStatus.value = data?.familyStatus || ''
   discovery.value = data?.discovery || ''
+  referralCode.value = data?.referralCode || ''
+  referralPoints.value = Number(data?.referralPoints || 0)
+  referralCount.value = Number(data?.referralCount || 0)
+  referredByCode.value = data?.referredByCode || ''
   profilePhotoPreview.value = data?.profilePhoto || ''
 }
 
@@ -231,18 +243,42 @@ onMounted(async () => {
             </div>
           </div>
 
-          <div class="profile-metrics">
-            <div class="profile-metric">
-              <div class="profile-metric__label">Identité</div>
-              <div class="profile-metric__value">{{ firstname || 'À compléter' }}</div>
+            <div class="profile-metrics">
+              <div class="profile-metric">
+                <div class="profile-metric__label">Identité</div>
+                <div class="profile-metric__value">{{ firstname || 'À compléter' }}</div>
             </div>
             <div class="profile-metric">
               <div class="profile-metric__label">Naissance</div>
               <div class="profile-metric__value">{{ birthdate || 'À compléter' }}</div>
             </div>
+              <div class="profile-metric">
+                <div class="profile-metric__label">Fonction</div>
+                <div class="profile-metric__value">{{ jobTitle || 'À compléter' }}</div>
+              </div>
+            </div>
+
+          <div class="profile-metrics profile-metrics--referral">
             <div class="profile-metric">
-              <div class="profile-metric__label">Fonction</div>
-              <div class="profile-metric__value">{{ jobTitle || 'À compléter' }}</div>
+              <div class="profile-metric__label">Code de parrainage</div>
+              <div class="profile-metric__value">{{ referralCode || 'Indisponible' }}</div>
+            </div>
+            <div class="profile-metric">
+              <div class="profile-metric__label">Points gagnés</div>
+              <div class="profile-metric__value">{{ referralPoints }}</div>
+            </div>
+            <div class="profile-metric">
+              <div class="profile-metric__label">Inscriptions parrainées</div>
+              <div class="profile-metric__value">{{ referralCount }}</div>
+            </div>
+            <div class="profile-metric profile-metric--wide">
+              <div class="profile-metric__label">Parrainage</div>
+              <div class="profile-metric__value profile-metric__value--small">
+                {{ referralMessage }}
+              </div>
+              <div v-if="referredByCode" class="profile-metric__hint">
+                Vous avez utilise le code {{ referredByCode }}.
+              </div>
             </div>
           </div>
         </v-card>
@@ -540,6 +576,10 @@ onMounted(async () => {
   gap: 12px;
 }
 
+.profile-metrics--referral {
+  margin-top: 18px;
+}
+
 .profile-metric {
   padding: 14px 16px;
   border-radius: 18px;
@@ -560,6 +600,21 @@ onMounted(async () => {
   font-size: 14px;
   font-weight: 700;
   color: #fff8f0;
+}
+
+.profile-metric__value--small {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.profile-metric__hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(255, 247, 238, 0.72);
+}
+
+.profile-metric--wide {
+  grid-column: 1 / -1;
 }
 
 .profile-panel__header {

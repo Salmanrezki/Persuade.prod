@@ -7,6 +7,7 @@ import { normalizeUserProfileRole, normalizeUserRole } from '../utils/userRole.j
 const router = express.Router()
 
 const MAX_PROFILE_PHOTO_BYTES = 300 * 1024
+const REFERRAL_POINTS_PER_SIGNUP = 100
 const usersCollection = () => admin.firestore().collection('users')
 const followupCollection = () => admin.firestore().collection('coachFollowupRequests')
 
@@ -22,6 +23,9 @@ const getUserProfile = async (uid) => {
   const doc = await usersCollection().doc(uid).get()
   return doc.exists ? normalizeUserProfileRole({ uid: doc.id, ...doc.data() }) : null
 }
+
+const normalizeReferralCode = (value) =>
+  typeof value === 'string' ? value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '') : ''
 
 const canCoachAccessClientProgress = async (coachId, clientId) => {
   const snapshot = await followupCollection().where('coachId', '==', coachId).get()
@@ -68,6 +72,22 @@ router.get('/', verifyToken, async (req, res) => {
     res.json(users)
   } catch (error) {
     res.status(500).json({ message: 'Failed to load users' })
+  }
+})
+
+router.get('/referral/:code/validate', async (req, res) => {
+  try {
+    const referralCode = normalizeReferralCode(req.params.code)
+    if (!referralCode) {
+      return res.status(400).json({ message: 'Missing referral code' })
+    }
+
+    const snapshot = await usersCollection().where('referralCode', '==', referralCode).limit(1).get()
+    const exists = !snapshot.empty
+
+    res.json({ valid: exists })
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to validate referral code' })
   }
 })
 
@@ -124,6 +144,80 @@ router.patch('/me', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('PATCH /api/users/me failed:', error)
     res.status(500).json({ message: 'Failed to update profile' })
+  }
+})
+
+router.post('/referral/claim', verifyToken, async (req, res) => {
+  try {
+    const referralCode = normalizeReferralCode(req.body?.referralCode)
+    if (!referralCode) {
+      return res.status(400).json({ message: 'Missing referral code' })
+    }
+
+    const currentUserRef = usersCollection().doc(req.user.uid)
+    const currentUserDoc = await currentUserRef.get()
+    if (!currentUserDoc.exists) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    const currentUser = currentUserDoc.data() || {}
+    const ownReferralCode = normalizeReferralCode(currentUser.referralCode)
+
+    if (currentUser.referredByCode) {
+      return res.status(409).json({ message: 'Referral code already used' })
+    }
+
+    if (ownReferralCode && ownReferralCode === referralCode) {
+      return res.status(400).json({ message: 'You cannot use your own referral code' })
+    }
+
+    const referrerSnapshot = await usersCollection().where('referralCode', '==', referralCode).limit(1).get()
+    if (referrerSnapshot.empty) {
+      return res.status(404).json({ message: 'Referral code not found' })
+    }
+
+    const referrerDoc = referrerSnapshot.docs[0]
+    if (referrerDoc.id === req.user.uid) {
+      return res.status(400).json({ message: 'You cannot use your own referral code' })
+    }
+
+    const referrer = referrerDoc.data() || {}
+    const nextReferralPoints = Number(referrer.referralPoints || 0) + REFERRAL_POINTS_PER_SIGNUP
+    const nextReferralCount = Number(referrer.referralCount || 0) + 1
+
+    const batch = admin.firestore().batch()
+    batch.set(
+      currentUserRef,
+      {
+        referredByCode: referralCode,
+        referralAppliedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    )
+    batch.set(
+      referrerDoc.ref,
+      {
+        referralPoints: nextReferralPoints,
+        referralCount: nextReferralCount,
+        referralUpdatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    )
+    await batch.commit()
+
+    res.json({
+      referredByCode: referralCode,
+      referrer: {
+        uid: referrerDoc.id,
+        firstname: referrer.firstname || '',
+      },
+      pointsAwarded: REFERRAL_POINTS_PER_SIGNUP,
+      referralPoints: nextReferralPoints,
+      referralCount: nextReferralCount,
+    })
+  } catch (error) {
+    console.error('POST /api/users/referral/claim failed:', error)
+    res.status(500).json({ message: 'Failed to claim referral code' })
   }
 })
 

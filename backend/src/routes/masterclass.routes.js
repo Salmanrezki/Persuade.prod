@@ -26,6 +26,7 @@ const DEFAULT_LEVEL = 'Tous niveaux'
 const DEFAULT_FORMAT = 'online'
 const DEFAULT_LANGUAGE = 'Français'
 const DEFAULT_STATUS = 'scheduled'
+const PUBLIC_MASTERCLASS_STATUSES = ['scheduled', 'completed', 'cancelled']
 const PUBLIC_CACHE_TTL_MS = 30 * 1000
 const PUBLIC_REFRESH_RETRY_MS = 60 * 1000
 
@@ -57,10 +58,14 @@ const normalizeFormat = (value) => {
   return allowed.includes(value) ? value : DEFAULT_FORMAT
 }
 
-const normalizeStatus = (value) => {
-  const allowed = ['draft', 'scheduled', 'completed', 'cancelled']
+const normalizeStatus = (value, { allowDraft = false } = {}) => {
+  const allowed = allowDraft
+    ? ['draft', 'scheduled', 'completed', 'cancelled']
+    : PUBLIC_MASTERCLASS_STATUSES
   return allowed.includes(value) ? value : DEFAULT_STATUS
 }
+
+const isPublicMasterclass = (item) => PUBLIC_MASTERCLASS_STATUSES.includes(item?.status)
 
 const buildLocation = ({ format, location, city }) => {
   if (location) return location
@@ -105,7 +110,7 @@ const buildMasterclassPayload = (body, user, profile, options = {}) => {
     supportIncluded: sanitizeBoolean(body?.supportIncluded, false),
     speakerBio: sanitizeString(body?.speakerBio),
     featured: sanitizeBoolean(body?.featured, false),
-    status: normalizeStatus(body?.status),
+    status: normalizeStatus(body?.status, { allowDraft: options.allowDraft }),
     coachId: user.uid,
     coachName: profile.firstname || profile.email || 'Coach',
   }
@@ -165,7 +170,10 @@ const refreshPublicMasterclassesCache = async () => {
       ...doc.data(),
     }))
 
-    publicMasterclassesCache = sortMasterclasses([...masterclassSeedData, ...items])
+    publicMasterclassesCache = sortMasterclasses([
+      ...masterclassSeedData,
+      ...items.filter(isPublicMasterclass),
+    ])
     publicMasterclassesLastSyncAt = Date.now()
     return publicMasterclassesCache
   })()
@@ -210,6 +218,11 @@ const refreshRegistrationSummaryCache = async () => {
 
 const upsertPublicMasterclassCache = (item) => {
   if (!item?.id) return
+
+  if (!isPublicMasterclass(item)) {
+    removeFromPublicMasterclassCache(item.id)
+    return
+  }
 
   const nextItems = publicMasterclassesCache.filter((entry) => entry.id !== item.id)
   nextItems.push(item)

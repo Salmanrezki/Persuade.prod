@@ -3,6 +3,7 @@ import api from '@/services/api'
 const VIEWED_COURSES_STORAGE_PREFIX = 'persuade.viewed-courses'
 const EXERCISE_PROGRESS_STORAGE_PREFIX = 'persuade.exercise-progress'
 const syncTimers = new Map()
+export const LEARNING_PROGRESS_UPDATED_EVENT = 'persuade:learning-progress-updated'
 
 const getKey = (prefix, uid) => `${prefix}.${uid || 'guest'}`
 
@@ -20,6 +21,16 @@ const readJson = (key, fallback) => {
 const writeJson = (key, value) => {
   if (typeof window === 'undefined') return
   window.localStorage.setItem(key, JSON.stringify(value))
+}
+
+const notifyLearningProgressUpdated = (uid) => {
+  if (typeof window === 'undefined') return
+
+  window.dispatchEvent(
+    new CustomEvent(LEARNING_PROGRESS_UPDATED_EVENT, {
+      detail: { uid: uid || 'guest' },
+    })
+  )
 }
 
 export const recordViewedCourse = (uid, course) => {
@@ -40,6 +51,7 @@ export const recordViewedCourse = (uid, course) => {
   ].slice(0, 12)
 
   writeJson(key, next)
+  notifyLearningProgressUpdated(uid)
   scheduleLearningProgressSync(uid)
 }
 
@@ -58,6 +70,7 @@ export const setExerciseCompleted = (uid, exerciseId, completed) => {
       [exerciseId]: Boolean(completed),
     },
   })
+  notifyLearningProgressUpdated(uid)
   scheduleLearningProgressSync(uid)
 }
 
@@ -71,6 +84,7 @@ export const setExerciseNote = (uid, exerciseId, note) => {
       [exerciseId]: note,
     },
   })
+  notifyLearningProgressUpdated(uid)
   scheduleLearningProgressSync(uid)
 }
 
@@ -90,6 +104,7 @@ export const setExerciseScore = (uid, exerciseId, scorePayload) => {
       [exerciseId]: nextScore,
     },
   })
+  notifyLearningProgressUpdated(uid)
   scheduleLearningProgressSync(uid)
 }
 
@@ -137,6 +152,7 @@ export const hydrateLearningProgress = async (uid) => {
     if (progress.practicalExercises) {
       writeJson(getKey(EXERCISE_PROGRESS_STORAGE_PREFIX, uid), progress.practicalExercises)
     }
+    notifyLearningProgressUpdated(uid)
   } catch (error) {
     return
   }

@@ -404,6 +404,225 @@ export const situationalExercises = [
 
 const normalizeTone = (index) => ['teal', 'gold', 'coral'][index % 3]
 
+const slugify = (value) =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+const inferCourseQuizTheme = (course = {}, index = 0) => {
+  const fingerprint = `${course.title || ''} ${course.subtitle || ''} ${course.category || ''} ${course.description || ''}`.toLowerCase()
+
+  if (
+    fingerprint.includes('empath') ||
+    fingerprint.includes('ecoute') ||
+    fingerprint.includes('reformul') ||
+    fingerprint.includes('communication')
+  ) {
+    return {
+      category: 'Ecoute active',
+      objective: 'Verifier votre capacite a ecouter, reformuler et faire progresser une conversation sensible.',
+      context:
+        'Vous venez de consulter une video orientee ecoute active et empathie tactique. Ce quiz vous aide a transformer ces principes en reflexes concrets.',
+      successCriteria: [
+        'Vous reperez les bons reflexes d ecoute',
+        'Vous savez reformuler sans affaiblir votre cadre',
+        'Vous gardez la conversation orientee clarification',
+      ],
+      questions: [
+        {
+          key: 'listen-main',
+          prompt: 'Quel reflexe montre une empathie tactique utile en negociation ?',
+          choices: [
+            'reformuler la preoccupation de l autre avant de proposer votre solution',
+            'corriger tout de suite son raisonnement',
+            'multiplier les arguments pour reprendre le controle',
+          ],
+          answerIndex: 0,
+          explanation:
+            'L empathie tactique commence par une comprehension exprimee clairement, avant toute tentative de persuasion.',
+        },
+        {
+          key: 'listen-objection',
+          prompt: 'Quand une reserve apparait, quelle suite est la plus solide ?',
+          choices: [
+            'passer au point suivant pour garder le rythme',
+            'demander ce qui cree exactement cette reserve',
+            'faire une concession immediate',
+          ],
+          answerIndex: 1,
+          explanation:
+            'Une reserve bien clarifiee evite de repondre a cote et donne une base plus utile a la suite de l echange.',
+        },
+        {
+          key: 'listen-posture',
+          prompt: 'La meilleure reformulation ressemble plutot a :',
+          choices: [
+            'Si je vous suis bien, votre hesitation porte sur le risque et le delai.',
+            'Vous avez tort de voir les choses comme ca.',
+            'Je vais vous expliquer pourquoi ce n est pas un probleme.',
+          ],
+          answerIndex: 0,
+          explanation:
+            'Une bonne reformulation reprend le fond du message sans juger ni recadrer trop tot.',
+        },
+      ],
+    }
+  }
+
+  if (
+    fingerprint.includes('conflit') ||
+    fingerprint.includes('compromis') ||
+    fingerprint.includes('objection') ||
+    fingerprint.includes('tension')
+  ) {
+    return {
+      category: 'Gestion de tension',
+      objective: 'Verifier vos reflexes pour traiter une tension sans sortir du cadre de negociation.',
+      context:
+        'Cette video abordait la gestion du conflit, des desaccords ou des objections. Le quiz teste vos choix de posture sous pression.',
+      successCriteria: [
+        'Vous evitez l escalade immediate',
+        'Vous savez recentrer sur les interets utiles',
+        'Vous cherchez un compromis praticable plutot qu un accord flou',
+      ],
+      questions: [
+        {
+          key: 'conflict-main',
+          prompt: 'Face a un desaccord qui se durcit, quel premier geste est le plus utile ?',
+          choices: [
+            'revenir aux enjeux precis et aux points a clarifier',
+            'forcer un compromis immediate',
+            'rappeler que vous avez raison',
+          ],
+          answerIndex: 0,
+          explanation:
+            'Quand la tension monte, le plus utile est de redonner du cadre et de la clarte avant de pousser une solution.',
+        },
+        {
+          key: 'conflict-compromise',
+          prompt: 'Un compromis utile doit surtout etre :',
+          choices: [
+            'rapide, meme si personne ne sait comment l appliquer',
+            'clair, realiste et acceptable pour les deux parties',
+            'vague pour laisser de la souplesse',
+          ],
+          answerIndex: 1,
+          explanation:
+            'Un bon compromis n est pas juste un accord verbal: il doit etre concret et applicable.',
+        },
+        {
+          key: 'conflict-objection',
+          prompt: 'Que faire quand l autre formule une objection abrupte ?',
+          choices: [
+            'la prendre comme une attaque personnelle',
+            'identifier ce qui bloque reellement avant de repondre',
+            'proposer tout de suite une baisse de prix',
+          ],
+          answerIndex: 1,
+          explanation:
+            'Une objection est souvent un signal d information manquante, de risque percu ou de priorite differente.',
+        },
+      ],
+    }
+  }
+
+  return {
+    category: 'Preparation',
+    objective: 'Verifier si vous savez preparer un echange avec cadre, objectif et prochaine action claire.',
+    context:
+      'Vous avez consulte une video de fondamentaux ou de preparation. Ce quiz valide les reperes de base avant une negociation.',
+    successCriteria: [
+      'Vous distinguez objectif, alternative et seuil',
+      'Vous reperez les bons reflexes avant de negocier',
+      'Vous savez relier une idee vue a une action concrete',
+    ],
+    questions: [
+      {
+        key: 'prep-main',
+        prompt: 'Apres avoir vu ce cours, quel est le meilleur premier usage du contenu ?',
+        choices: [
+          'transformer une idee cle en action observable a tester',
+          'attendre un contexte parfait pour l utiliser',
+          'retenir seulement les definitions theoriques',
+        ],
+        answerIndex: 0,
+        explanation:
+          'Le contenu est vraiment appris quand il est transforme rapidement en comportement testable.',
+      },
+      {
+        key: 'prep-batna',
+        prompt: 'Avant une discussion importante, il est utile de clarifier :',
+        choices: [
+          'votre objectif, votre marge et votre alternative',
+          'uniquement la premiere phrase a prononcer',
+          'seulement les concessions que vous ferez',
+        ],
+        answerIndex: 0,
+        explanation:
+          'Une bonne preparation repose sur plusieurs reperes, pas uniquement sur l ouverture de discussion.',
+      },
+      {
+        key: 'prep-next-step',
+        prompt: 'En sortie de video, quel signe montre que l apprentissage est exploitable ?',
+        choices: [
+          'vous pouvez nommer une situation ou tester le contenu cette semaine',
+          'vous avez regarde la video jusqu au bout',
+          'vous etes d accord avec toutes les idees entendues',
+        ],
+        answerIndex: 0,
+        explanation:
+          'L apprentissage devient utile quand il est rattache a une situation concrete et proche.',
+      },
+    ],
+  }
+}
+
+const buildViewedCourseQuiz = (course, index) => {
+  const tone = normalizeTone(index)
+  const theme = inferCourseQuizTheme(course, index)
+  const baseTitle = course.title || 'Cours'
+  const level = course.level || 'Tous niveaux'
+  const courseSlug = slugify(course.id || baseTitle || `course-${index + 1}`)
+
+  return {
+    id: `recommended-video-quiz-${courseSlug}`,
+    type: 'quiz',
+    tone,
+    title: `Quiz video: ${baseTitle}`,
+    difficulty: level,
+    duration: '7 min',
+    timeboxSeconds: 300,
+    category: theme.category,
+    linkedCourseId: course.id,
+    linkedCourseTitle: baseTitle,
+    linkedCourseCategory: course.category || '',
+    objective: theme.objective,
+    context: `${theme.context} Video consultee: ${baseTitle}.`,
+    successCriteria: theme.successCriteria,
+    questions: theme.questions.map((question) => ({
+      id: `${courseSlug}-${question.key}`,
+      prompt: question.prompt,
+      choices: question.choices,
+      answerIndex: question.answerIndex,
+      explanation: question.explanation,
+    })),
+  }
+}
+
+export const buildRecommendedVideoQuizzes = (viewedCourses, allCourses) => {
+  const coursesById = new Map((allCourses || []).map((course) => [course.id, course]))
+
+  return (viewedCourses || [])
+    .slice(0, 3)
+    .map((viewedCourse, index) => {
+      const course = coursesById.get(viewedCourse.id) || viewedCourse
+      return buildViewedCourseQuiz(course, index)
+    })
+}
+
 export const buildCourseLinkedExercises = (viewedCourses, allCourses) => {
   const coursesById = new Map(allCourses.map((course) => [course.id, course]))
 
@@ -461,51 +680,6 @@ export const buildCourseLinkedExercises = (viewedCourses, allCourses) => {
           'Une prochaine etape formulee',
         ],
         context: `Mise en pratique inspiree du cours ${baseTitle}.`,
-      },
-      {
-        id: `course-quiz-${course.id}`,
-        type: 'quiz',
-        tone,
-        title: `Quiz express: ${baseTitle}`,
-        difficulty: level,
-        duration: '6 min',
-        timeboxSeconds: 240,
-        category,
-        linkedCourseId: course.id,
-        linkedCourseTitle: baseTitle,
-        objective: 'Verifier si les idees cle du cours sont assez claires pour etre reutilisees.',
-        context: `Verification rapide des reflexes retenus apres le cours ${baseTitle}.`,
-        successCriteria: [
-          'Vous transformez le contenu en decisions pratiques',
-          'Vous reperez le bon reflexe de negociation',
-          'Vous consolidez l idee principale du cours',
-        ],
-        questions: [
-          {
-            id: `course-quiz-main-${course.id}`,
-            prompt: `Apres le cours ${baseTitle}, quel est le meilleur usage immediat du contenu ?`,
-            choices: [
-              'Le resumer en une action observable a tester cette semaine',
-              'Le relire plus tard sans rien changer',
-              'Attendre un contexte parfait avant de l utiliser',
-            ],
-            answerIndex: 0,
-            explanation:
-              'Le meilleur ancrage d apprentissage consiste a transformer rapidement une idee en test concret.',
-          },
-          {
-            id: `course-quiz-objection-${course.id}`,
-            prompt: 'Face a une reserve du client, quel reflexe est le plus utile ?',
-            choices: [
-              'Couper pour corriger tout de suite',
-              'Clarifier la reserve avant de repondre',
-              'Empiler plusieurs arguments sans verifier',
-            ],
-            answerIndex: 1,
-            explanation:
-              'Clarifier d abord permet de traiter la vraie reserve plutot que votre interpretation.',
-          },
-        ],
       },
     ]
   })

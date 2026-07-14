@@ -8,7 +8,16 @@ import {
   onAuthStateChanged,
 } from 'firebase/auth'
 
-import { createUserProfile, getUserProfile, normalizeUserProfile, normalizeUserRole } from '@/services/userService'
+import {
+  claimReferralCode,
+  createUserProfile,
+  generateReferralCode,
+  getUserProfile,
+  normalizeReferralCode,
+  normalizeUserProfile,
+  normalizeUserRole,
+  validateReferralCode,
+} from '@/services/userService'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -55,18 +64,37 @@ export const useAuthStore = defineStore('auth', {
       this.user = cred.user
     },
 
-    async register(email, password, firstname, birthdate, role) {
+    async register(email, password, firstname, birthdate, role, referralCode = '') {
+      const normalizedReferralCode = normalizeReferralCode(referralCode)
+      if (normalizedReferralCode) {
+        const validation = await validateReferralCode(normalizedReferralCode)
+        if (!validation?.valid) {
+          const error = new Error('Invalid referral code')
+          error.code = 'referral/invalid-code'
+          throw error
+        }
+      }
+
       const cred = await createUserWithEmailAndPassword(auth, email, password)
       const normalizedRole = normalizeUserRole(role)
+      const ownReferralCode = generateReferralCode(firstname, cred.user.uid)
 
       await createUserProfile(cred.user.uid, {
         email,
         firstname,
         birthdate,
         role: normalizedRole,
+        referralCode: ownReferralCode,
+        referralPoints: 0,
+        referralCount: 0,
+        referredByCode: null,
         coachApplicationStatus: normalizedRole === 'coach' ? 'pending_review' : null,
         hasOnboarded: true,
       })
+
+      if (normalizedReferralCode) {
+        await claimReferralCode(normalizedReferralCode)
+      }
 
       this.user = cred.user
     },
