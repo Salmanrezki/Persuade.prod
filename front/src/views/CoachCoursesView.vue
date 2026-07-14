@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { getUserProfile } from '@/services/userService'
 import { addDoc, collection, deleteDoc, doc, getDocs, query, serverTimestamp, updateDoc, where } from 'firebase/firestore'
 import { recordViewedCourse } from '@/services/learningActivityService'
+import { isCoachProfile } from '@/utils/profile'
 
 const COURSE_IMAGE_MAX_SIZE = 1024 * 1024 * 1.5
 const auth = useAuthStore()
@@ -111,9 +112,9 @@ function courseToForm(course) {
   }
 }
 
-const role = computed(() => profile.value?.role || '—')
-const isCoach = computed(() => role.value === 'coach')
-const isLearner = computed(() => role.value === 'apprenant')
+const role = computed(() => (isCoachProfile(profile.value) ? 'coach' : profile.value?.role || '—'))
+const isCoach = computed(() => isCoachProfile(profile.value))
+const isLearner = computed(() => !isCoach.value)
 const isEditingCourse = computed(() => !!editingCourseId.value)
 const formTitle = computed(() =>
   isEditingCourse.value ? 'Modifier un cours particulier' : 'Créer un cours particulier'

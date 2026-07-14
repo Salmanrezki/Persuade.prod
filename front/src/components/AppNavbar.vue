@@ -13,6 +13,7 @@ import navMasterclassUrl from '@/assets/nav-masterclass.svg'
 import navExercisesUrl from '@/assets/nav-exercises.svg'
 import navChatUrl from '@/assets/nav-chat.svg'
 import { db } from '@/services/firebase'
+import { formatAccountStatusLabel, formatProfileRoleLabel, isCoachProfile } from '@/utils/profile'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -38,7 +39,7 @@ const SECTION_KEYS = {
   practicalExercises: ROUTE_PATHS.practicalExercises,
   chat: ROUTE_PATHS.chat,
 }
-const isCoach = computed(() => auth.profile?.role === 'coach')
+const isCoach = computed(() => isCoachProfile(auth.profile))
 const workspaceLabel = computed(() => (isCoach.value ? 'Espace coach' : 'Espace personnel'))
 
 const getStorageKey = (uid) => `${SECTION_STORAGE_PREFIX}.${uid}`
@@ -110,7 +111,8 @@ const displayName = computed(() => {
 })
 
 const activeNavItem = computed(() => navItems.value.find((item) => item.path === route.path) || navItems.value[0])
-const accountRoleLabel = computed(() => (isCoach.value ? 'Coach' : 'Apprenant'))
+const accountRoleLabel = computed(() => formatProfileRoleLabel(auth.profile))
+const accountStatusLabel = computed(() => formatAccountStatusLabel(auth.profile))
 
 const profilePhoto = computed(() => auth.profile?.profilePhoto || '')
 const userInitials = computed(() => {
@@ -435,7 +437,7 @@ onBeforeUnmount(() => {
                 <v-chip size="small" rounded="pill" class="app-sidebar-account__chip">
                   {{ accountRoleLabel }}
                 </v-chip>
-                <span class="app-sidebar-account__route">{{ activeNavItem?.title }}</span>
+                <span class="app-sidebar-account__route">{{ accountRoleLabel }} · {{ accountStatusLabel }}</span>
               </div>
             </div>
           </div>
@@ -563,7 +565,7 @@ onBeforeUnmount(() => {
                 <v-chip size="small" rounded="pill" class="app-sidebar-account__chip">
                   {{ accountRoleLabel }}
                 </v-chip>
-                <span class="app-sidebar-account__route">{{ activeNavItem?.title }}</span>
+                <span class="app-sidebar-account__route">{{ accountRoleLabel }} · {{ accountStatusLabel }}</span>
               </div>
             </div>
           </div>

@@ -1,21 +1,24 @@
-Persuade - preparation front + back
+# Persuade
 
-## Prerequis
+Persuade is a full-stack learning platform built around negotiation training, coach-led content, guided follow-up, chat, courses, and masterclasses.
 
-- Node.js 18 minimum
+## Prerequisites
+
+- Node.js 18 or newer
 - npm
-- Un projet Firebase actif avec Auth et Firestore
+- A Firebase project with Authentication and Firestore enabled
 
-## Structure
+## Project Structure
 
-- `front/` : Vue 3 + Vite + Vuetify
-- `backend/` : Node.js + Express + Firebase Admin
+- `front/`: Vue 3 + Vite + Vuetify frontend
+- `backend/`: Node.js + Express + Firebase Admin API
 
 ## Installation
 
 ```bash
 cd front
 npm install
+
 cd ../backend
 npm install
 ```
@@ -24,7 +27,7 @@ npm install
 
 ### Frontend
 
-Copier `front/.env.example` vers `front/.env` et renseigner :
+Copy `front/.env.example` to `front/.env` and fill in the values:
 
 ```bash
 VITE_API_BASE_URL=http://localhost:3001/api
@@ -39,16 +42,18 @@ VITE_FIREBASE_MEASUREMENT_ID=...
 
 ### Backend
 
-Copier `backend/.env.example` vers `backend/.env`.
+Copy `backend/.env.example` to `backend/.env`.
 
-Option 1, locale :
-- placer la cle Firebase Admin dans `backend/serviceAccountKey.json`
-- laisser `FIREBASE_SERVICE_ACCOUNT_PATH=serviceAccountKey.json`
+Local option:
 
-Option 2, production :
-- injecter `FIREBASE_SERVICE_ACCOUNT` avec le JSON complet du service account sur une seule ligne
+- place the Firebase Admin key in `backend/serviceAccountKey.json`
+- keep `FIREBASE_SERVICE_ACCOUNT_PATH=serviceAccountKey.json`
 
-Variables principales :
+Production option:
+
+- provide `FIREBASE_SERVICE_ACCOUNT` as a single-line JSON string
+
+Main backend variables:
 
 ```bash
 PORT=3001
@@ -57,37 +62,45 @@ CORS_ORIGIN=http://localhost:5173,http://127.0.0.1:5173
 FIREBASE_SERVICE_ACCOUNT_PATH=serviceAccountKey.json
 ```
 
-## Lancement
+## Run Locally
+
+Backend:
 
 ```bash
 cd backend
 npm run dev
 ```
 
+Frontend:
+
 ```bash
 cd front
 npm run dev
 ```
 
-## Verification utile
+## Useful Local URLs
 
-- Front local : `http://localhost:5173`
-- API locale : `http://localhost:3001`
-- Healthcheck API : `GET /api/health`
-- Route protegee de base : `GET /api/users/me`
+- Frontend: `http://localhost:5173`
+- API: `http://localhost:3001`
+- Health check: `GET /api/health`
+- Basic protected route: `GET /api/users/me`
 
-## Premiere mise en prod
+## First Production Deployment Checklist
 
-- definir `VITE_API_BASE_URL` avec l URL publique du backend
-- definir `CORS_ORIGIN` avec l URL publique du front
-- ne pas committer `backend/serviceAccountKey.json`
-- preferer `FIREBASE_SERVICE_ACCOUNT` cote hebergeur pour la prod
-- verifier les regles Firestore avant ouverture publique
+- set `VITE_API_BASE_URL` to the public backend URL
+- set `CORS_ORIGIN` to the public frontend URL
+- do not commit `backend/serviceAccountKey.json`
+- prefer `FIREBASE_SERVICE_ACCOUNT` in the hosting environment
+- review Firestore rules before public release
 
-## Firestore
+## Firestore Rules
 
-Deployer les regles si besoin :
+Deploy rules when needed:
 
 ```bash
 firebase deploy --only firestore:rules
 ```
+
+## Additional Documentation
+
+- Backend documentation: [backend/README.md](/mnt/c/Users/salma/Desktop/New%20folder/Persuade.prod/backend/README.md)

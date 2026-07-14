@@ -8,6 +8,7 @@ import {
   getMasterclassRegistrationSummary,
   invalidateContent,
 } from '@/services/contentService'
+import { isCoachProfile } from '@/utils/profile'
 
 const MASTERCLASS_IMAGE_MAX_SIZE = 1024 * 1024 * 1.5
 const auth = useAuthStore()
@@ -131,9 +132,9 @@ function masterclassToForm(item) {
   }
 }
 
-const role = computed(() => profile.value?.role || '—')
-const isCoach = computed(() => role.value === 'coach')
-const isLearner = computed(() => role.value === 'apprenant')
+const role = computed(() => (isCoachProfile(profile.value) ? 'coach' : profile.value?.role || '—'))
+const isCoach = computed(() => isCoachProfile(profile.value))
+const isLearner = computed(() => !isCoach.value)
 const isEditingMasterclass = computed(() => !!editingMasterclassId.value)
 const formTitle = computed(() =>
   isEditingMasterclass.value ? 'Modifier ma masterclass' : 'Créer ma masterclass'

@@ -2,7 +2,7 @@ import express from 'express'
 import admin from '../firebaseAdmin.js'
 import { verifyToken } from '../middleware/authMiddleware.js'
 import { listCoachDirectory } from '../utils/coachDirectory.js'
-import { normalizeUserProfileRole, normalizeUserRole } from '../utils/userRole.js'
+import { normalizeUserProfileRole } from '../utils/userRole.js'
 
 const router = express.Router()
 
@@ -124,10 +124,6 @@ router.patch('/me', verifyToken, async (req, res) => {
         updates[key] = req.body[key]
       }
     })
-
-    if (req.body?.role !== undefined) {
-      updates.role = normalizeUserRole(req.body.role)
-    }
 
     if (
       typeof updates.profilePhoto === 'string' &&

@@ -4,7 +4,9 @@ import api from '@/services/api'
 
 export const normalizeUserRole = (value) => {
   const normalized = typeof value === 'string' ? value.trim().toLowerCase() : ''
-  return normalized === 'coach' ? 'coach' : 'apprenant'
+  if (normalized === 'coach') return 'coach'
+  if (normalized === 'apprenant') return 'apprenant'
+  return null
 }
 
 export const normalizeReferralCode = (value) =>
@@ -29,19 +31,24 @@ export const generateReferralCode = (firstname, uid) => {
 }
 
 export const normalizeUserProfile = (data = {}, fallback = {}) => {
-  const normalizedRole = normalizeUserRole(data?.role ?? fallback?.role)
+  const normalizedRole = normalizeUserRole(data?.role) || normalizeUserRole(fallback?.role)
+  const inferredRole =
+    normalizedRole ||
+    (data?.coachApplicationStatus === 'pending_review' || fallback?.coachApplicationStatus === 'pending_review'
+      ? 'coach'
+      : null)
 
   return {
     ...fallback,
     ...data,
-    role: normalizedRole,
+    role: inferredRole || data?.role || fallback?.role || null,
     coachApplicationStatus:
-      normalizedRole === 'coach' ? data?.coachApplicationStatus || fallback?.coachApplicationStatus || 'pending_review' : null,
+      (inferredRole === 'coach' ? data?.coachApplicationStatus || fallback?.coachApplicationStatus || 'pending_review' : null),
   }
 }
 
 export const createUserProfile = async (uid, data) => {
-  const normalizedRole = normalizeUserRole(data?.role)
+  const normalizedRole = normalizeUserRole(data?.role) || 'apprenant'
   const normalizedReferralCode = normalizeReferralCode(data?.referralCode)
 
   await setDoc(doc(db, 'users', uid), {
@@ -101,9 +108,7 @@ export const updateUserProfile = async (uid, data) => {
     updatedAt: serverTimestamp(),
   }
 
-  if (data?.role !== undefined) {
-    payload.role = normalizeUserRole(data.role)
-  }
+  delete payload.role
 
   await setDoc(
     doc(db, 'users', uid),

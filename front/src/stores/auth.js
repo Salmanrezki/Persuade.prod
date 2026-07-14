@@ -76,7 +76,7 @@ export const useAuthStore = defineStore('auth', {
       }
 
       const cred = await createUserWithEmailAndPassword(auth, email, password)
-      const normalizedRole = normalizeUserRole(role)
+      const normalizedRole = normalizeUserRole(role) || 'apprenant'
       const ownReferralCode = generateReferralCode(firstname, cred.user.uid)
 
       await createUserProfile(cred.user.uid, {
@@ -120,7 +120,11 @@ export const useAuthStore = defineStore('auth', {
         this.hasOnboarded = true
         this.profileLoaded = true
       } catch (error) {
-        this.profile = normalizeUserProfile({}, { uid: this.user.uid, email: this.user.email })
+        this.profile = normalizeUserProfile(this.profile || {}, {
+          uid: this.user.uid,
+          email: this.user.email,
+          role: this.profile?.role || null,
+        })
         this.hasOnboarded = true
         this.profileLoaded = true
       } finally {

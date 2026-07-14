@@ -15,3 +15,17 @@ export const formatRoleLabel = (role) => {
     .replace(/[_-]+/g, ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
 }
+
+export const inferProfileRole = (profile) => {
+  if (profile?.role === 'coach') return 'coach'
+  if (profile?.role === 'apprenant') return 'apprenant'
+  if (profile?.coachApplicationStatus === 'pending_review') return 'coach'
+  return null
+}
+
+export const isCoachProfile = (profile) => inferProfileRole(profile) === 'coach'
+
+export const formatProfileRoleLabel = (profile) => formatRoleLabel(inferProfileRole(profile))
+
+export const formatAccountStatusLabel = (profile) =>
+  profile?.coachApplicationStatus === 'pending_review' ? 'En évaluation' : 'Actif'

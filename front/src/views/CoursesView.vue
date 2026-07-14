@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { getUserProfile } from '@/services/userService'
 import { getCourses, invalidateContent } from '@/services/contentService'
 import { recordViewedCourse } from '@/services/learningActivityService'
+import { isCoachProfile } from '@/utils/profile'
 
 const LIBRARY_IMAGE_MAX_SIZE = 1024 * 1024 * 1.5
 const auth = useAuthStore()
@@ -104,8 +105,8 @@ function courseToForm(course) {
   }
 }
 
-const role = computed(() => profile.value?.role || '—')
-const isCoach = computed(() => role.value === 'coach')
+const role = computed(() => (isCoachProfile(profile.value) ? 'coach' : profile.value?.role || '—'))
+const isCoach = computed(() => isCoachProfile(profile.value))
 const isEditingLibraryCourse = computed(() => !!editingLibraryCourseId.value)
 const formTitle = computed(() =>
   isEditingLibraryCourse.value ? 'Modifier un cours pré-enregistré' : 'Créer un cours pré-enregistré'

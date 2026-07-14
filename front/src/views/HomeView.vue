@@ -13,6 +13,7 @@ import { getUserProfile } from '@/services/userService'
 import { getCourses, getMasterclasses } from '@/services/contentService'
 import { getCachedCoachDirectory, getCoachDirectory } from '@/services/coachDirectoryService'
 import { collection, getDocs, query, where } from 'firebase/firestore'
+import { formatAccountStatusLabel, formatProfileRoleLabel, isCoachProfile } from '@/utils/profile'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -38,16 +39,12 @@ const coachClientFilter = ref('all')
 const coachClientNotes = ref({})
 const coachClientActions = ref({})
 
-const role = computed(() => profile.value?.role || '—')
-const roleLabel = computed(() => {
-  if (role.value === 'coach') return 'Coach'
-  if (role.value === 'apprenant') return 'Apprenant'
-  return role.value
-})
+const role = computed(() => (isCoachProfile(profile.value) ? 'coach' : profile.value?.role || '—'))
+const roleLabel = computed(() => formatProfileRoleLabel(profile.value))
 const coachApplicationStatus = computed(() => profile.value?.coachApplicationStatus || auth.profile?.coachApplicationStatus || '')
-const isCoach = computed(() => role.value === 'coach')
+const isCoach = computed(() => isCoachProfile(profile.value))
 const isCoachPendingReview = computed(() => isCoach.value && coachApplicationStatus.value === 'pending_review')
-const accountStatusLabel = computed(() => (isCoachPendingReview.value ? 'En évaluation' : 'Actif'))
+const accountStatusLabel = computed(() => formatAccountStatusLabel(profile.value))
 
 const toMillis = (value) => {
   if (!value) return 0
@@ -1012,7 +1009,10 @@ onMounted(async () => {
   profileError.value = ''
 
   try {
-    profile.value = auth.profile || (await getUserProfile(auth.user?.uid))
+    profile.value =
+      auth.profile?.role || auth.profile?.coachApplicationStatus === 'pending_review'
+        ? auth.profile
+        : await getUserProfile(auth.user?.uid)
   } catch (error) {
     console.error(error)
   }
@@ -1035,7 +1035,10 @@ watch(
   async ([uid, profileLoaded]) => {
     if (!uid || !profileLoaded) return
 
-    profile.value = auth.profile || profile.value || (await getUserProfile(uid))
+    profile.value =
+      auth.profile?.role || auth.profile?.coachApplicationStatus === 'pending_review'
+        ? auth.profile
+        : profile.value || (await getUserProfile(uid))
 
     if (!isCoach.value && availableCoaches.value.length === 0) {
       try {

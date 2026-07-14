@@ -15,7 +15,12 @@ import {
   sectorOptions,
   seniorityOptions,
 } from '@/data/profileOptions'
-import { estimateDataUrlBytes, formatRoleLabel, MAX_PROFILE_PHOTO_BYTES } from '@/utils/profile'
+import {
+  estimateDataUrlBytes,
+  formatAccountStatusLabel,
+  formatProfileRoleLabel,
+  MAX_PROFILE_PHOTO_BYTES,
+} from '@/utils/profile'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -50,7 +55,8 @@ const needsJobTitleDetail = computed(() => jobTitle.value === 'Autre')
 
 const displayName = computed(() => firstname.value || auth.user?.displayName || auth.user?.email?.split('@')[0] || 'Utilisateur')
 const email = computed(() => auth.user?.email || auth.profile?.email || '—')
-const roleLabel = computed(() => formatRoleLabel(auth.profile?.role))
+const roleLabel = computed(() => formatProfileRoleLabel(auth.profile))
+const accountStatusLabel = computed(() => formatAccountStatusLabel(auth.profile))
 const referralMessage = computed(
   () =>
     'Partagez votre code: si une personne s inscrit avec, vous gagnez des points pour acceder gratuitement a des masterclass privees.'
@@ -237,6 +243,7 @@ onMounted(async () => {
 
             <div class="profile-summary__chips">
               <v-chip size="small" class="profile-chip" variant="flat">{{ roleLabel }}</v-chip>
+              <v-chip size="small" class="profile-chip" variant="flat">{{ accountStatusLabel }}</v-chip>
               <v-chip size="small" class="profile-chip profile-chip--accent" variant="flat">
                 Profil complété à {{ profileCompletion }}%
               </v-chip>

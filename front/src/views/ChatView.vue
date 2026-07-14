@@ -19,6 +19,7 @@ import {
 import { getUserPresenceLabel, getUserPresenceState } from '@/services/presenceService'
 import { useAuthStore } from '@/stores/auth'
 import { getUserProfile } from '@/services/userService'
+import { isCoachProfile } from '@/utils/profile'
 
 const profile = ref(null)
 const route = useRoute()
@@ -51,8 +52,8 @@ let messagesUnsub = null
 let focusListener = null
 let blurListener = null
 
-const role = computed(() => profile.value?.role || '—')
-const isCoach = computed(() => role.value === 'coach')
+const role = computed(() => (isCoachProfile(profile.value) ? 'coach' : profile.value?.role || '—'))
+const isCoach = computed(() => isCoachProfile(profile.value))
 const contactRole = computed(() => (isCoach.value ? 'apprenant' : 'coach'))
 
 const contactsMap = computed(() => {
