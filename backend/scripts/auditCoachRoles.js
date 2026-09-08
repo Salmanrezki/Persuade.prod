@@ -1,5 +1,5 @@
 import admin from '../src/firebaseAdmin.js'
-import { normalizeUserProfileRole } from '../src/utils/userRole.js'
+import { normalizeUserProfileRole, normalizeUserRole } from '../src/utils/userRole.js'
 
 const firestore = admin.firestore()
 const hasApplyFlag = process.argv.includes('--apply')
@@ -35,8 +35,8 @@ const summarizeSnapshotByField = async (collection, fieldName) => {
 const buildReasonList = ({ user, ownedCourses, ownedMasterclasses, followupAsCoach, courseRequestsAsCoach, registrationsAsCoach }) => {
   const reasons = []
 
-  if (user?.coachApplicationStatus === 'pending_review') {
-    reasons.push('coachApplicationStatus=pending_review')
+  if (user?.coachApplicationStatus) {
+    reasons.push(`coachApplicationStatus=${user.coachApplicationStatus}`)
   }
 
   if (ownedCourses > 0) {
@@ -83,10 +83,13 @@ const run = async () => {
 
   const suspiciousProfiles = []
   const repairCandidates = []
+  const learnerRepairCandidates = []
   const batch = firestore.batch()
 
   usersSnapshot.docs.forEach((doc) => {
-    const user = normalizeUserProfileRole({ uid: doc.id, ...doc.data() })
+    const rawUser = { uid: doc.id, ...doc.data() }
+    const user = normalizeUserProfileRole(rawUser)
+    const storedRole = normalizeUserRole(rawUser.role)
     const ownedCourses = Number(courseCoachCounts.get(doc.id) || 0)
     const ownedMasterclasses = Number(masterclassCoachCounts.get(doc.id) || 0)
     const followupAsCoach = Number(followupCoachCounts.get(doc.id) || 0)
@@ -102,13 +105,12 @@ const run = async () => {
       registrationsAsCoach,
     })
 
-    if (!reasons.length) return
-
     const profileSignals = {
       uid: doc.id,
       email: user.email || '',
       firstname: user.firstname || '',
-      currentRole: user.role || null,
+      currentRole: rawUser.role || null,
+      normalizedRole: user.role,
       coachApplicationStatus: user.coachApplicationStatus || null,
       ownedCourses,
       ownedMasterclasses,
@@ -118,9 +120,28 @@ const run = async () => {
       reasons,
     }
 
+    if (!reasons.length && storedRole !== 'apprenant') {
+      learnerRepairCandidates.push(profileSignals)
+
+      if (hasApplyFlag) {
+        batch.set(
+          doc.ref,
+          {
+            role: 'apprenant',
+            coachApplicationStatus: null,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        )
+      }
+      return
+    }
+
+    if (!reasons.length) return
+
     suspiciousProfiles.push(profileSignals)
 
-    if (user.role !== 'coach' && shouldRepairToCoach(profileSignals)) {
+    if (storedRole !== 'coach' && shouldRepairToCoach(profileSignals)) {
       repairCandidates.push(profileSignals)
 
       if (hasApplyFlag) {
@@ -137,7 +158,7 @@ const run = async () => {
     }
   })
 
-  if (hasApplyFlag && repairCandidates.length) {
+  if (hasApplyFlag && (repairCandidates.length || learnerRepairCandidates.length)) {
     await batch.commit()
   }
 
@@ -147,9 +168,12 @@ const run = async () => {
         mode: hasApplyFlag ? 'apply' : 'dry-run',
         targetUid: targetUid || null,
         suspiciousProfilesCount: suspiciousProfiles.length,
-        repairCandidatesCount: repairCandidates.length,
+        coachRepairCandidatesCount: repairCandidates.length,
+        learnerRepairCandidatesCount: learnerRepairCandidates.length,
         suspiciousProfiles,
+        learnerRepairCandidates,
         repairedProfiles: hasApplyFlag ? repairCandidates.map((item) => item.uid) : [],
+        repairedLearnerProfiles: hasApplyFlag ? learnerRepairCandidates.map((item) => item.uid) : [],
       },
       null,
       2

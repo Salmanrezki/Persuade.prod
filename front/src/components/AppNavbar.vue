@@ -13,7 +13,7 @@ import navMasterclassUrl from '@/assets/nav-masterclass.svg'
 import navExercisesUrl from '@/assets/nav-exercises.svg'
 import navChatUrl from '@/assets/nav-chat.svg'
 import { db } from '@/services/firebase'
-import { formatAccountStatusLabel, formatProfileRoleLabel, isCoachProfile } from '@/utils/profile'
+import { isCoachProfile } from '@/utils/profile'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -111,8 +111,6 @@ const displayName = computed(() => {
 })
 
 const activeNavItem = computed(() => navItems.value.find((item) => item.path === route.path) || navItems.value[0])
-const accountRoleLabel = computed(() => formatProfileRoleLabel(auth.profile))
-const accountStatusLabel = computed(() => formatAccountStatusLabel(auth.profile))
 
 const profilePhoto = computed(() => auth.profile?.profilePhoto || '')
 const userInitials = computed(() => {
@@ -433,12 +431,6 @@ onBeforeUnmount(() => {
 
             <div class="app-sidebar-account__copy">
               <div class="app-sidebar-account__name">{{ displayName }}</div>
-              <div class="app-sidebar-account__meta">
-                <v-chip size="small" rounded="pill" class="app-sidebar-account__chip">
-                  {{ accountRoleLabel }}
-                </v-chip>
-                <span class="app-sidebar-account__route">{{ accountRoleLabel }} · {{ accountStatusLabel }}</span>
-              </div>
             </div>
           </div>
         </v-sheet>
@@ -561,12 +553,6 @@ onBeforeUnmount(() => {
 
             <div class="app-sidebar-account__copy">
               <div class="app-sidebar-account__name">{{ displayName }}</div>
-              <div class="app-sidebar-account__meta">
-                <v-chip size="small" rounded="pill" class="app-sidebar-account__chip">
-                  {{ accountRoleLabel }}
-                </v-chip>
-                <span class="app-sidebar-account__route">{{ accountRoleLabel }} · {{ accountStatusLabel }}</span>
-              </div>
             </div>
           </div>
         </v-sheet>
@@ -917,25 +903,6 @@ onBeforeUnmount(() => {
 
 .app-sidebar-item__subtitle {
   margin-top: 4px;
-  font-size: 12px;
-  color: rgba(42, 36, 29, 0.58);
-}
-
-.app-sidebar-account__meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 6px;
-}
-
-.app-sidebar-account__chip {
-  background: rgba(181, 93, 63, 0.1);
-  color: #9f4e33;
-  font-weight: 700;
-}
-
-.app-sidebar-account__route {
   font-size: 12px;
   color: rgba(42, 36, 29, 0.58);
 }

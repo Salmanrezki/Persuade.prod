@@ -956,9 +956,6 @@ onMounted(async () => {
         <div v-if="isLearner && !loading" class="learner-dashboard">
           <v-card class="learner-coaches-card" elevation="4">
             <div class="coach-panel-title">Coachs de la plateforme</div>
-            <div class="coach-panel-subtitle">
-              Découvrez les coachs disponibles et ouvrez leur fiche pour voir leur profil et leurs cours.
-            </div>
 
             <div v-if="learnerCoachSpotlights.length" class="learner-coaches-grid">
               <div

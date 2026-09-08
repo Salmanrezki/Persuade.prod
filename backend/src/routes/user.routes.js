@@ -2,7 +2,7 @@ import express from 'express'
 import admin from '../firebaseAdmin.js'
 import { verifyToken } from '../middleware/authMiddleware.js'
 import { listCoachDirectory } from '../utils/coachDirectory.js'
-import { normalizeUserProfileRole } from '../utils/userRole.js'
+import { normalizeUserProfileRole, normalizeUserRole } from '../utils/userRole.js'
 
 const router = express.Router()
 
@@ -27,6 +27,20 @@ const getUserProfile = async (uid) => {
 const normalizeReferralCode = (value) =>
   typeof value === 'string' ? value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '') : ''
 
+const repairUserProfileRole = async (ref, rawProfile, normalizedProfile) => {
+  const currentRole = normalizeUserRole(rawProfile?.role)
+  if (currentRole === normalizedProfile.role) return
+
+  await ref.set(
+    {
+      role: normalizedProfile.role,
+      coachApplicationStatus: normalizedProfile.coachApplicationStatus,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true }
+  )
+}
+
 const canCoachAccessClientProgress = async (coachId, clientId) => {
   const snapshot = await followupCollection().where('coachId', '==', coachId).get()
   return snapshot.docs.some((doc) => {
@@ -37,8 +51,12 @@ const canCoachAccessClientProgress = async (coachId, clientId) => {
 
 router.get('/me', verifyToken, async (req, res) => {
   try {
-    const doc = await usersCollection().doc(req.user.uid).get()
-    const profile = normalizeUserProfileRole(doc.exists ? doc.data() : {})
+    const ref = usersCollection().doc(req.user.uid)
+    const doc = await ref.get()
+    const rawProfile = doc.exists ? doc.data() : {}
+    const profile = normalizeUserProfileRole(rawProfile)
+
+    await repairUserProfileRole(ref, rawProfile, profile)
 
     res.json({
       uid: req.user.uid,
@@ -113,7 +131,6 @@ router.patch('/me', verifyToken, async (req, res) => {
       'primaryGoal',
       'availability',
       'learningFormat',
-      'coachApplicationStatus',
       'hasOnboarded',
       'onboardingCompletedAt',
     ]
@@ -134,9 +151,25 @@ router.patch('/me', verifyToken, async (req, res) => {
       })
     }
 
-    await usersCollection().doc(req.user.uid).set(updates, { merge: true })
+    const ref = usersCollection().doc(req.user.uid)
+    const doc = await ref.get()
+    const currentProfile = normalizeUserProfileRole(doc.exists ? doc.data() : {})
+    const normalizedUpdates = normalizeUserProfileRole({
+      ...currentProfile,
+      ...updates,
+    })
 
-    res.json(normalizeUserProfileRole({ uid: req.user.uid, ...updates }))
+    updates.coachApplicationStatus = normalizedUpdates.coachApplicationStatus
+
+    await ref.set(
+      {
+        ...updates,
+        role: normalizedUpdates.role,
+      },
+      { merge: true }
+    )
+
+    res.json(normalizeUserProfileRole({ uid: req.user.uid, ...currentProfile, ...updates }))
   } catch (error) {
     console.error('PATCH /api/users/me failed:', error)
     res.status(500).json({ message: 'Failed to update profile' })

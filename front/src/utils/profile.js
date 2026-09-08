@@ -9,9 +9,13 @@ export const estimateDataUrlBytes = (value) => {
 }
 
 export const formatRoleLabel = (role) => {
-  if (!role) return 'Profil actif'
+  if (!role) return 'Apprenant'
 
-  return role
+  const normalized = String(role).trim().toLowerCase()
+  if (normalized === 'apprenant') return 'Apprenant'
+  if (normalized === 'coach') return 'Coach'
+
+  return String(role)
     .replace(/[_-]+/g, ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
 }
@@ -19,8 +23,8 @@ export const formatRoleLabel = (role) => {
 export const inferProfileRole = (profile) => {
   if (profile?.role === 'coach') return 'coach'
   if (profile?.role === 'apprenant') return 'apprenant'
-  if (profile?.coachApplicationStatus === 'pending_review') return 'coach'
-  return null
+  if (profile?.coachApplicationStatus) return 'coach'
+  return 'apprenant'
 }
 
 export const isCoachProfile = (profile) => inferProfileRole(profile) === 'coach'

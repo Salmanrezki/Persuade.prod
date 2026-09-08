@@ -3,6 +3,7 @@ import admin from '../firebaseAdmin.js'
 import { verifyToken } from '../middleware/authMiddleware.js'
 import { librarySeedCourses } from '../data/librarySeedCourses.js'
 import { logFirestoreWarning } from '../utils/firestoreErrors.js'
+import { normalizeUserProfileRole } from '../utils/userRole.js'
 
 const router = express.Router()
 
@@ -20,7 +21,7 @@ const PUBLIC_REFRESH_RETRY_MS = 60 * 1000
 
 const getUserProfile = async (uid) => {
   const doc = await usersCollection().doc(uid).get()
-  return doc.exists ? doc.data() : null
+  return doc.exists ? normalizeUserProfileRole({ uid: doc.id, ...doc.data() }) : null
 }
 
 const sanitizeString = (value, fallback = '') =>

@@ -7,6 +7,7 @@ import {
   logFirestoreWarning,
   toFirestoreUserMessage,
 } from '../utils/firestoreErrors.js'
+import { normalizeUserProfileRole } from '../utils/userRole.js'
 
 const router = express.Router()
 
@@ -15,7 +16,7 @@ const followupCollection = () => admin.firestore().collection('coachFollowupRequ
 
 const getUserProfile = async (uid) => {
   const doc = await usersCollection().doc(uid).get()
-  return doc.exists ? { uid: doc.id, ...doc.data() } : null
+  return doc.exists ? normalizeUserProfileRole({ uid: doc.id, ...doc.data() }) : null
 }
 
 router.get('/me', verifyToken, async (req, res) => {

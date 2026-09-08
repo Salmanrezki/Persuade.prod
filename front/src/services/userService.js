@@ -6,6 +6,7 @@ export const normalizeUserRole = (value) => {
   const normalized = typeof value === 'string' ? value.trim().toLowerCase() : ''
   if (normalized === 'coach') return 'coach'
   if (normalized === 'apprenant') return 'apprenant'
+  if (normalized === 'learner' || normalized === 'student') return 'apprenant'
   return null
 }
 
@@ -34,14 +35,14 @@ export const normalizeUserProfile = (data = {}, fallback = {}) => {
   const normalizedRole = normalizeUserRole(data?.role) || normalizeUserRole(fallback?.role)
   const inferredRole =
     normalizedRole ||
-    (data?.coachApplicationStatus === 'pending_review' || fallback?.coachApplicationStatus === 'pending_review'
+    (data?.coachApplicationStatus || fallback?.coachApplicationStatus
       ? 'coach'
-      : null)
+      : 'apprenant')
 
   return {
     ...fallback,
     ...data,
-    role: inferredRole || data?.role || fallback?.role || null,
+    role: inferredRole,
     coachApplicationStatus:
       (inferredRole === 'coach' ? data?.coachApplicationStatus || fallback?.coachApplicationStatus || 'pending_review' : null),
   }
@@ -91,15 +92,20 @@ const ensureReferralCodeForLearner = async (uid, profile) => {
 }
 
 export const getUserProfile = async (uid) => {
-  const snapshot = await getDoc(doc(db, 'users', uid))
-  if (!snapshot.exists()) return null
+  try {
+    const response = await api.get('/users/me')
+    return ensureReferralCodeForLearner(uid, normalizeUserProfile(response.data || {}, { uid }))
+  } catch (error) {
+    const snapshot = await getDoc(doc(db, 'users', uid))
+    if (!snapshot.exists()) return null
 
-  const normalizedProfile = normalizeUserProfile({
-    uid: snapshot.id,
-    ...snapshot.data(),
-  })
+    const normalizedProfile = normalizeUserProfile({
+      uid: snapshot.id,
+      ...snapshot.data(),
+    })
 
-  return ensureReferralCodeForLearner(uid, normalizedProfile)
+    return ensureReferralCodeForLearner(uid, normalizedProfile)
+  }
 }
 
 export const updateUserProfile = async (uid, data) => {
@@ -110,11 +116,17 @@ export const updateUserProfile = async (uid, data) => {
 
   delete payload.role
 
-  await setDoc(
-    doc(db, 'users', uid),
-    payload,
-    { merge: true }
-  )
+  try {
+    const response = await api.patch('/users/me', data)
+    return normalizeUserProfile(response.data || {}, { uid })
+  } catch (error) {
+    await setDoc(
+      doc(db, 'users', uid),
+      payload,
+      { merge: true }
+    )
+    return null
+  }
 }
 
 export const validateReferralCode = async (referralCode) => {

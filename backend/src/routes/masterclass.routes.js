@@ -32,7 +32,7 @@ const PUBLIC_REFRESH_RETRY_MS = 60 * 1000
 
 const getUserProfile = async (uid) => {
   const doc = await usersCollection().doc(uid).get()
-  return doc.exists ? normalizeUserProfileRole(doc.data()) : null
+  return doc.exists ? normalizeUserProfileRole({ uid: doc.id, ...doc.data() }) : null
 }
 
 const sanitizeString = (value, fallback = '') =>

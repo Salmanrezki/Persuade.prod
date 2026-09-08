@@ -11,7 +11,7 @@ service cloud.firestore {
     }
 
     function hasAllowedRoleOnCreate() {
-      return request.resource.data.role == 'apprenant';
+      return request.resource.data.role in ['apprenant', 'coach'];
     }
 
     function keepsSameRoleOnUpdate() {

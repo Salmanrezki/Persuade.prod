@@ -13,7 +13,7 @@ import { getUserProfile } from '@/services/userService'
 import { getCourses, getMasterclasses } from '@/services/contentService'
 import { getCachedCoachDirectory, getCoachDirectory } from '@/services/coachDirectoryService'
 import { collection, getDocs, query, where } from 'firebase/firestore'
-import { formatAccountStatusLabel, formatProfileRoleLabel, isCoachProfile } from '@/utils/profile'
+import { isCoachProfile } from '@/utils/profile'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -40,11 +40,9 @@ const coachClientNotes = ref({})
 const coachClientActions = ref({})
 
 const role = computed(() => (isCoachProfile(profile.value) ? 'coach' : profile.value?.role || '—'))
-const roleLabel = computed(() => formatProfileRoleLabel(profile.value))
 const coachApplicationStatus = computed(() => profile.value?.coachApplicationStatus || auth.profile?.coachApplicationStatus || '')
 const isCoach = computed(() => isCoachProfile(profile.value))
 const isCoachPendingReview = computed(() => isCoach.value && coachApplicationStatus.value === 'pending_review')
-const accountStatusLabel = computed(() => formatAccountStatusLabel(profile.value))
 
 const toMillis = (value) => {
   if (!value) return 0
@@ -386,6 +384,8 @@ const filteredCoachClientSummaries = computed(() => {
   return coachClientSummaries.value
 })
 
+const coachPriorityClient = computed(() => filteredCoachClientSummaries.value[0] || null)
+
 const coachProgressMap = computed(() =>
   coachClientProgress.value.reduce((map, item) => {
     if (item?.client?.uid) {
@@ -687,11 +687,6 @@ const coachQuickViewNextStep = computed(() => {
 })
 
 const quickViewTitle = computed(() => (isCoach.value ? 'Tableau de bord coach' : 'Tableau de bord'))
-const quickViewSubtitle = computed(() =>
-  isCoach.value
-    ? 'Gardez sous les yeux vos apprenants, les priorités de suivi et les prochaines sessions.'
-    : 'Retrouvez vos cours assistés, vos sessions confirmées et les prochains points d’attention.'
-)
 
 const openClientFollowUp = (client) => {
   if (!client?.id) {
@@ -1063,11 +1058,7 @@ watch(
             <div>
               <div class="home-hero-panel__eyebrow">Vue rapide</div>
               <div class="home-hero-panel__title">{{ quickViewTitle }}</div>
-              <div class="home-hero-panel__subtitle">{{ quickViewSubtitle }}</div>
             </div>
-            <v-chip class="home-chip home-chip--panel" size="small" variant="flat">
-              {{ roleLabel }} · {{ accountStatusLabel }}
-            </v-chip>
           </div>
 
           <div class="home-hero-signal-grid home-hero-signal-grid--wide">
@@ -1129,7 +1120,6 @@ watch(
             </div>
 
             <div class="home-hero-actions">
-              <div class="home-hero-actions__title">Actions directes</div>
               <v-btn
                 v-for="action in dashboardActions"
                 :key="action.path"
@@ -1172,7 +1162,6 @@ watch(
           <div class="home-review-alert__title">Votre compte coach est en cours d’évaluation.</div>
           <div class="home-review-alert__text">
             Nous vous contacterons par email pour passer à l’étape de validation de votre compte.
-            Nous tenons à avoir des coachs de qualité sur notre plateforme afin de garantir la meilleure expérience possible.
           </div>
         </v-alert>
       </v-col>
@@ -1182,7 +1171,6 @@ watch(
       <v-col cols="12" md="10">
         <DashboardSectionCard
           title="Planning coach"
-          subtitle="Les suivis à organiser et les prochaines sessions prévues avec vos clients."
           :chip="`${coachPlanningEntries.length} éléments`"
         >
           <template #default>
@@ -1207,11 +1195,11 @@ watch(
     </v-row>
 
     <v-row v-if="isCoach" class="home-grid" align="center" justify="center">
-      <v-col cols="12" md="10">
+      <v-col cols="12" md="11" xl="10">
         <DashboardSectionCard
           title="Suivi clients"
-          subtitle="Visualisez l’activité de vos apprenants, les cours validés et les sessions à venir."
           extra-class="home-card--coach-clients"
+          feature
         >
           <template #header-actions>
             <div class="home-card-header-actions">
@@ -1238,11 +1226,35 @@ watch(
             />
           </div>
 
+          <v-sheet
+            v-if="coachPriorityClient"
+            class="home-coach-priority"
+            :class="`home-coach-priority--${coachClientStatusTone(coachPriorityClient)}`"
+            rounded="xl"
+          >
+            <div>
+              <div class="home-coach-priority__label">Priorité suivi</div>
+              <div class="home-coach-priority__name">{{ coachPriorityClient.name }}</div>
+              <div class="home-coach-priority__detail">
+                {{ coachClientStatus(coachPriorityClient) }} · dernière activité {{ formatRelativeDate(coachPriorityClient.lastActivityAt) }}
+              </div>
+            </div>
+            <v-btn
+              class="home-coach-priority__cta"
+              variant="flat"
+              size="small"
+              @click="openClientFollowUp(coachPriorityClient)"
+            >
+              Ouvrir le suivi
+            </v-btn>
+          </v-sheet>
+
           <div v-if="filteredCoachClientSummaries.length" class="home-coach-client-list">
             <v-sheet
-              v-for="client in filteredCoachClientSummaries.slice(0, 8)"
+              v-for="client in filteredCoachClientSummaries.slice(0, 12)"
               :key="client.key"
               class="home-coach-client-card"
+              :class="{ 'home-coach-client-card--priority': client.key === coachPriorityClient?.key }"
               rounded="xl"
             >
               <div class="home-coach-client-card__head">
@@ -1397,7 +1409,6 @@ watch(
       <v-col cols="12" md="10">
         <DashboardSectionCard
           title="Parcours guidés"
-          subtitle="Commencer, continuer ou approfondir selon votre niveau actuel."
           chip="Bibliothèque"
           feature
           extra-class="home-card--paths"
@@ -1445,7 +1456,6 @@ watch(
       <v-col cols="12" md="10">
         <DashboardSectionCard
           title="Demande de suivi approfondi"
-          subtitle="Connectez-vous à un coach pour un accompagnement plus poussé et personnalisé."
           :chip="`${followupRequests.length} demande(s)`"
           feature
         >
@@ -1611,7 +1621,6 @@ watch(
       <v-col cols="12" md="5">
         <DashboardSectionCard
           title="Activité récente"
-          subtitle="Ce qui s’est passé sur votre compte"
           :chip="loadingProfile ? 'Synchronisation…' : 'À jour'"
           side
         >
@@ -1632,8 +1641,6 @@ watch(
       <v-col cols="12" md="5">
         <DashboardSectionCard
           title="Focus du moment"
-          subtitle="L’essentiel à garder sous les yeux"
-          :chip="accountStatusLabel"
           side
         >
           <div class="home-focus-list">
@@ -1671,7 +1678,6 @@ watch(
       <v-col cols="12" md="10">
         <DashboardSectionCard
           title="Demandes de suivi reçues"
-          subtitle="Les clients peuvent vous demander un accompagnement approfondi et partager leur progression une fois acceptés."
           :chip="`${coachFollowupPending.length} en attente`"
           feature
         >
@@ -1812,14 +1818,6 @@ watch(
   flex-direction: column;
   gap: 10px;
   align-content: flex-start;
-}
-
-.home-hero-actions__title {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(28, 26, 22, 0.5);
 }
 
 .home-hero-action-btn {
@@ -2399,6 +2397,60 @@ watch(
   color: var(--home-ink);
 }
 
+.home-coach-priority {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--home-line);
+  background:
+    radial-gradient(circle at 96% 8%, rgba(181, 93, 63, 0.16), transparent 28%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(250, 247, 242, 0.96));
+}
+
+.home-coach-priority--teal {
+  border-color: rgba(46, 75, 64, 0.22);
+}
+
+.home-coach-priority--gold {
+  border-color: rgba(196, 146, 55, 0.28);
+}
+
+.home-coach-priority--coral {
+  border-color: rgba(181, 93, 63, 0.3);
+}
+
+.home-coach-priority__label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(28, 26, 22, 0.5);
+}
+
+.home-coach-priority__name {
+  margin-top: 4px;
+  font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--home-ink);
+}
+
+.home-coach-priority__detail {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--home-muted);
+}
+
+.home-coach-priority__cta {
+  text-transform: none;
+  font-weight: 800;
+  color: #fff8ef;
+  background: linear-gradient(135deg, var(--home-forest), #3b6b61);
+}
+
 .home-coach-client-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2414,6 +2466,11 @@ watch(
     radial-gradient(circle at top right, rgba(46, 75, 64, 0.08), transparent 32%),
     linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(247, 244, 238, 0.98));
   border: 1px solid var(--home-line);
+}
+
+.home-coach-client-card--priority {
+  border-color: rgba(181, 93, 63, 0.28);
+  box-shadow: 0 16px 34px rgba(181, 93, 63, 0.1);
 }
 
 .home-coach-client-card__head {

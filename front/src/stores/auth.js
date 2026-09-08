@@ -6,6 +6,8 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  setPersistence,
+  browserSessionPersistence,
 } from 'firebase/auth'
 
 import {
@@ -18,6 +20,39 @@ import {
   normalizeUserRole,
   validateReferralCode,
 } from '@/services/userService'
+
+const AUTH_SESSION_MARKER = 'persuade.auth.session'
+let persistencePromise = null
+
+const getSessionStorage = () => (typeof window !== 'undefined' ? window.sessionStorage : null)
+
+const hasActiveBrowserSession = () => {
+  try {
+    return getSessionStorage()?.getItem(AUTH_SESSION_MARKER) === 'active'
+  } catch {
+    return false
+  }
+}
+
+const markActiveBrowserSession = () => {
+  try {
+    getSessionStorage()?.setItem(AUTH_SESSION_MARKER, 'active')
+  } catch {}
+}
+
+const clearActiveBrowserSession = () => {
+  try {
+    getSessionStorage()?.removeItem(AUTH_SESSION_MARKER)
+  } catch {}
+}
+
+const ensureSessionPersistence = () => {
+  if (!persistencePromise) {
+    persistencePromise = setPersistence(auth, browserSessionPersistence)
+  }
+
+  return persistencePromise
+}
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -38,15 +73,29 @@ export const useAuthStore = defineStore('auth', {
       this.profile = null
     },
 
-    init() {
+    async init() {
+      try {
+        await ensureSessionPersistence()
+      } catch (error) {
+        console.error('Unable to configure session persistence:', error)
+      }
+
       onAuthStateChanged(auth, async (user) => {
         const previousUid = this.user?.uid || null
+
+        if (user && !hasActiveBrowserSession()) {
+          await signOut(auth)
+          return
+        }
+
         this.user = user
         this.loading = false
 
         if (!user) {
+          clearActiveBrowserSession()
           this.resetProfileState()
         } else if (user.uid !== previousUid || this.profile?.uid !== user.uid) {
+          markActiveBrowserSession()
           this.resetProfileState()
           this.profileSyncing = true
         }
@@ -60,11 +109,19 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async login(email, password) {
-      const cred = await signInWithEmailAndPassword(auth, email, password)
-      this.user = cred.user
+      await ensureSessionPersistence()
+      markActiveBrowserSession()
+      try {
+        const cred = await signInWithEmailAndPassword(auth, email, password)
+        this.user = cred.user
+      } catch (error) {
+        clearActiveBrowserSession()
+        throw error
+      }
     },
 
     async register(email, password, firstname, birthdate, role, referralCode = '') {
+      await ensureSessionPersistence()
       const normalizedReferralCode = normalizeReferralCode(referralCode)
       if (normalizedReferralCode) {
         const validation = await validateReferralCode(normalizedReferralCode)
@@ -75,7 +132,14 @@ export const useAuthStore = defineStore('auth', {
         }
       }
 
-      const cred = await createUserWithEmailAndPassword(auth, email, password)
+      markActiveBrowserSession()
+      let cred
+      try {
+        cred = await createUserWithEmailAndPassword(auth, email, password)
+      } catch (error) {
+        clearActiveBrowserSession()
+        throw error
+      }
       const normalizedRole = normalizeUserRole(role) || 'apprenant'
       const ownReferralCode = generateReferralCode(firstname, cred.user.uid)
 
@@ -102,6 +166,7 @@ export const useAuthStore = defineStore('auth', {
     async logout() {
       await stopUserPresence()
       await signOut(auth)
+      clearActiveBrowserSession()
       this.user = null
       this.chatUnreadCount = 0
       this.resetProfileState()

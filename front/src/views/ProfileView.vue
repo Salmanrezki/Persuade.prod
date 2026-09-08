@@ -161,10 +161,11 @@ const submit = async () => {
       throw new Error('Missing authenticated user')
     }
 
-    await updateUserProfile(auth.user.uid, payload)
+    const updatedProfile = await updateUserProfile(auth.user.uid, payload)
 
     auth.setProfile({
       ...(auth.profile || {}),
+      ...(updatedProfile || {}),
       uid: auth.user.uid,
       email: auth.user.email,
       ...payload,
@@ -211,9 +212,6 @@ onMounted(async () => {
               </div>
 
               <div class="profile-hero__title">Voir et gérer mes informations</div>
-              <div class="profile-hero__subtitle">
-                Retrouvez vos informations personnelles, votre photo et votre profil professionnel au même endroit.
-              </div>
             </div>
 
             <div class="profile-hero__actions">

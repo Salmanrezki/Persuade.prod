@@ -1,6 +1,7 @@
 import express from 'express'
 import admin from '../firebaseAdmin.js'
 import { verifyToken } from '../middleware/authMiddleware.js'
+import { normalizeUserProfileRole } from '../utils/userRole.js'
 
 const router = express.Router()
 
@@ -10,7 +11,7 @@ const requestsCollection = () => admin.firestore().collection('courseRequests')
 
 const getUserProfile = async (uid) => {
   const doc = await usersCollection().doc(uid).get()
-  return doc.exists ? doc.data() : null
+  return doc.exists ? normalizeUserProfileRole({ uid: doc.id, ...doc.data() }) : null
 }
 
 router.get('/me', verifyToken, async (req, res) => {
