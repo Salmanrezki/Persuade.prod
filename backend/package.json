@@ -7,6 +7,7 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "audit:coach-roles": "node scripts/auditCoachRoles.js",
+    "cleanup:deleted-users": "node scripts/cleanupDeletedUsers.js",
     "delete:coaches": "node scripts/deleteCoachAccounts.js --yes",
     "reset:data": "node scripts/resetFirebase.js --yes",
     "test": "echo \"Error: no test specified\" && exit 1"

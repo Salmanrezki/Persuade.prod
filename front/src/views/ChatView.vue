@@ -141,6 +141,7 @@ const notifyUser = (title, body) => {
 
 const conversationIdFor = (uidA, uidB) => [uidA, uidB].sort().join('__')
 const getConversationRef = (conversationId) => doc(db, 'conversations', conversationId)
+const isVisibleChatUser = (user) => user?.uid && !user.deletedAt && user.isDeleted !== true
 
 const loadProfile = async () => {
   if (!authStore.user?.uid) {
@@ -155,7 +156,7 @@ const loadContacts = async () => {
   const snapshot = await getDocs(query(collection(db, 'users'), where('role', '==', contactRole.value)))
   contacts.value = snapshot.docs
     .map((item) => ({ uid: item.id, ...item.data() }))
-    .filter((item) => item.uid !== profile.value?.uid)
+    .filter((item) => item.uid !== profile.value?.uid && isVisibleChatUser(item))
     .sort((a, b) => {
       const nameA = (a.firstname || a.email || '').toLowerCase()
       const nameB = (b.firstname || b.email || '').toLowerCase()
@@ -416,7 +417,7 @@ const setupContactsListener = () => {
     (snapshot) => {
       contacts.value = snapshot.docs
         .map((doc) => ({ uid: doc.id, ...doc.data() }))
-        .filter((item) => item.uid !== profile.value?.uid)
+        .filter((item) => item.uid !== profile.value?.uid && isVisibleChatUser(item))
         .sort((a, b) => {
           const nameA = (a.firstname || a.email || '').toLowerCase()
           const nameB = (b.firstname || b.email || '').toLowerCase()
