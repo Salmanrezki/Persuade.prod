@@ -189,6 +189,7 @@ const vReveal = {
               src="/AcceuilAnimation.png"
               alt="Illustration d'accueil Persuade"
               cover
+              eager
               class="landing-hero-image"
             />
           </div>
@@ -321,7 +322,7 @@ const vReveal = {
           </div>
 
           <div class="landing-feature-preview">
-            <v-img :src="activeFeature.image" :alt="activeFeature.title" cover class="landing-feature-preview__image" />
+            <v-img :src="activeFeature.image" :alt="activeFeature.title" cover loading="lazy" class="landing-feature-preview__image" />
           </div>
         </div>
       </section>
@@ -350,7 +351,7 @@ const vReveal = {
           </div>
 
           <div class="landing-login-stack">
-            <v-img src="/landing/Login.register.png" alt="Aperçu de l'écran de connexion Persuade" contain class="landing-login-stack__image" />
+            <v-img src="/landing/Login.register.png" alt="Aperçu de l'écran de connexion Persuade" contain loading="lazy" class="landing-login-stack__image" />
           </div>
         </div>
       </section>
@@ -388,7 +389,7 @@ const vReveal = {
               v-reveal
             >
               <v-avatar size="124" class="landing-founder-avatar">
-                <v-img :src="person.image" :alt="`Photo de ${person.name}`" cover />
+                <v-img :src="person.image" :alt="`Photo de ${person.name}`" cover loading="lazy" />
               </v-avatar>
               <div>
                 <h3 class="landing-card-title">{{ person.name }}</h3>
@@ -1478,7 +1479,7 @@ const vReveal = {
   .landing-title {
     font-size: clamp(2.5rem, 12.2vw, 3.35rem);
     line-height: 0.98;
-    transform: translateY(-0.65rem);
+    transform: translateY(0.35rem);
   }
 
   .landing-section-title {
@@ -1504,6 +1505,7 @@ const vReveal = {
     scroll-snap-type: x mandatory;
     scroll-padding-inline: 0.25rem;
     scrollbar-width: none;
+    scroll-behavior: smooth;
   }
 
   .landing-offer-grid::-webkit-scrollbar,
@@ -1523,6 +1525,7 @@ const vReveal = {
     min-height: 305px;
     padding: 1.25rem;
     border-radius: 24px;
+    box-shadow: 0 18px 38px rgba(31, 52, 47, 0.12);
   }
 
   .landing-offer-controls {
@@ -1530,7 +1533,8 @@ const vReveal = {
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    margin-top: -0.25rem;
+    margin: 0.1rem 0 0.2rem;
+    padding-inline: 0.15rem;
   }
 
   .landing-offer-control {
@@ -1757,6 +1761,9 @@ const vReveal = {
   .landing-footer__links {
     margin-top: 0.45rem;
     gap: 0.55rem;
+    width: 100%;
+    padding-top: 0.7rem;
+    border-top: 1px solid rgba(31, 52, 47, 0.08);
   }
 
   .landing-footer__brand {
@@ -1767,6 +1774,14 @@ const vReveal = {
     max-width: 100%;
     font-size: 0.78rem;
     line-height: 1.45;
+  }
+
+  .landing-footer__links a {
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
   }
 
   .landing-actions {
