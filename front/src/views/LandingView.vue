@@ -1494,7 +1494,7 @@ const vReveal = {
 
   .landing-offer-grid {
     grid-auto-flow: column;
-    grid-auto-columns: minmax(86vw, 1fr);
+    grid-auto-columns: minmax(90vw, 1fr);
     grid-template-columns: none;
     gap: 1rem;
     margin-inline: -0.25rem;
@@ -1502,10 +1502,13 @@ const vReveal = {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-inline: contain;
+    overscroll-behavior-x: contain;
     scroll-snap-type: x mandatory;
+    scroll-snap-stop: always;
     scroll-padding-inline: 0.25rem;
     scrollbar-width: none;
     scroll-behavior: smooth;
+    touch-action: pan-x;
   }
 
   .landing-offer-grid::-webkit-scrollbar,
@@ -1525,6 +1528,16 @@ const vReveal = {
     min-height: 305px;
     padding: 1.25rem;
     border-radius: 24px;
+    box-shadow: 0 18px 38px rgba(31, 52, 47, 0.12);
+    transform: none !important;
+    transition: opacity 720ms cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms),
+      filter 720ms cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms),
+      box-shadow 180ms ease;
+  }
+
+  .landing-offer-card:hover,
+  .landing-offer-card:active {
+    transform: none !important;
     box-shadow: 0 18px 38px rgba(31, 52, 47, 0.12);
   }
 
