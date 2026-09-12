@@ -20,13 +20,23 @@
 
 <style scoped>
 .landing-tablet-showcase {
+  position: relative;
   display: grid;
   place-items: center;
   width: 100%;
   min-height: 460px;
   padding: 1rem;
-  background: #ffffff;
+  background: transparent;
   overflow: hidden;
+}
+
+.landing-tablet-showcase::before {
+  content: '';
+  position: absolute;
+  inset: 18% 9% 16% 13%;
+  background: linear-gradient(135deg, rgba(255, 253, 248, 0.24), rgba(255, 255, 255, 0));
+  transform: skew(-10deg);
+  pointer-events: none;
 }
 
 .landing-tablet-showcase__device {
@@ -35,18 +45,24 @@
   aspect-ratio: 16 / 10;
   padding: 0.85rem;
   border-radius: 34px;
-  border: 1px solid rgba(19, 18, 16, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.22);
 
   background: linear-gradient(
     145deg,
-    #26231f 0%,
-    #575048 24%,
-    #1d1a17 52%,
-    #4d463f 100%
+    #151f1d 0%,
+    #405550 24%,
+    #171d1b 52%,
+    #8a6747 100%
   );
 
-  box-shadow: 0 24px 56px rgba(21, 18, 14, 0.2);
-  transform: rotate(-4deg);
+  box-shadow: 0 34px 76px rgba(21, 18, 14, 0.28);
+  transform: rotate(-4deg) translateY(0);
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+.landing-tablet-showcase__device:hover {
+  box-shadow: 0 40px 86px rgba(21, 18, 14, 0.34);
+  transform: rotate(-2deg) translateY(-6px);
 }
 
 .landing-tablet-showcase__device::before {
@@ -55,6 +71,16 @@
   inset: 0.55rem;
   border-radius: 28px;
   border: 1px solid rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+.landing-tablet-showcase__device::after {
+  content: '';
+  position: absolute;
+  inset: 0.85rem 0.85rem auto 0.85rem;
+  height: 42%;
+  border-radius: 24px 24px 80px 80px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent);
   pointer-events: none;
 }
 
@@ -84,8 +110,6 @@
   overflow: hidden;
   border-radius: 24px;
   background: #f6efe8;
-
-  /* moins d'espace vertical */
   padding: 4px 10px;
 }
 

@@ -5,6 +5,7 @@ import { LEGACY_ROUTE_REDIRECTS, ROUTE_PATHS } from '@/router/paths'
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
 
 const LandingView = () => import('@/views/LandingView.vue')
+const LegalView = () => import('@/views/LegalView.vue')
 const AuthView = () => import('@/views/AuthView.vue')
 const HomeView = () => import('@/views/HomeView.vue')
 const CoursesView = () => import('@/views/CoursesView.vue')
@@ -20,6 +21,16 @@ const routes = [
   {
     path: ROUTE_PATHS.landing,
     component: LandingView,
+  },
+  {
+    path: ROUTE_PATHS.privacy,
+    component: LegalView,
+    meta: { legalPage: 'privacy' },
+  },
+  {
+    path: ROUTE_PATHS.legal,
+    component: LegalView,
+    meta: { legalPage: 'legal' },
   },
   {
     path: ROUTE_PATHS.login,

@@ -5,12 +5,19 @@
 
       <v-row justify="center" class="fill-height align-center">
         <v-col cols="12" sm="10" md="8" lg="5" xl="4">
-          <v-card class="auth-card" rounded="xl" elevation="0">
-            <v-card-text class="pa-6 pa-sm-8">
-              <div class="text-center mb-6">
+            <v-card class="auth-card" rounded="xl" elevation="0">
+              <v-card-text class="pa-6 pa-sm-8">
+                <div class="text-center mb-6">
+                <div class="auth-brand" aria-label="Persuade">
+                  <span>Persuade</span>
+                </div>
+                <div class="auth-kicker">Espace Persuade</div>
                 <h1 class="auth-title mb-2">
                   {{ isRegisterMode ? 'Inscription' : 'Connexion' }}
                 </h1>
+                <p class="auth-subtitle mb-0">
+                  Retrouvez votre espace d'apprentissage de la négociation.
+                </p>
               </div>
 
               <v-btn-toggle
@@ -20,8 +27,8 @@
                 variant="outlined"
                 class="auth-toggle mb-6"
               >
-                <v-btn value="login" class="auth-toggle__button">J'ai deja un compte</v-btn>
-                <v-btn value="register" class="auth-toggle__button">Creer un compte</v-btn>
+                <v-btn value="login" class="auth-toggle__button">Connexion</v-btn>
+                <v-btn value="register" class="auth-toggle__button" disabled>S'inscrire</v-btn>
               </v-btn-toggle>
 
               <v-alert
@@ -165,6 +172,13 @@
                   Creer mon compte
                 </v-btn>
               </v-form>
+
+              <div class="auth-access-notice">
+                <v-icon icon="mdi-lock-outline" size="19" />
+                <span>
+                  Pour obtenir un accès, <a href="mailto:persuade.fr@gmail.com">contactez-nous</a>.
+                </span>
+              </div>
             </v-card-text>
           </v-card>
         </v-col>
@@ -187,7 +201,7 @@ const activeMode = ref('login')
 const navItems = [
   { label: 'Vision', href: `${ROUTE_PATHS.landing}#vision` },
   { label: 'Fonctionnalites', href: `${ROUTE_PATHS.landing}#fonctionnalites` },
-  { label: 'Apercu', href: `${ROUTE_PATHS.landing}#preview` },
+  { label: 'Démo', href: `${ROUTE_PATHS.landing}#preview` },
   { label: 'Equipe', href: `${ROUTE_PATHS.landing}#equipe` },
   { label: 'Contact', href: `${ROUTE_PATHS.landing}#contact` },
 ]
@@ -272,28 +286,107 @@ const register = async () => {
 
 <style scoped>
 .auth-page {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   min-height: 100vh;
   background:
-    radial-gradient(circle at 12% 10%, rgba(35, 71, 68, 0.1), transparent 24%),
-    radial-gradient(circle at 82% 14%, rgba(181, 93, 63, 0.1), transparent 22%),
+    linear-gradient(120deg, rgba(35, 71, 68, 0.07), transparent 34%),
+    linear-gradient(300deg, rgba(181, 93, 63, 0.09), transparent 34%),
     linear-gradient(180deg, #ffffff 0%, #fffaf5 54%, #ffffff 100%);
 }
 
+.auth-page::before,
+.auth-page::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.auth-page::before {
+  left: -10vw;
+  bottom: -18vh;
+  width: 44vw;
+  height: 74vh;
+  border-radius: 52% 48% 0 0;
+  background: linear-gradient(145deg, rgba(35, 71, 68, 0.94), rgba(35, 71, 68, 0.72));
+  transform: rotate(9deg);
+  opacity: 0.9;
+}
+
+.auth-page::after {
+  right: -8vw;
+  bottom: -22vh;
+  width: 30vw;
+  height: 54vh;
+  border-radius: 50% 50% 0 0;
+  border: 1px solid rgba(181, 93, 63, 0.32);
+  background: linear-gradient(160deg, rgba(181, 93, 63, 0.12), rgba(181, 93, 63, 0.76));
+  transform: rotate(-7deg);
+}
+
 .auth-frame {
+  position: relative;
+  z-index: 1;
   max-width: 1160px;
 }
 
 .auth-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px !important;
   border: 1px solid rgba(35, 71, 68, 0.12);
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(14px);
-  box-shadow: 0 24px 56px rgba(35, 71, 68, 0.08);
+  box-shadow: 0 28px 70px rgba(31, 52, 47, 0.13);
+}
+
+.auth-card::before {
+  content: '';
+  display: block;
+  height: 5px;
+  background: linear-gradient(90deg, #234744, #2f5a56 52%, #b55d3f);
 }
 
 .auth-title {
   color: #234744;
+  font-family: 'Avenir Next', Avenir, Inter, sans-serif;
+  font-weight: 800;
   font-size: clamp(1.9rem, 4vw, 2.4rem);
-  line-height: 1;
+  letter-spacing: 0;
+  line-height: 1.05;
+}
+
+.auth-brand {
+  display: inline-flex;
+  position: relative;
+  margin-bottom: 1rem;
+  color: #173f3b;
+  font-family: 'Avenir Next', Avenir, Inter, sans-serif;
+  font-size: clamp(1.55rem, 3vw, 2rem);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.auth-brand::after {
+  content: '';
+  position: absolute;
+  top: -0.2rem;
+  right: -0.3rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #c97958;
+}
+
+.auth-kicker {
+  margin-bottom: 0.7rem;
+  color: #b55d3f;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .auth-subtitle {
@@ -317,6 +410,7 @@ const register = async () => {
   min-height: 3rem;
   text-transform: none;
   font-weight: 600;
+  transition: color 180ms ease, background 180ms ease;
 }
 
 :deep(.auth-toggle .v-btn) {
@@ -327,6 +421,13 @@ const register = async () => {
 :deep(.auth-toggle .v-btn--active) {
   color: #fffdf8;
   background: linear-gradient(135deg, #b55d3f, #c97958);
+}
+
+:deep(.auth-toggle .v-btn--disabled) {
+  color: rgba(31, 52, 47, 0.34) !important;
+  background: rgba(31, 52, 47, 0.06) !important;
+  opacity: 1;
+  cursor: not-allowed;
 }
 
 .auth-submit {
@@ -352,8 +453,40 @@ const register = async () => {
   font-weight: 500;
 }
 
+.auth-access-notice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  margin-top: 1.35rem;
+  padding-top: 1.1rem;
+  color: rgba(31, 52, 47, 0.6);
+  border-top: 1px solid rgba(31, 52, 47, 0.1);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.auth-access-notice a {
+  color: #b55d3f;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.auth-access-notice a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 :deep(.v-field) {
   border-radius: 16px;
+  background: rgba(255, 255, 255, 0.62);
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+:deep(.v-field:focus-within) {
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(181, 93, 63, 0.1);
 }
 
 :deep(.v-field--variant-outlined .v-field__outline) {
@@ -362,6 +495,20 @@ const register = async () => {
 
 :deep(.v-label.v-field-label) {
   color: rgba(35, 71, 68, 0.62);
+}
+
+@media (max-width: 600px) {
+  .auth-page::before {
+    left: -30vw;
+    width: 76vw;
+    height: 35vh;
+  }
+
+  .auth-page::after {
+    right: -22vw;
+    width: 56vw;
+    height: 28vh;
+  }
 }
 
 </style>

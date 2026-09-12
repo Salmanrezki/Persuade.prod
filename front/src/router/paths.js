@@ -1,5 +1,7 @@
 export const ROUTE_PATHS = {
   landing: '/',
+  privacy: '/politique-de-confidentialite',
+  legal: '/mentions-legales',
   login: '/connexion',
   legacyLogin: '/auth',
   appRoot: '/app',
