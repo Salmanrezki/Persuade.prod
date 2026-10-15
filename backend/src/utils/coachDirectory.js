@@ -13,7 +13,8 @@ const mergeCoach = (map, coach) => {
   const current = map.get(coach.uid) || {}
   map.set(coach.uid, {
     uid: coach.uid,
-    firstname: coach.firstname || current.firstname || '',
+    coachProfile: coach.coachProfile || current.coachProfile || {},
+    firstname: current.firstname || coach.firstname || '',
     email: coach.email || current.email || '',
     profilePhoto: coach.profilePhoto || current.profilePhoto || '',
     profession: coach.profession || current.profession || '',

@@ -62,12 +62,13 @@ defineProps({
   border-radius: 28px;
   padding: 24px 26px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 247, 242, 0.94));
-  border: 1px solid rgba(19, 58, 59, 0.08);
+    radial-gradient(48% 74% at 100% 0%, rgba(22, 79, 69, 0.06), transparent 62%),
+    linear-gradient(180deg, var(--home-surface-strong, rgba(255, 255, 255, 0.98)), var(--home-surface, rgba(250, 247, 242, 0.94)));
+  border: 1px solid var(--home-line, rgba(19, 58, 59, 0.08));
   box-shadow:
-    0 18px 44px rgba(12, 31, 32, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(12px);
+    0 22px 54px rgba(60, 43, 24, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(16px);
 }
 
 .dashboard-section-card--feature {
@@ -103,19 +104,19 @@ defineProps({
   font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 23px;
   font-weight: 600;
-  color: #1c1a16;
+  color: var(--home-ink, #1c1a16);
   letter-spacing: -0.03em;
 }
 
 .dashboard-section-card__subtitle {
   margin-top: 4px;
   font-size: 14px;
-  color: #625b53;
+  color: var(--home-muted, #625b53);
 }
 
 .dashboard-section-card__chip {
-  background: rgba(46, 75, 64, 0.1);
-  color: #2e4b40;
+  background: var(--home-forest-soft, rgba(46, 75, 64, 0.1));
+  color: var(--home-forest, #2e4b40);
   font-weight: 600;
 }
 

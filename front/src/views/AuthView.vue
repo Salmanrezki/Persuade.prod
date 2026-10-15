@@ -81,6 +81,7 @@
                   Se connecter
                 </v-btn>
 
+                <PasswordResetButton :email="loginEmail" class="mt-3" />
                 <div v-if="isLoggingIn" class="auth-loading-hint" aria-live="polite">
                   <v-progress-circular indeterminate size="18" width="2" color="#234744" />
                   <span>Connexion en cours...</span>
@@ -193,6 +194,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ROUTE_PATHS } from '@/router/paths'
 import MarketingNavbar from '@/components/MarketingNavbar.vue'
+import PasswordResetButton from '@/components/PasswordResetButton.vue'
 
 const router = useRouter()
 const auth = useAuthStore()

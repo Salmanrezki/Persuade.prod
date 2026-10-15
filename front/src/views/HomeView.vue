@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ROUTE_PATHS } from '@/router/paths'
 import AppNewsCarousel from '@/components/AppNewsCarousel.vue'
+import CoachPublicDetails from '@/components/CoachPublicDetails.vue'
 import DashboardMetricTile from '@/components/dashboard/DashboardMetricTile.vue'
 import DashboardSectionCard from '@/components/dashboard/DashboardSectionCard.vue'
 import DashboardSurfaceItem from '@/components/dashboard/DashboardSurfaceItem.vue'
@@ -157,6 +158,7 @@ const selectedCoachHeadline = computed(() => {
   if (!selectedCoach.value) return 'Coach disponible sur la plateforme'
 
   return (
+    selectedCoach.value.coachProfile?.headline ||
     selectedCoach.value.jobTitleDetail ||
     selectedCoach.value.jobTitle ||
     selectedCoach.value.professionDetail ||
@@ -172,6 +174,8 @@ const selectedCoachMeta = computed(() => {
   if (!selectedCoach.value) return []
 
   return [
+    ...(selectedCoach.value.coachProfile?.specialties || []),
+    ...(selectedCoach.value.coachProfile?.formats || []),
     selectedCoach.value.sectorDetail || selectedCoach.value.sector || '',
     selectedCoach.value.seniority || '',
     selectedCoach.value.learningFormat || '',
@@ -1591,6 +1595,7 @@ watch(
         </div>
 
         <div class="home-coach-preview-dialog__body">
+          <CoachPublicDetails :profile="selectedCoach.coachProfile || {}" />
           <div class="home-coach-preview-dialog__block">
             <div class="home-coach-preview-dialog__label">Statut</div>
             <div class="home-coach-preview-dialog__text">
@@ -1603,10 +1608,6 @@ watch(
             <div class="home-coach-preview-dialog__text">{{ selectedCoachHeadline }}</div>
           </div>
 
-          <div class="home-coach-preview-dialog__block" v-if="selectedCoach.email">
-            <div class="home-coach-preview-dialog__label">Contact</div>
-            <div class="home-coach-preview-dialog__text">{{ selectedCoach.email }}</div>
-          </div>
         </div>
 
         <div class="home-coach-preview-dialog__footer">
@@ -1724,34 +1725,43 @@ watch(
 
 <style scoped>
 .home-container {
-  --home-bg: #f5efe6;
-  --home-bg-soft: #ebdfd1;
-  --home-surface: rgba(255, 250, 243, 0.92);
-  --home-surface-strong: #fff9f1;
-  --home-line: rgba(28, 26, 22, 0.1);
-  --home-ink: #1c1a16;
-  --home-muted: #625b53;
-  --home-accent: #b55d3f;
-  --home-accent-soft: rgba(181, 93, 63, 0.12);
-  --home-forest: #2e4b40;
-  --home-forest-soft: rgba(46, 75, 64, 0.1);
-  --home-gold-soft: rgba(196, 146, 55, 0.12);
+  --home-bg: #f7f0e7;
+  --home-bg-soft: #eadccb;
+  --home-surface: rgba(255, 252, 247, 0.9);
+  --home-surface-strong: #fffaf3;
+  --home-line: rgba(42, 36, 29, 0.1);
+  --home-ink: #102d2c;
+  --home-muted: rgba(48, 51, 48, 0.68);
+  --home-accent: #bf6648;
+  --home-accent-soft: rgba(191, 102, 72, 0.13);
+  --home-forest: #164f45;
+  --home-forest-deep: #0d3d37;
+  --home-forest-soft: rgba(22, 79, 69, 0.11);
+  --home-sage: #dcece6;
+  --home-gold: #d59b4d;
+  --home-gold-soft: rgba(213, 155, 77, 0.15);
+  --home-peach-soft: rgba(222, 151, 117, 0.14);
   position: relative;
   min-height: 100vh;
   padding: 40px 16px 72px;
-  background: #ffffff;
+  background:
+    radial-gradient(42rem 42rem at -8% 22%, rgba(210, 120, 84, 0.24), transparent 58%),
+    radial-gradient(50rem 50rem at 108% -4%, rgba(22, 79, 69, 0.18), transparent 56%),
+    radial-gradient(34rem 34rem at 88% 98%, rgba(22, 79, 69, 0.12), transparent 58%),
+    linear-gradient(180deg, #fffaf4 0%, var(--home-bg) 58%, #f1e7dc 100%);
   overflow: hidden;
   font-family: 'Avenir Next', 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
 .home-backdrop {
   position: absolute;
-  inset: -25% -15% auto -15%;
-  height: 55%;
+  inset: -20% -12% auto -12%;
+  height: 70%;
   background:
-    radial-gradient(120% 120% at 10% 15%, rgba(46, 75, 64, 0.08), transparent 60%),
-    radial-gradient(80% 80% at 85% 5%, rgba(181, 93, 63, 0.08), transparent 55%);
-  filter: blur(18px);
+    radial-gradient(45% 58% at 10% 54%, rgba(205, 116, 82, 0.22), transparent 62%),
+    radial-gradient(42% 58% at 88% 8%, rgba(13, 61, 55, 0.28), transparent 60%),
+    linear-gradient(115deg, rgba(255, 252, 247, 0.72), rgba(255, 252, 247, 0));
+  filter: blur(8px);
   z-index: 0;
   pointer-events: none;
 }
@@ -1767,14 +1777,32 @@ watch(
 }
 
 .home-hero-panel {
-  padding: 22px 24px;
+  position: relative;
+  padding: 26px;
   border-radius: 32px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 242, 234, 0.92));
-  border: 1px solid rgba(255, 255, 255, 0.58);
-  box-shadow: 0 28px 64px rgba(21, 18, 14, 0.12);
+    radial-gradient(40% 80% at 98% 0%, rgba(22, 79, 69, 0.08), transparent 64%),
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(251, 246, 238, 0.88));
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 28px 70px rgba(60, 43, 24, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  backdrop-filter: blur(18px);
   display: grid;
   gap: 16px;
+  overflow: hidden;
+}
+
+.home-hero-panel::after {
+  content: '';
+  position: absolute;
+  right: -110px;
+  top: -140px;
+  width: 260px;
+  height: 260px;
+  border-radius: 999px;
+  background: rgba(22, 79, 69, 0.12);
+  pointer-events: none;
 }
 
 .home-hero-panel--top {
@@ -1794,7 +1822,7 @@ watch(
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--home-accent);
+  color: #a8482c;
 }
 
 .home-hero-panel__title {
@@ -1853,18 +1881,20 @@ watch(
 
 .home-hero-signal {
   min-height: 92px;
-  padding: 12px 12px;
+  padding: 14px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.62);
-  border: 1px solid rgba(28, 26, 22, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(241, 248, 245, 0.64));
+  border: 1px solid rgba(22, 79, 69, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .home-hero-signal--gold {
-  background: rgba(196, 146, 55, 0.1);
+  background: linear-gradient(180deg, rgba(255, 248, 235, 0.82), rgba(250, 239, 220, 0.62));
 }
 
 .home-hero-signal--coral {
-  background: rgba(181, 93, 63, 0.1);
+  background: linear-gradient(180deg, rgba(255, 243, 239, 0.82), rgba(252, 232, 225, 0.64));
 }
 
 .home-hero-signal__label {
@@ -1907,13 +1937,16 @@ watch(
   align-items: center;
   padding: 12px 14px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(28, 26, 22, 0.08);
+  background: rgba(255, 255, 255, 0.64);
+  border: 1px solid rgba(42, 36, 29, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .home-quickview-item--priority {
-  background: linear-gradient(135deg, rgba(181, 93, 63, 0.09), rgba(255, 255, 255, 0.65));
-  border-color: rgba(181, 93, 63, 0.18);
+  background:
+    radial-gradient(90% 140% at 100% 0%, rgba(191, 102, 72, 0.16), transparent 58%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(253, 242, 235, 0.7));
+  border-color: rgba(191, 102, 72, 0.18);
 }
 
 .home-quickview-item--interactive {
@@ -2004,7 +2037,10 @@ watch(
   padding: 24px 26px;
   background: var(--home-surface);
   border: 1px solid var(--home-line);
-  box-shadow: 0 18px 44px rgba(44, 29, 16, 0.08);
+  box-shadow:
+    0 18px 44px rgba(60, 43, 24, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px);
 }
 
 .home-card--feature {
@@ -2405,8 +2441,8 @@ watch(
   padding: 18px 20px;
   border: 1px solid var(--home-line);
   background:
-    radial-gradient(circle at 96% 8%, rgba(181, 93, 63, 0.16), transparent 28%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(250, 247, 242, 0.96));
+    radial-gradient(circle at 96% 8%, rgba(191, 102, 72, 0.18), transparent 30%),
+    linear-gradient(135deg, rgba(255, 252, 247, 0.98), rgba(247, 237, 225, 0.9));
 }
 
 .home-coach-priority--teal {
@@ -2448,7 +2484,7 @@ watch(
   text-transform: none;
   font-weight: 800;
   color: #fff8ef;
-  background: linear-gradient(135deg, var(--home-forest), #3b6b61);
+  background: linear-gradient(135deg, var(--home-forest-deep), var(--home-forest));
 }
 
 .home-coach-client-list {
@@ -2463,9 +2499,10 @@ watch(
   padding: 16px;
   border-radius: 22px;
   background:
-    radial-gradient(circle at top right, rgba(46, 75, 64, 0.08), transparent 32%),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(247, 244, 238, 0.98));
+    radial-gradient(circle at top right, rgba(22, 79, 69, 0.1), transparent 32%),
+    linear-gradient(145deg, rgba(255, 253, 248, 0.98), rgba(248, 240, 230, 0.92));
   border: 1px solid var(--home-line);
+  box-shadow: 0 16px 34px rgba(60, 43, 24, 0.08);
 }
 
 .home-coach-client-card--priority {
@@ -2540,7 +2577,8 @@ watch(
 .home-coach-client-card__stat {
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(46, 75, 64, 0.05);
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(42, 36, 29, 0.07);
   display: grid;
   gap: 6px;
 }
@@ -2595,7 +2633,7 @@ watch(
 .home-coach-client-card__tag {
   padding: 8px 10px;
   border-radius: 999px;
-  background: rgba(46, 75, 64, 0.08);
+  background: rgba(22, 79, 69, 0.08);
   color: var(--home-forest);
   font-size: 12px;
   font-weight: 600;
@@ -2608,7 +2646,8 @@ watch(
   gap: 10px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(46, 75, 64, 0.05);
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(42, 36, 29, 0.07);
   font-size: 12px;
   color: var(--home-muted);
 }
@@ -2618,7 +2657,7 @@ watch(
   gap: 2px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(196, 146, 55, 0.1);
+  background: rgba(213, 155, 77, 0.13);
 }
 
 .home-coach-client-card__timeline-title {

@@ -42,20 +42,20 @@ defineProps({
   padding: 14px;
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(19, 58, 59, 0.08);
+  border: 1px solid var(--home-line, rgba(19, 58, 59, 0.08));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
 .dashboard-metric-tile--teal {
-  background: linear-gradient(180deg, rgba(230, 243, 241, 0.95), rgba(255, 255, 255, 0.9));
+  background: linear-gradient(180deg, rgba(220, 236, 230, 0.95), rgba(255, 255, 255, 0.84));
 }
 
 .dashboard-metric-tile--gold {
-  background: linear-gradient(180deg, rgba(251, 242, 224, 0.95), rgba(255, 255, 255, 0.9));
+  background: linear-gradient(180deg, rgba(252, 242, 224, 0.96), rgba(255, 255, 255, 0.84));
 }
 
 .dashboard-metric-tile--coral {
-  background: linear-gradient(180deg, rgba(252, 236, 231, 0.95), rgba(255, 255, 255, 0.9));
+  background: linear-gradient(180deg, rgba(254, 238, 232, 0.96), rgba(255, 255, 255, 0.84));
 }
 
 .dashboard-metric-tile__top {
@@ -70,7 +70,7 @@ defineProps({
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(28, 26, 22, 0.52);
+  color: rgba(42, 36, 29, 0.54);
 }
 
 .dashboard-metric-tile__icon {
@@ -79,8 +79,8 @@ defineProps({
   border-radius: 10px;
   display: grid;
   place-items: center;
-  background: rgba(46, 75, 64, 0.08);
-  color: #2e4b40;
+  background: var(--home-forest-soft, rgba(46, 75, 64, 0.08));
+  color: var(--home-forest, #2e4b40);
 }
 
 .dashboard-metric-tile__value {
@@ -88,12 +88,12 @@ defineProps({
   font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
   font-size: 26px;
   font-weight: 700;
-  color: #1c1a16;
+  color: var(--home-ink, #1c1a16);
 }
 
 .dashboard-metric-tile__detail {
   margin-top: 6px;
   font-size: 12px;
-  color: #625b53;
+  color: var(--home-muted, #625b53);
 }
 </style>

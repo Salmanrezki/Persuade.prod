@@ -109,6 +109,15 @@ router.get('/referral/:code/validate', async (req, res) => {
   }
 })
 
+router.get('/security', verifyToken, async (req, res) => {
+  try {
+    const account = await admin.auth().getUser(req.user.uid)
+    // Firebase Authentication is authoritative, never the editable profile or request body.
+    if (account.email) await usersCollection().doc(req.user.uid).set({ email: account.email }, { merge: true })
+    res.json({ email: account.email || '', emailVerified: account.emailVerified === true, passwordEnabled: account.providerData.some(provider => provider.providerId === 'password') })
+  } catch { res.status(503).json({ message: 'Impossible de vérifier les informations du compte.' }) }
+})
+
 router.patch('/me', verifyToken, async (req, res) => {
   try {
     const allowedFields = [

@@ -20,10 +20,12 @@ import {
   formatAccountStatusLabel,
   formatProfileRoleLabel,
   MAX_PROFILE_PHOTO_BYTES,
+  isCoachProfile,
 } from '@/utils/profile'
 
 const router = useRouter()
 const auth = useAuthStore()
+const isCoach = computed(() => isCoachProfile(auth.profile))
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -203,7 +205,7 @@ onMounted(async () => {
         <v-card class="profile-hero" elevation="8">
           <div class="profile-hero__content">
             <div class="profile-hero__copy">
-              <div class="profile-hero__brand">
+              <div v-if="!isCoach" class="profile-hero__brand">
                 <v-img :src="logoUrl" alt="Logo Persuade" width="68" height="68" class="profile-hero__logo" />
                 <div>
                   <div class="profile-hero__brand-name">Persuade</div>
@@ -263,7 +265,7 @@ onMounted(async () => {
               </div>
             </div>
 
-          <div class="profile-metrics profile-metrics--referral">
+          <div v-if="!isCoach" class="profile-metrics profile-metrics--referral">
             <div class="profile-metric">
               <div class="profile-metric__label">Code de parrainage</div>
               <div class="profile-metric__value">{{ referralCode || 'Indisponible' }}</div>
@@ -294,7 +296,7 @@ onMounted(async () => {
           <div class="profile-panel__header">
             <div>
               <div class="profile-panel__title">Informations du compte</div>
-              <div class="profile-panel__subtitle">Modifiez ce qui décrit votre identité et votre contexte.</div>
+              <div v-if="!isCoach" class="profile-panel__subtitle">Modifiez ce qui décrit votre identité et votre contexte.</div>
             </div>
           </div>
 

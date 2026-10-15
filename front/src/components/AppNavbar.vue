@@ -6,12 +6,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useDisplay } from 'vuetify'
 import api from '@/services/api'
 import { collection, getDocs, query, where } from 'firebase/firestore'
-import navDashboardUrl from '@/assets/nav-dashboard.svg'
-import navLibraryUrl from '@/assets/nav-library.svg'
-import navCoachUrl from '@/assets/nav-coach.svg'
-import navMasterclassUrl from '@/assets/nav-masterclass.svg'
-import navExercisesUrl from '@/assets/nav-exercises.svg'
-import navChatUrl from '@/assets/nav-chat.svg'
 import { db } from '@/services/firebase'
 import { isCoachProfile } from '@/utils/profile'
 
@@ -50,7 +44,6 @@ const navItems = computed(() => [
     subtitle: 'Vue generale',
     path: ROUTE_PATHS.home,
     icon: 'mdi-view-grid-outline',
-    image: navDashboardUrl,
     tone: 'teal',
   },
   {
@@ -58,44 +51,39 @@ const navItems = computed(() => [
     subtitle: 'Messages et suivi',
     path: ROUTE_PATHS.chat,
     icon: 'mdi-message-processing-outline',
-    image: navChatUrl,
     badge: auth.chatUnreadCount || 0,
     showNotification: shouldShowNotification('chat'),
     tone: 'coral',
   },
   {
-    title: 'Cours particuliers',
+    title: 'Coaching',
     subtitle: isCoach.value ? 'Offres et suivi client' : 'Sessions guidees',
     path: ROUTE_PATHS.coachCourses,
     icon: 'mdi-account-tie-outline',
-    image: navCoachUrl,
     showNotification: shouldShowNotification('coachCourses'),
     tone: 'teal',
   },
   {
-    title: isCoach.value ? 'Mes masterclass' : 'Masterclass',
+    title: 'Masterclass',
     subtitle: isCoach.value ? 'Créer et mettre en avant' : 'Formats experts',
     path: ROUTE_PATHS.masterclass,
     icon: 'mdi-presentation-play',
-    image: navMasterclassUrl,
     showNotification: shouldShowNotification('masterclass'),
     tone: 'coral',
   },
   {
-    title: 'Cours pré-enregistrés',
+    title: 'Cours',
     subtitle: 'A votre rythme',
     path: ROUTE_PATHS.courses,
     icon: 'mdi-play-circle-outline',
-    image: navLibraryUrl,
     showNotification: shouldShowNotification('courses'),
     tone: 'gold',
   },
   {
-    title: 'Exercices pratiques',
+    title: 'Exercices',
     subtitle: 'Bientôt disponible',
     path: ROUTE_PATHS.practicalExercises,
     icon: 'mdi-dumbbell',
-    image: navExercisesUrl,
     showNotification: shouldShowNotification('practicalExercises'),
     statusLabel: 'Bientôt',
     statusVariant: 'soon',
@@ -369,10 +357,7 @@ onBeforeUnmount(() => {
       <span class="app-mobile-drawer-trigger__icon">
         <v-icon size="22">mdi-menu</v-icon>
       </span>
-      <span class="app-mobile-drawer-trigger__copy">
-        <span class="app-mobile-drawer-trigger__label">Menu</span>
-        <span class="app-mobile-drawer-trigger__hint">Ouvrir la navigation</span>
-      </span>
+      <span class="app-mobile-drawer-trigger__copy">Menu</span>
     </button>
 
     <v-app-bar
@@ -383,8 +368,10 @@ onBeforeUnmount(() => {
     >
       <div class="app-mobile-bar__inner">
         <v-btn variant="text" class="app-mobile-brand" @click="goTo(ROUTE_PATHS.home)">
+          <span class="app-sidebar-brand-mark">
+            <v-icon size="18">mdi-leaf</v-icon>
+          </span>
           <div class="app-mobile-brand__copy">
-            <div class="app-mobile-brand__eyebrow">{{ workspaceLabel }}</div>
             <div class="app-mobile-brand__title">Persuade</div>
           </div>
         </v-btn>
@@ -399,17 +386,17 @@ onBeforeUnmount(() => {
       @update:model-value="mobileDrawer = $event"
       location="left"
       temporary
-      width="300"
+      width="312"
       class="app-sidebar app-sidebar--mobile"
     >
       <div class="app-sidebar-shell app-sidebar-shell--mobile">
         <v-sheet class="app-sidebar-panel app-sidebar-panel--mobile" rounded="xl">
           <div class="app-sidebar-top app-sidebar-top--mobile">
             <v-btn variant="text" class="app-sidebar-brand" @click="goTo(ROUTE_PATHS.home)">
-              <div>
-                <div class="app-sidebar-kicker">{{ workspaceLabel }}</div>
-                <div class="app-sidebar-title">Persuade</div>
-              </div>
+              <span class="app-sidebar-brand-mark">
+                <v-icon size="18">mdi-leaf</v-icon>
+              </span>
+              <span class="app-sidebar-title">Persuade</span>
             </v-btn>
 
             <v-btn
@@ -437,7 +424,22 @@ onBeforeUnmount(() => {
 
         <div class="app-sidebar-nav-wrap">
           <div class="app-sidebar-nav-stack">
-            <div class="app-sidebar-section-label">Explorer</div>
+            <div class="app-sidebar-preview">
+              <div class="app-sidebar-preview__window">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <div class="app-sidebar-preview__icon" :class="`app-sidebar-preview__icon--${activeNavItem.tone}`">
+                <v-icon size="22">{{ activeNavItem.icon }}</v-icon>
+              </div>
+              <div class="app-sidebar-preview__lines">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <div class="app-sidebar-preview__bar"></div>
+            </div>
 
             <v-list nav class="app-sidebar-nav" bg-color="transparent">
               <v-list-item
@@ -454,24 +456,13 @@ onBeforeUnmount(() => {
               >
                 <template #prepend>
                   <div class="app-sidebar-item__icon-wrap">
-                    <v-img
-                      v-if="item.image"
-                      :src="item.image"
-                      :alt="`Illustration ${item.title}`"
-                      contain
-                      class="app-sidebar-item__icon-illustration"
-                    />
-                    <v-icon v-else size="20">{{ item.icon }}</v-icon>
+                    <v-icon size="20">{{ item.icon }}</v-icon>
                   </div>
                 </template>
 
                 <v-list-item-title class="app-sidebar-item__title">
                   <span class="app-sidebar-item__title-text">{{ item.title }}</span>
                 </v-list-item-title>
-
-                <v-list-item-subtitle class="app-sidebar-item__subtitle">
-                  {{ item.subtitle }}
-                </v-list-item-subtitle>
 
                 <template v-if="navStatusLabel(item)" #append>
                   <span
@@ -524,7 +515,7 @@ onBeforeUnmount(() => {
       :model-value="true"
       permanent
       location="left"
-      width="332"
+      width="292"
       class="app-sidebar"
     >
       <div class="app-sidebar-shell">
@@ -535,10 +526,10 @@ onBeforeUnmount(() => {
               class="app-sidebar-brand"
               @click="goTo(ROUTE_PATHS.home)"
             >
-              <div>
-                <div class="app-sidebar-kicker">{{ workspaceLabel }}</div>
-                <div class="app-sidebar-title">Persuade</div>
-              </div>
+              <span class="app-sidebar-brand-mark">
+                <v-icon size="18">mdi-leaf</v-icon>
+              </span>
+              <span class="app-sidebar-title">Persuade</span>
             </v-btn>
           </div>
 
@@ -550,7 +541,6 @@ onBeforeUnmount(() => {
               </v-avatar>
               <span class="app-profile-card__status"></span>
             </div>
-
             <div class="app-sidebar-account__copy">
               <div class="app-sidebar-account__name">{{ displayName }}</div>
             </div>
@@ -559,7 +549,22 @@ onBeforeUnmount(() => {
 
         <div class="app-sidebar-nav-wrap">
           <div class="app-sidebar-nav-stack">
-            <div class="app-sidebar-section-label">Explorer</div>
+            <div class="app-sidebar-preview">
+              <div class="app-sidebar-preview__window">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <div class="app-sidebar-preview__icon" :class="`app-sidebar-preview__icon--${activeNavItem.tone}`">
+                <v-icon size="22">{{ activeNavItem.icon }}</v-icon>
+              </div>
+              <div class="app-sidebar-preview__lines">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <div class="app-sidebar-preview__bar"></div>
+            </div>
 
             <v-list nav class="app-sidebar-nav" bg-color="transparent">
               <v-list-item
@@ -576,14 +581,7 @@ onBeforeUnmount(() => {
               >
                 <template #prepend>
                   <div class="app-sidebar-item__icon-wrap">
-                    <v-img
-                      v-if="item.image"
-                      :src="item.image"
-                      :alt="`Illustration ${item.title}`"
-                      contain
-                      class="app-sidebar-item__icon-illustration"
-                    />
-                    <v-icon v-else size="20">{{ item.icon }}</v-icon>
+                    <v-icon size="20">{{ item.icon }}</v-icon>
                   </div>
                 </template>
 
@@ -591,10 +589,6 @@ onBeforeUnmount(() => {
                   <v-list-item-title class="app-sidebar-item__title">
                     <span class="app-sidebar-item__title-text">{{ item.title }}</span>
                   </v-list-item-title>
-
-                  <v-list-item-subtitle class="app-sidebar-item__subtitle">
-                    {{ item.subtitle }}
-                  </v-list-item-subtitle>
                 </div>
 
                 <template v-if="navStatusLabel(item)" #append>
@@ -651,13 +645,14 @@ onBeforeUnmount(() => {
   top: 18px;
   right: 18px;
   z-index: 1300;
-  min-width: 146px;
-  min-height: 58px;
-  padding: 10px 14px 10px 10px;
+  min-width: 96px;
+  height: 56px;
+  padding: 8px 14px 8px 8px;
   border: 1px solid rgba(42, 36, 29, 0.08);
-  border-radius: 22px;
+  border-radius: 20px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   background:
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.42), transparent 34%),
@@ -674,8 +669,8 @@ onBeforeUnmount(() => {
 }
 
 .app-mobile-drawer-trigger__icon {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 14px;
   display: grid;
   place-items: center;
@@ -685,9 +680,9 @@ onBeforeUnmount(() => {
 }
 
 .app-mobile-drawer-trigger__copy {
-  display: grid;
-  text-align: left;
-  line-height: 1.1;
+  font-size: 13px;
+  font-weight: 800;
+  color: #2a241d;
 }
 
 .app-mobile-drawer-trigger__label {
@@ -736,6 +731,19 @@ onBeforeUnmount(() => {
   justify-content: flex-start;
 }
 
+.app-sidebar-brand-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.38), transparent 54%),
+    linear-gradient(135deg, #164f45, #d98b61);
+  color: #fffaf4;
+  flex-shrink: 0;
+}
+
 .app-mobile-brand__copy {
   min-width: 0;
 }
@@ -758,16 +766,16 @@ onBeforeUnmount(() => {
 }
 
 .app-mobile-bar__spacer {
-  width: 146px;
-  height: 58px;
+  width: 56px;
+  height: 56px;
   flex-shrink: 0;
 }
 
 .app-sidebar {
   background:
-    radial-gradient(circle at top left, rgba(246, 214, 133, 0.22), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(190, 228, 220, 0.22), transparent 26%),
-    linear-gradient(180deg, rgba(255, 251, 246, 0.98), rgba(245, 238, 228, 0.96)),
+    radial-gradient(circle at 0% 0%, rgba(191, 102, 72, 0.18), transparent 34%),
+    radial-gradient(circle at 100% 100%, rgba(22, 79, 69, 0.18), transparent 34%),
+    linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(244, 235, 224, 0.96)),
     #f8f1e8;
   color: #2a241d;
   border-right: 1px solid rgba(42, 36, 29, 0.08);
@@ -788,6 +796,12 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(20px);
 }
 
+.app-sidebar:not(.app-sidebar--mobile) .app-sidebar-shell {
+  align-items: stretch;
+  gap: 16px;
+  padding: 18px 16px;
+}
+
 .app-sidebar-shell--mobile {
   padding: 18px 14px 16px;
 }
@@ -805,6 +819,13 @@ onBeforeUnmount(() => {
   padding: 16px;
   display: grid;
   gap: 16px;
+}
+
+.app-sidebar:not(.app-sidebar--mobile) .app-sidebar-panel {
+  width: auto;
+  padding: 14px;
+  justify-items: stretch;
+  border-radius: 26px;
 }
 
 .app-sidebar-panel--mobile {
@@ -830,6 +851,28 @@ onBeforeUnmount(() => {
   padding: 0;
 }
 
+.app-sidebar:not(.app-sidebar--mobile) .app-sidebar-brand {
+  justify-content: flex-start;
+}
+
+.app-sidebar:not(.app-sidebar--mobile) .app-sidebar-title,
+.app-sidebar:not(.app-sidebar--mobile) .app-sidebar-account__copy,
+.app-sidebar:not(.app-sidebar--mobile) .app-sidebar-item__body,
+.app-sidebar:not(.app-sidebar--mobile) .app-sidebar-item__title {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+.app-sidebar-kicker,
+.app-sidebar-section-label,
+.app-sidebar-item__subtitle {
+  display: none;
+}
+
 .app-sidebar-toggle {
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.64);
@@ -848,6 +891,14 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.58);
   color: #2a241d;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.app-sidebar:not(.app-sidebar--mobile) .app-sidebar-account {
+  width: 100%;
+  height: auto;
+  padding: 10px;
+  justify-content: flex-start;
+  border-radius: 20px;
 }
 
 .app-sidebar-item:hover {
@@ -925,10 +976,115 @@ onBeforeUnmount(() => {
 
 .app-sidebar-nav-stack {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   align-content: start;
-  padding: 14px;
+  padding: 12px;
   border-radius: 28px;
+}
+
+.app-sidebar:not(.app-sidebar--mobile) .app-sidebar-nav-stack {
+  width: auto;
+  padding: 12px;
+  gap: 12px;
+  border-radius: 28px;
+}
+
+.app-sidebar-preview {
+  position: relative;
+  height: 132px;
+  border-radius: 24px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 16% 18%, rgba(191, 102, 72, 0.18), transparent 24%),
+    radial-gradient(circle at 92% 8%, rgba(22, 79, 69, 0.22), transparent 34%),
+    linear-gradient(145deg, rgba(255, 253, 248, 0.98), rgba(241, 232, 220, 0.92));
+  border: 1px solid rgba(42, 36, 29, 0.08);
+  box-shadow: 0 16px 34px rgba(60, 43, 24, 0.11);
+}
+
+.app-sidebar-preview::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, rgba(16, 45, 44, 0.08), transparent 56%);
+  pointer-events: none;
+}
+
+.app-sidebar-preview__window {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: flex;
+  gap: 6px;
+}
+
+.app-sidebar-preview__window span {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #d9785c;
+  box-shadow: 14px 0 0 #d9a34f, 28px 0 0 #70a996;
+}
+
+.app-sidebar-preview__icon {
+  position: absolute;
+  top: 42px;
+  left: 18px;
+  width: 48px;
+  height: 48px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  color: #fffaf4;
+  background: linear-gradient(135deg, #164f45, #2f7468);
+  box-shadow: 0 16px 28px rgba(22, 79, 69, 0.18);
+}
+
+.app-sidebar-preview__icon--gold {
+  background: linear-gradient(135deg, #c48932, #e0b267);
+}
+
+.app-sidebar-preview__icon--coral {
+  background: linear-gradient(135deg, #b55d3f, #d98b61);
+}
+
+.app-sidebar-preview__lines {
+  position: absolute;
+  left: 82px;
+  right: 18px;
+  top: 48px;
+  display: grid;
+  gap: 10px;
+}
+
+.app-sidebar-preview__lines span {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(42, 36, 29, 0.1);
+}
+
+.app-sidebar-preview__lines span:nth-child(1) {
+  width: 78%;
+  background: rgba(16, 45, 44, 0.18);
+}
+
+.app-sidebar-preview__lines span:nth-child(2) {
+  width: 100%;
+}
+
+.app-sidebar-preview__lines span:nth-child(3) {
+  width: 58%;
+}
+
+.app-sidebar-preview__bar {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 18px;
+  height: 9px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, #164f45 0 64%, rgba(42, 36, 29, 0.1) 64% 100%);
 }
 
 .app-sidebar-section-label {
@@ -950,11 +1106,19 @@ onBeforeUnmount(() => {
 .app-sidebar-item {
   --nav-accent: rgba(67, 196, 175, 0.2);
   --nav-accent-strong: #2e8b78;
-  min-height: 72px;
-  padding: 10px 12px;
-  border-radius: 22px;
+  min-height: 58px;
+  padding: 8px 10px;
+  border-radius: 18px;
   color: rgba(42, 36, 29, 0.76);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.app-sidebar:not(.app-sidebar--mobile) .app-sidebar-item {
+  position: relative;
+  width: auto;
+  min-height: 58px;
+  padding: 8px 10px;
+  border-radius: 18px;
 }
 
 .app-sidebar-item--gold {
@@ -985,6 +1149,11 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 
+.app-sidebar:not(.app-sidebar--mobile) .app-sidebar-item__icon-wrap {
+  width: 42px;
+  height: 42px;
+}
+
 .app-sidebar-item__icon-illustration {
   width: 28px;
   height: 28px;
@@ -1013,6 +1182,23 @@ onBeforeUnmount(() => {
   text-transform: uppercase;
 }
 
+.app-sidebar:not(.app-sidebar--mobile) .app-sidebar-item__status-pill {
+  position: static;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10px;
+  border-radius: 999px;
+}
+
+.app-sidebar:not(.app-sidebar--mobile) .app-sidebar-item__status-pill:not(.app-sidebar-item__status-pill--badge) {
+  width: 10px;
+  min-width: 10px;
+  height: 10px;
+  padding: 0;
+  color: transparent;
+}
+
 .app-sidebar-item__status-pill--badge {
   background: rgba(217, 139, 97, 0.16);
   border-color: rgba(181, 93, 63, 0.18);
@@ -1030,6 +1216,10 @@ onBeforeUnmount(() => {
   align-self: center;
 }
 
+.app-sidebar:not(.app-sidebar--mobile) .app-sidebar-item :deep(.v-list-item__prepend) {
+  margin-inline-end: 0;
+}
+
 .app-sidebar-item :deep(.v-list-item__append) {
   margin-inline-start: 12px;
 }
@@ -1040,15 +1230,36 @@ onBeforeUnmount(() => {
 }
 
 .app-sidebar-bottom {
-  display: grid;
-  gap: 10px;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.app-sidebar:not(.app-sidebar--mobile) .app-sidebar-bottom {
+  display: flex;
+}
+
+.app-sidebar-bottom :deep(.v-btn__content) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.app-sidebar-bottom :deep(.v-btn__prepend) {
+  margin-inline-end: 0;
 }
 
 .app-profile-card__logout {
   text-transform: none;
   font-weight: 700;
   border-radius: 20px;
-  min-height: 52px;
+  flex: 1 1 50px;
+  min-width: 50px;
+  min-height: 50px;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(250, 244, 236, 0.96)),
     rgba(255, 255, 255, 0.72);
@@ -1061,6 +1272,8 @@ onBeforeUnmount(() => {
   text-transform: none;
   font-weight: 700;
   border-radius: 20px;
+  flex: 1 1 50px;
+  min-width: 50px;
   min-height: 50px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(42, 36, 29, 0.08);
@@ -1114,20 +1327,20 @@ onBeforeUnmount(() => {
 
 @media (max-width: 520px) {
   .app-mobile-drawer-trigger {
-    min-width: 132px;
+    min-width: 52px;
     right: 14px;
     top: 14px;
-    min-height: 54px;
-    padding: 9px 12px 9px 9px;
+    height: 52px;
+    padding: 7px;
   }
 
-  .app-mobile-drawer-trigger__hint {
-    font-size: 10px;
+  .app-mobile-drawer-trigger__copy {
+    display: none;
   }
 
   .app-mobile-bar__spacer {
-    width: 132px;
-    height: 54px;
+    width: 52px;
+    height: 52px;
   }
 
   .app-mobile-brand__title,

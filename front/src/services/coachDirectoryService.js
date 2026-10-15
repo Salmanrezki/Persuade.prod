@@ -2,7 +2,7 @@ import api from '@/services/api'
 import { db } from '@/services/firebase'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 
-const CACHE_KEY = 'persuade.coach-directory'
+const CACHE_KEY = 'persuade.coach-directory.v3'
 const CACHE_TTL_MS = 5 * 60 * 1000
 
 let memoryCache = {
@@ -12,6 +12,11 @@ let memoryCache = {
 }
 
 const isSeedCoachId = (value) => typeof value === 'string' && value.startsWith('seed-coach-')
+
+export const invalidateCoachDirectory = () => {
+  memoryCache = { value: [], timestamp: 0, promise: null }
+  if (typeof window !== 'undefined') window.localStorage.removeItem(CACHE_KEY)
+}
 
 const readCache = () => {
   if (memoryCache.value.length) return memoryCache

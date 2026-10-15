@@ -10,7 +10,7 @@ export const verifyToken = async (req, res, next) => {
   const token = header.split('Bearer ')[1]
 
   try {
-    const decoded = await admin.auth().verifyIdToken(token)
+    const decoded = await admin.auth().verifyIdToken(token, true)
     req.user = decoded
     next()
   } catch (error) {

@@ -5,6 +5,7 @@ import logoUrl from '@/assets/logo.png'
 import { ROUTE_PATHS } from '@/router/paths'
 import { useAuthStore } from '@/stores/auth'
 import { getUserProfile, updateUserProfile } from '@/services/userService'
+import { isCoachProfile } from '@/utils/profile'
 import {
   availabilityOptions,
   expectationsOptions,
@@ -13,6 +14,7 @@ import {
 
 const router = useRouter()
 const auth = useAuthStore()
+const isCoach = computed(() => isCoachProfile(auth.profile))
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -101,7 +103,7 @@ onMounted(async () => {
         <v-card class="preferences-hero" elevation="8">
           <div class="preferences-hero__content">
             <div class="preferences-hero__copy">
-              <div class="preferences-hero__brand">
+              <div v-if="!isCoach" class="preferences-hero__brand">
                 <v-img :src="logoUrl" alt="Logo Persuade" width="68" height="68" class="preferences-hero__logo" />
                 <div>
                   <div class="preferences-hero__brand-name">Persuade</div>
@@ -110,7 +112,7 @@ onMounted(async () => {
               </div>
 
               <div class="preferences-hero__title">Gérer mes préférences</div>
-              <div class="preferences-hero__subtitle">{{ heroSubtitle }}</div>
+              <div v-if="!isCoach" class="preferences-hero__subtitle">{{ heroSubtitle }}</div>
 
               <div class="preferences-hero__chips" v-if="summaryChips.length">
                 <v-chip v-for="chip in summaryChips" :key="chip" size="small" class="preferences-chip" variant="flat">
@@ -136,8 +138,8 @@ onMounted(async () => {
       <v-col cols="12" md="4">
         <v-card class="preferences-panel preferences-panel--spotlight" elevation="6">
           <div class="preferences-spotlight__eyebrow">Réglages utiles</div>
-          <div class="preferences-spotlight__title">Votre expérience d’apprentissage</div>
-          <div class="preferences-spotlight__text">
+          <div class="preferences-spotlight__title">{{ isCoach ? 'Vos préférences' : 'Votre expérience d’apprentissage' }}</div>
+          <div v-if="!isCoach" class="preferences-spotlight__text">
             Ces préférences aident à garder un parcours cohérent avec votre objectif, votre disponibilité et le format qui vous convient.
           </div>
 
@@ -161,8 +163,8 @@ onMounted(async () => {
       <v-col cols="12" md="6">
         <v-card class="preferences-panel" elevation="6">
           <div class="preferences-panel__header">
-            <div class="preferences-panel__title">Préférences d’apprentissage</div>
-            <div class="preferences-panel__subtitle">
+            <div class="preferences-panel__title">{{ isCoach ? 'Disponibilités et préférences' : 'Préférences d’apprentissage' }}</div>
+            <div v-if="!isCoach" class="preferences-panel__subtitle">
               Indiquez ce que vous attendez réellement de la plateforme pour mieux structurer votre parcours.
             </div>
           </div>

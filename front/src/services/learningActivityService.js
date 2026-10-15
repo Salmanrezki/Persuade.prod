@@ -1,7 +1,7 @@
 import api from '@/services/api'
 
-const VIEWED_COURSES_STORAGE_PREFIX = 'persuade.viewed-courses'
-const EXERCISE_PROGRESS_STORAGE_PREFIX = 'persuade.exercise-progress'
+const VIEWED_COURSES_STORAGE_PREFIX = 'persuade.viewed-courses.v2'
+const EXERCISE_PROGRESS_STORAGE_PREFIX = 'persuade.exercise-progress.v2'
 const syncTimers = new Map()
 export const LEARNING_PROGRESS_UPDATED_EVENT = 'persuade:learning-progress-updated'
 
@@ -59,6 +59,12 @@ export const getViewedCourses = (uid) => readJson(getKey(VIEWED_COURSES_STORAGE_
 
 export const getExerciseProgress = (uid) =>
   readJson(getKey(EXERCISE_PROGRESS_STORAGE_PREFIX, uid), { completed: {}, notes: {}, scores: {} })
+
+export const cacheLearningProgress = (uid, progress) => {
+  writeJson(getKey(VIEWED_COURSES_STORAGE_PREFIX, uid), progress.viewedCourses || [])
+  writeJson(getKey(EXERCISE_PROGRESS_STORAGE_PREFIX, uid), progress.practicalExercises || { completed: {}, notes: {}, scores: {} })
+  notifyLearningProgressUpdated(uid)
+}
 
 export const setExerciseCompleted = (uid, exerciseId, completed) => {
   const key = getKey(EXERCISE_PROGRESS_STORAGE_PREFIX, uid)

@@ -2,7 +2,7 @@ import api from '@/services/api'
 
 const CACHE_TTL_MS = 30 * 1000
 const cache = new Map()
-const STORAGE_PREFIX = 'persuade.content-cache'
+const STORAGE_PREFIX = 'persuade.content-cache.v2'
 
 const hasFreshValue = (entry) => entry?.value !== undefined && Date.now() - entry.timestamp < CACHE_TTL_MS
 

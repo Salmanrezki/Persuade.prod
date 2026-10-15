@@ -20,6 +20,7 @@ import { getUserPresenceLabel, getUserPresenceState } from '@/services/presenceS
 import { useAuthStore } from '@/stores/auth'
 import { getUserProfile } from '@/services/userService'
 import { isCoachProfile } from '@/utils/profile'
+import { ROUTE_PATHS } from '@/router/paths'
 
 const profile = ref(null)
 const route = useRoute()
@@ -38,6 +39,8 @@ const selectedContactId = ref('')
 const sending = ref(false)
 const refreshing = ref(false)
 const searchQuery = ref('')
+const sidebarTab = ref('conversations')
+const mobileThreadOpen = ref(false)
 const snackbar = ref(false)
 const snackbarText = ref('')
 const lastSeenMap = ref({})
@@ -53,7 +56,7 @@ let focusListener = null
 let blurListener = null
 
 const role = computed(() => (isCoachProfile(profile.value) ? 'coach' : profile.value?.role || '—'))
-const isCoach = computed(() => isCoachProfile(profile.value))
+const isCoach = computed(() => isCoachProfile(profile.value || authStore.profile))
 const contactRole = computed(() => (isCoach.value ? 'apprenant' : 'coach'))
 
 const contactsMap = computed(() => {
@@ -216,6 +219,7 @@ const presenceLabel = (user) => getUserPresenceLabel(user)
 const presenceClass = (user) => `chat-presence--${getUserPresenceState(user)}`
 
 const selectConversation = async (conversation) => {
+  mobileThreadOpen.value = true
   selectedConversationId.value = conversation.id
   selectedContactId.value = ''
   await loadMessages(conversation.id)
@@ -239,6 +243,7 @@ const startConversation = async (contact) => {
 
   await loadConversations()
   selectedConversationId.value = conversationId
+  mobileThreadOpen.value = true
   await loadMessages(conversationId)
 }
 
@@ -450,6 +455,7 @@ const setupMessagesListener = (conversationId) => {
 
 watch(selectedConversationId, async (value) => {
   if (value) {
+    mobileThreadOpen.value = true
     await loadMessages(value)
     markSeen(value)
     setupMessagesListener(value)
@@ -510,7 +516,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <v-container class="chat-container" fluid>
+  <v-container class="chat-container chat-workspace" :class="{ 'chat-workspace--thread': mobileThreadOpen }" fluid>
     <div class="chat-backdrop" aria-hidden="true"></div>
 
     <v-row class="chat-hero" align="center" justify="center">
@@ -518,10 +524,12 @@ onBeforeUnmount(() => {
         <v-card class="chat-hero-card" elevation="0">
           <div class="chat-hero-content">
             <div class="chat-hero-copy">
-              <div class="chat-hero-title">Chat</div>
+              <h1 class="chat-hero-title">{{ isCoach ? 'Chat' : 'Messages' }}</h1>
+              <p v-if="!isCoach" class="learner-chat-subtitle">Gardez le contact avec vos coachs et préparez vos prochaines séances.</p>
             </div>
 
             <div class="chat-hero-stats">
+              <v-btn v-if="!isCoach" :to="ROUTE_PATHS.coachCourses" variant="outlined" color="#24443f" prepend-icon="mdi-arrow-left" class="chat-coaching-link">Mon coaching</v-btn>
               <v-sheet class="chat-hero-stat-card" rounded="xl">
                 <div class="chat-hero-stat">{{ displayedConversations.length }}</div>
                 <div class="chat-hero-label">conversations</div>
@@ -549,7 +557,11 @@ onBeforeUnmount(() => {
 
         <div class="chat-shell">
           <v-sheet class="chat-sidebar" rounded="xl">
-            <v-sheet class="chat-sidebar-section chat-sidebar-section--highlight" rounded="xl">
+            <div class="coach-chat-tabs" aria-label="Liste de messagerie">
+              <button type="button" :aria-pressed="sidebarTab === 'conversations'" :class="{ active: sidebarTab === 'conversations' }" @click="sidebarTab = 'conversations'">Conversations <span>{{ displayedConversations.length }}</span></button>
+              <button type="button" :aria-pressed="sidebarTab === 'contacts'" :class="{ active: sidebarTab === 'contacts' }" @click="sidebarTab = 'contacts'">Contacts</button>
+            </div>
+            <v-sheet v-show="sidebarTab === 'conversations'" class="chat-sidebar-section chat-sidebar-section--highlight" rounded="xl">
               <div class="chat-sidebar-header">
                 <div>
                   <div class="chat-sidebar-title">Conversations</div>
@@ -617,7 +629,7 @@ onBeforeUnmount(() => {
               </v-sheet>
             </v-sheet>
 
-            <v-sheet class="chat-sidebar-section" rounded="xl">
+            <v-sheet v-show="sidebarTab === 'contacts'" class="chat-sidebar-section" rounded="xl">
               <div class="chat-contact-header">
                 <div>
                   <div class="chat-sidebar-title">Contacts {{ contactRole === 'coach' ? 'coachs' : 'apprenants' }}</div>
@@ -670,11 +682,13 @@ onBeforeUnmount(() => {
                   </template>
                 </v-list-item>
               </v-list>
+              <p v-if="!filteredContacts.length" class="chat-empty">{{ searchQuery ? 'Aucun contact trouvé.' : 'Aucun contact disponible.' }}</p>
             </v-sheet>
           </v-sheet>
 
           <v-sheet class="chat-main" rounded="xl">
             <div v-if="selectedOtherUser" class="chat-main-header">
+              <v-btn class="coach-chat-back" icon="mdi-arrow-left" variant="text" aria-label="Revenir aux conversations" @click="mobileThreadOpen = false" />
               <div class="chat-main-user">
                 <v-avatar size="52" class="chat-avatar">
                   <img
@@ -700,7 +714,7 @@ onBeforeUnmount(() => {
                 </div>
               </div>
 
-              <div class="chat-main-header__stats">
+              <div v-if="!isCoach" class="chat-main-header__stats learner-thread-status">
                 <v-chip class="chat-chip" size="small" variant="flat">
                   {{ currentMessageCount }} message(s)
                 </v-chip>
@@ -713,9 +727,10 @@ onBeforeUnmount(() => {
             <v-sheet v-else class="chat-placeholder" rounded="xl">
               <v-icon size="28" class="mb-3">mdi-message-outline</v-icon>
               <div class="chat-placeholder__title">Sélectionnez une conversation</div>
-              <div class="chat-placeholder__text">
+              <div v-if="!isCoach" class="chat-placeholder__text">
                 Choisissez un échange existant ou démarrez une discussion depuis la liste des contacts.
               </div>
+              <v-btn variant="outlined" color="#24443f" class="mt-5" @click="sidebarTab = 'contacts'">Choisir un contact</v-btn>
             </v-sheet>
 
             <div v-if="selectedConversationId" class="chat-messages">
@@ -790,6 +805,7 @@ onBeforeUnmount(() => {
                   rows="1"
                   density="comfortable"
                   placeholder="Écrire un message..."
+                  aria-label="Votre message"
                   variant="outlined"
                   hide-details
                 />
@@ -811,7 +827,7 @@ onBeforeUnmount(() => {
                   label="Pièce jointe"
                   @update:modelValue="handleFileSelected"
                 />
-                <v-btn class="chat-send" :loading="sending" @click="sendMessage">Envoyer</v-btn>
+                <v-btn class="chat-send" :loading="sending" :disabled="!messageText.trim() && !attachment" @click="sendMessage">Envoyer</v-btn>
               </div>
             </div>
           </v-sheet>
@@ -826,6 +842,13 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.learner-chat-subtitle { margin-top: 12px; color: #68736c; font-size: 14px; line-height: 1.6; }
+.chat-coaching-link { border-radius: 8px; }
+.chat-workspace .learner-thread-status { gap: 6px; }
+.chat-workspace .chat-placeholder__text { max-width: 360px; margin-inline: auto; font-size: 14px; line-height: 1.7; color: #68736c; }
+@media (max-width: 760px) {
+  .learner-thread-status { display: none !important; }
+}
 .chat-container {
   --chat-bg: #ffffff;
   --chat-surface: rgba(255, 250, 243, 0.92);
@@ -1377,5 +1400,84 @@ onBeforeUnmount(() => {
   .chat-input {
     grid-template-columns: 1fr;
   }
+}
+</style>
+
+<style scoped>
+.chat-workspace {
+  --chat-ink: #24443f;
+  --chat-muted: #6c766e;
+  --chat-line: #24443f1a;
+  --chat-surface: #fffdf8;
+  padding: 28px 24px 48px;
+  min-height: 0;
+}
+.chat-workspace .chat-hero-title { font-family: inherit; letter-spacing: -.035em; }
+.chat-workspace .chat-hero-content { align-items: center; gap: 16px; }
+.chat-workspace .chat-hero-stats { gap: 12px; align-items: center; }
+.chat-workspace .chat-hero-stat-card { display: none; }
+.chat-workspace .chat-notify { background: transparent; box-shadow: none; color: #24443f; border: 1px solid #24443f30; border-radius: 8px; min-height: 36px; }
+.chat-workspace .chat-grid { margin-top: 12px; }
+.chat-workspace .chat-shell { grid-template-columns: minmax(270px, 320px) minmax(0, 1fr); gap: 0; border: 1px solid #24443f20; border-radius: 16px; overflow: hidden; height: clamp(520px, 68dvh, 800px); background: #fffdf8; }
+.chat-workspace .chat-sidebar { display: flex; flex-direction: column; gap: 0; border-right: 1px solid #24443f20; border-radius: 0 !important; overflow: hidden; background: #fffdf8; min-height: 0; }
+.coach-chat-tabs { display: flex; gap: 20px; padding: 20px 18px 0; border-bottom: 1px solid #24443f15; flex-shrink: 0; }
+.coach-chat-tabs button { padding: 0 0 15px; color: #6c766e; font-size: 13px; border-bottom: 2px solid transparent; }
+.coach-chat-tabs button.active { color: #b55d3f; border-color: #b55d3f; font-weight: 600; }
+.coach-chat-tabs span { margin-left: 3px; padding: 2px 6px; border-radius: 12px; background: #f2e8df; font-size: 11px; }
+.coach-chat-tabs button:focus-visible { outline: 2px solid #b55d3f; outline-offset: 4px; }
+.chat-workspace .chat-sidebar-section { border: 0; border-radius: 0 !important; background: transparent; box-shadow: none; padding: 16px 10px; overflow-y: auto; min-height: 0; }
+.chat-workspace .chat-sidebar-header { padding-inline: 8px; }
+.chat-workspace .chat-sidebar-title { font-family: inherit; font-size: 13px; font-weight: 600; }
+.chat-workspace .chat-sidebar-summary { margin: 10px 8px 14px; }
+.chat-workspace .chat-refresh { font-size: 11px; min-width: 0; padding-inline: 8px; }
+.chat-workspace .chat-conversation-list, .chat-workspace .chat-contact-list { max-height: none; gap: 5px; padding: 0; overflow: visible; }
+.chat-workspace .chat-conversation, .chat-workspace .chat-contact { padding: 14px 10px; background: transparent; border: 1px solid transparent; border-radius: 10px !important; }
+.chat-workspace .chat-conversation.active { background: #eaf0e9; border-color: #24443f15; }
+.chat-workspace .chat-conversation:hover, .chat-workspace .chat-contact:hover { background: #f1f2eb; }
+.chat-workspace .chat-conversation :deep(.v-list-item__spacer), .chat-workspace .chat-contact :deep(.v-list-item__spacer) { width: 10px; }
+.chat-workspace .chat-conversation-head { display: block; }
+.chat-workspace .chat-conversation-head .chat-presence { font-size: 10px; margin-top: 3px; }
+.chat-workspace .chat-conversation-preview { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 175px; }
+.chat-workspace .chat-conversation-time { font-size: 10px; max-width: 44px; text-align: right; }
+.chat-workspace .chat-avatar { background: #e7ece4; color: #24443f; border-radius: 50%; }
+.chat-workspace .chat-unread-dot { background: #b55d3f; }
+.chat-workspace .chat-contact-header { padding: 0 8px 16px; gap: 14px; }
+.chat-workspace .chat-main { border: 0; border-radius: 0 !important; padding: 0; box-shadow: none; min-height: 0; overflow: hidden; background: #fffdf8; }
+.chat-workspace .chat-main-header { padding: 18px 24px; flex-shrink: 0; gap: 10px; background: #fffdf8; }
+.chat-workspace .chat-main-name { font-size: 15px; overflow-wrap: anywhere; }
+.chat-workspace .chat-main-user { min-width: 0; }
+.chat-workspace .chat-placeholder { flex: 1; margin: 0; align-content: center; border-radius: 0 !important; background: #f8f7f0; padding: 28px; }
+.chat-workspace .chat-placeholder > .v-icon { width: 64px; height: 64px; border-radius: 50%; background: #e9eee4; color: #24443f; }
+.chat-workspace .chat-placeholder__title { font-family: inherit; font-size: 18px; font-weight: 500; }
+.chat-workspace .chat-messages { display: flex; flex-direction: column; gap: 18px; min-height: 0; padding: 24px; background: #f8f7f0; overscroll-behavior: contain; }
+.chat-workspace .chat-message { gap: 8px; align-items: flex-end; flex-shrink: 0; }
+.chat-workspace .chat-message-stack { max-width: min(82%, 520px); min-width: 0; }
+.chat-workspace .chat-message-bubble { max-width: 100%; padding: 12px 16px; background: #fffdf8; color: #24443f; border: 1px solid #24443f15; border-radius: 14px 14px 14px 3px !important; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-workspace .chat-message-bubble--mine { background: #24443f; color: #fffdf8; border-color: #24443f; border-radius: 14px 14px 3px 14px !important; }
+.chat-workspace .chat-message.mine .chat-message-time { text-align: right; }
+.chat-workspace .chat-message-avatar { display: none; }
+.chat-workspace .chat-message-bubble a { color: inherit; text-decoration: underline; }
+.chat-workspace .chat-attachment img { max-width: 100%; max-height: 280px; object-fit: contain; }
+.chat-workspace .chat-empty { background: transparent; padding: 24px 12px; text-align: center; }
+.chat-workspace .chat-input { padding: 16px 20px; flex-shrink: 0; background: #fffdf8; grid-template-columns: minmax(0,1fr) 132px; align-items: end; }
+.chat-workspace .chat-input :deep(textarea) { max-height: 130px; overflow-y: auto; }
+.chat-workspace .chat-input-actions { width: 132px; }
+.chat-workspace .chat-send { background: #b55d3f; color: #fffdf8; border-radius: 8px; box-shadow: none; }
+.chat-workspace :deep(.v-btn) { text-transform: none; letter-spacing: 0; }
+.coach-chat-back { display: none; }
+@media (max-width: 760px) {
+  .chat-workspace { padding: 22px 16px 32px; }
+  .chat-workspace .chat-shell { grid-template-columns: minmax(0,1fr); height: min(640px, 76dvh); min-height: 420px; }
+  .chat-workspace .chat-main { display: none; }
+  .chat-workspace .chat-sidebar { border-right: 0; }
+  .chat-workspace--thread .chat-sidebar { display: none; }
+  .chat-workspace--thread .chat-main { display: flex; }
+  .chat-workspace .coach-chat-back { display: inline-flex; flex-shrink: 0; }
+  .chat-workspace .chat-main-header { padding: 12px; justify-content: flex-start; }
+  .chat-workspace .chat-messages { padding: 18px 14px; }
+  .chat-workspace .chat-input { padding: 12px; grid-template-columns: minmax(0,1fr); gap: 10px; }
+  .chat-workspace .chat-input-actions { display: flex; width: 100%; gap: 12px; align-items: center; }
+  .chat-workspace .chat-input-actions .v-input { flex: 1; min-width: 0; }
+  .chat-workspace .chat-conversation-preview { max-width: 100%; }
 }
 </style>

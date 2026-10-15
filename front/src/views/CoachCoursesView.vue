@@ -7,6 +7,7 @@ import { getUserProfile } from '@/services/userService'
 import { addDoc, collection, deleteDoc, doc, getDocs, query, serverTimestamp, updateDoc, where } from 'firebase/firestore'
 import { recordViewedCourse } from '@/services/learningActivityService'
 import { isCoachProfile } from '@/utils/profile'
+import CoachPublicDetails from '@/components/CoachPublicDetails.vue'
 
 const COURSE_IMAGE_MAX_SIZE = 1024 * 1024 * 1.5
 const auth = useAuthStore()
@@ -353,9 +354,11 @@ const learnerCoachSpotlights = computed(() => {
       const coachProfile = coachProfilesMap.value[course.coachId] || {}
       grouped[course.coachId] = {
         uid: course.coachId,
-        name: course.coachName || coachProfile.firstname || 'Coach',
+        name: coachProfile.firstname || course.coachName || 'Coach',
         profilePhoto: coachProfile.profilePhoto || '',
+        coachProfile: coachProfile.coachProfile || {},
         headline:
+          coachProfile.coachProfile?.headline ||
           coachProfile.jobTitle ||
           coachProfile.professionDetail ||
           coachProfile.profession ||
@@ -377,6 +380,21 @@ const learnerCoachSpotlights = computed(() => {
     grouped[course.coachId].courseCount += 1
     if (course.featured) grouped[course.coachId].featuredCount += 1
     if (course.category) grouped[course.coachId].categories.add(course.category)
+  })
+
+  coachProfiles.value.forEach((coach) => {
+    if (grouped[coach.uid]) return
+    grouped[coach.uid] = {
+      uid: coach.uid,
+      name: coach.firstname || 'Coach',
+      profilePhoto: coach.profilePhoto || '',
+      coachProfile: coach.coachProfile || {},
+      headline: coach.coachProfile?.headline || 'Coach en négociation',
+      meta: [],
+      courseCount: 0,
+      featuredCount: 0,
+      categories: new Set(),
+    }
   })
 
   return Object.values(grouped)
@@ -970,6 +988,7 @@ onMounted(async () => {
                 <div class="learner-coach-body">
                   <div class="learner-coach-name">{{ coach.name }}</div>
                   <div class="learner-coach-headline">{{ coach.headline }}</div>
+                  <CoachPublicDetails :profile="coach.coachProfile" compact />
                   <div class="learner-coach-meta">
                     <span v-if="coach.sector">{{ coach.sector }}</span>
                     <span v-if="coach.seniority">{{ coach.seniority }}</span>
@@ -1719,6 +1738,7 @@ onMounted(async () => {
         <div class="course-dialog-content">
           <div class="course-dialog-grid">
             <div class="course-dialog-main">
+              <CoachPublicDetails :profile="activeCoachProfile?.coachProfile || {}" />
               <div v-if="activeCoachProfile?.meta?.length" class="course-dialog-coach-meta">
                 <span
                   v-for="item in activeCoachProfile.meta"

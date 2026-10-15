@@ -57,6 +57,7 @@ const ensureSessionPersistence = () => {
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
+    emailVerified: false,
     loading: true,
     chatUnreadCount: 0,
     hasOnboarded: true,
@@ -89,6 +90,7 @@ export const useAuthStore = defineStore('auth', {
         }
 
         this.user = user
+        this.emailVerified = user?.emailVerified === true
         this.loading = false
 
         if (!user) {
@@ -112,7 +114,7 @@ export const useAuthStore = defineStore('auth', {
       await ensureSessionPersistence()
       markActiveBrowserSession()
       try {
-        const cred = await signInWithEmailAndPassword(auth, email, password)
+        const cred = await signInWithEmailAndPassword(auth, email.trim(), password)
         this.user = cred.user
       } catch (error) {
         clearActiveBrowserSession()
@@ -168,6 +170,7 @@ export const useAuthStore = defineStore('auth', {
       await signOut(auth)
       clearActiveBrowserSession()
       this.user = null
+      this.emailVerified = false
       this.chatUnreadCount = 0
       this.resetProfileState()
     },

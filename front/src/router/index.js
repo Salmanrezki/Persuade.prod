@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { isCoachProfile } from '@/utils/profile'
 import { useAuthStore } from '@/stores/auth'
 import { LEGACY_ROUTE_REDIRECTS, ROUTE_PATHS } from '@/router/paths'
 
@@ -7,15 +8,11 @@ import DefaultLayout from '@/layouts/DefaultLayout.vue'
 const LandingView = () => import('@/views/LandingView.vue')
 const LegalView = () => import('@/views/LegalView.vue')
 const AuthView = () => import('@/views/AuthView.vue')
-const HomeView = () => import('@/views/HomeView.vue')
-const CoursesView = () => import('@/views/CoursesView.vue')
-const CoachCoursesView = () => import('@/views/CoachCoursesView.vue')
-const MasterclassView = () => import('@/views/MasterclassView.vue')
+const HomeView = () => import('@/views/WorkspaceHomeView.vue')
+const LearnerWorkspaceView = () => import('@/views/LearnerWorkspaceView.vue')
 const ChatView = () => import('@/views/ChatView.vue')
 const OnboardingView = () => import('@/views/OnboardingView.vue')
-const PracticalExercisesView = () => import('@/views/PracticalExercisesView.vue')
-const ProfileView = () => import('@/views/ProfileView.vue')
-const PreferencesView = () => import('@/views/PreferencesView.vue')
+const WorkspaceAccountView = () => import('@/views/WorkspaceAccountView.vue')
 
 const routes = [
   {
@@ -42,6 +39,8 @@ const routes = [
     component: DefaultLayout,
     meta: { requiresAuth: true },
     children: [
+      { path: 'coach/clients', component: () => import('@/views/CoachWorkspaceView.vue'), meta: { coachOnly: true }, props: { page: 'clients' } },
+      { path: 'coach/content', component: () => import('@/views/CoachWorkspaceView.vue'), meta: { coachOnly: true }, props: { page: 'content' } },
       {
         path: '',
         redirect: ROUTE_PATHS.home,
@@ -56,27 +55,33 @@ const routes = [
       },
       {
         path: 'profile',
-        component: ProfileView,
+        component: WorkspaceAccountView,
+        props: { page: 'profile' },
       },
       {
         path: 'preferences',
-        component: PreferencesView,
+        component: WorkspaceAccountView,
+        props: { page: 'preferences' },
       },
+      { path: 'settings', component: () => import('@/views/AccountSettingsView.vue') },
       {
         path: 'courses',
-        component: CoursesView,
+        component: LearnerWorkspaceView,
+        props: { page: 'formation' },
       },
       {
         path: 'coach-courses',
-        component: CoachCoursesView,
+        component: LearnerWorkspaceView,
+        props: { page: 'coaching' },
       },
       {
         path: 'masterclass',
-        component: MasterclassView,
+        redirect: { path: ROUTE_PATHS.courses, query: { tab: 'masterclasses' } },
       },
       {
         path: 'practical-exercises',
-        component: PracticalExercisesView,
+        component: LearnerWorkspaceView,
+        props: { page: 'exercises' },
       },
       {
         path: 'chat',
@@ -136,6 +141,13 @@ async function handleAuth(to, auth, next) {
     }
   }
 
+  const coach = isCoachProfile(auth.profile)
+  if (to.meta.coachOnly && !coach) return next(ROUTE_PATHS.home)
+  if (coach && to.meta.requiresAuth) {
+    const contentTabs = { [ROUTE_PATHS.courses]: 'courses', [ROUTE_PATHS.masterclass]: 'masterclasses', [ROUTE_PATHS.practicalExercises]: 'exercises' }
+    if (contentTabs[to.path]) return next({ path: ROUTE_PATHS.coachContent, query: { tab: to.path === ROUTE_PATHS.courses && to.query.tab === 'masterclasses' ? 'masterclasses' : contentTabs[to.path] } })
+    if (to.path === ROUTE_PATHS.coachCourses) return next(ROUTE_PATHS.coachClients)
+  }
   next()
 }
 

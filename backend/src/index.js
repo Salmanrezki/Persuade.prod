@@ -6,6 +6,10 @@ import courseRoutes from './routes/course.routes.js'
 import requestRoutes from './routes/request.routes.js'
 import masterclassRoutes from './routes/masterclass.routes.js'
 import chatRoutes from './routes/chat.routes.js'
+import exerciseRoutes from './routes/exercise.routes.js'
+import exerciseAttemptsRoutes from './routes/exerciseAttempts.routes.js'
+import accountSettingsRoutes from './routes/accountSettings.routes.js'
+import coachAccountRoutes from './routes/coachAccount.routes.js'
 import followupRoutes from './routes/followup.routes.js'
 
 const app = express()
@@ -71,6 +75,10 @@ app.use('/api/courses', courseRoutes)
 app.use('/api/requests', requestRoutes)
 app.use('/api/masterclasses', masterclassRoutes)
 app.use('/api/chat', chatRoutes)
+app.use('/api/exercises', exerciseRoutes)
+app.use('/api/exercise-attempts', exerciseAttemptsRoutes)
+app.use('/api/account-settings', accountSettingsRoutes)
+app.use('/api/coach-account', coachAccountRoutes)
 app.use('/api/follow-up', followupRoutes)
 
 app.use('/api', (_req, res) => {
