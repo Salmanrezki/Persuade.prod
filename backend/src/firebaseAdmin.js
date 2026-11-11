@@ -27,10 +27,18 @@ const loadServiceAccount = () => {
   )
 }
 
-const serviceAccount = loadServiceAccount()
+const testProjectId = process.env.FIREBASE_TEST_PROJECT_ID
+const isLocalEmulator =
+  testProjectId?.startsWith('demo-') &&
+  /^(localhost|127\.0\.0\.1):\d+$/.test(process.env.FIRESTORE_EMULATOR_HOST || '') &&
+  /^(localhost|127\.0\.0\.1):\d+$/.test(process.env.FIREBASE_AUTH_EMULATOR_HOST || '')
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-})
+if ((testProjectId || process.env.FIRESTORE_EMULATOR_HOST || process.env.FIREBASE_AUTH_EMULATOR_HOST) && !isLocalEmulator) {
+  throw new Error('Configuration des émulateurs incomplète ou non locale. Démarrage refusé.')
+}
+
+admin.initializeApp(isLocalEmulator
+  ? { projectId: testProjectId }
+  : { credential: admin.credential.cert(loadServiceAccount()) })
 
 export default admin

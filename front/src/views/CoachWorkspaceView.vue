@@ -6,6 +6,7 @@ import { notifyCoachJourneyUpdated } from '@/services/coachJourneyService'
 import { invalidateContent } from '@/services/contentService'
 import { ROUTE_PATHS } from '@/router/paths'
 import CoachClientCalendar from '@/components/CoachClientCalendar.vue'
+import AppointmentAccessPanel from '@/components/AppointmentAccessPanel.vue'
 const props = defineProps({ page: { type: String, default: 'dashboard' } })
 const route = useRoute()
 const courses = ref([]),
@@ -21,6 +22,13 @@ const search = ref(''),
   progress = ref(null),
   progressLoading = ref(false),
   progressError = ref('')
+const clientCalendar = ref(null)
+const clientStatus = ref('all')
+const normalizeSearch = (value) => (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+function createClientAppointment(client) {
+  openClient(client)
+  clientCalendar.value?.createForClient(client)
+}
 const tabs = [
   { key: 'courses', label: 'Cours préenregistrés' },
   { key: 'masterclasses', label: 'Masterclass' },
@@ -36,7 +44,7 @@ watch(
 )
 const title = computed(
   () =>
-    ({ dashboard: 'Dashboard', clients: 'Suivi client', content: 'Contenu' })[
+    ({ dashboard: 'Vue d’ensemble', clients: 'Mes clients', content: 'Mes contenus' })[
       props.page
     ],
 )
@@ -50,9 +58,9 @@ const items = computed(
 )
 const filteredClients = computed(() =>
   clients.value.filter((c) =>
-    `${c.clientName || ''} ${c.clientEmail || ''}`
-      .toLowerCase()
-      .includes(search.value.toLowerCase()),
+    (clientStatus.value === 'all' || c.status === clientStatus.value) &&
+    normalizeSearch(`${c.clientName || ''} ${c.clientEmail || ''}`)
+      .includes(normalizeSearch(search.value)),
   ),
 )
 const upcoming = computed(() =>
@@ -272,6 +280,7 @@ onMounted(load)
       >{{ success }}</v-alert
     >
     <template v-if="page === 'dashboard'">
+      <AppointmentAccessPanel coach />
       <div class="metrics">
         <router-link :to="ROUTE_PATHS.coachClients" class="metric"
           ><span>Clients suivis</span
@@ -355,31 +364,38 @@ onMounted(load)
       </div>
     </template>
     <template v-else-if="page === 'clients'">
-      <CoachClientCalendar
-        :clients="clients"
-        :courses="courses"
-        :masterclasses="masterclasses"
-        :selected="selected"
-        @select-client="openClient"
-      />
+      <section class="panel client-directory" aria-labelledby="client-directory-title">
+        <div class="section-heading">
+          <div>
+            <h2 id="client-directory-title">Vos élèves, à portée de main</h2>
+            <p class="directory-intro">Retrouvez un client, contactez-le ou planifiez votre prochain échange.</p>
+          </div>
+          <span class="status">{{ clients.length }} élèves</span>
+        </div>
       <v-text-field
         v-model="search"
-        label="Rechercher un client"
+        label="Rechercher un client par nom ou e-mail"
         prepend-inner-icon="mdi-magnify"
         variant="outlined"
-        density="compact"
+        clearable
         hide-details
         class="search-field"
       />
+      <div class="client-filters" role="group" aria-label="Filtrer les clients">
+        <v-btn v-for="filter in [{ value: 'all', label: 'Tous' }, { value: 'accepted', label: 'Suivis actifs' }, { value: 'pending', label: 'En attente' }, { value: 'rejected', label: 'Refusés' }]"
+          :key="filter.value" :variant="clientStatus === filter.value ? 'flat' : 'text'"
+          color="#24443f" :aria-pressed="clientStatus === filter.value" @click="clientStatus = filter.value">{{ filter.label }}</v-btn>
+        <span aria-live="polite">{{ filteredClients.length }} résultat{{ filteredClients.length > 1 ? 's' : '' }}</span>
+      </div>
       <div class="clients-grid">
-        <section class="panel client-list">
-          <button
+        <section class="client-list" aria-label="Liste des élèves">
+          <article
             v-for="client in filteredClients"
             :key="client.id"
             class="client-row"
             :class="{ active: selected?.id === client.id }"
-            @click="openClient(client)"
           >
+            <button class="client-identity" :aria-pressed="selected?.id === client.id" @click="openClient(client)">
             <span class="avatar">{{
               (client.clientName || 'C').slice(0, 1)
             }}</span
@@ -387,14 +403,19 @@ onMounted(load)
               ><strong>{{
                 client.clientName || client.clientEmail || 'Client'
               }}</strong
-              ><small>{{ statusLabel(client.status) }}</small></span
-            ><v-icon size="18">mdi-chevron-right</v-icon>
-          </button>
+              ><small>{{ client.clientEmail }}</small><small>{{ statusLabel(client.status) }}</small></span>
+            </button>
+            <div class="client-quick-actions">
+              <v-btn :to="{ path: ROUTE_PATHS.chat, query: { contact: client.clientId } }" variant="outlined" color="#24443f" prepend-icon="mdi-message-outline" :aria-label="`Contacter ${client.clientName || client.clientEmail || 'cet élève'}`">Contacter</v-btn>
+              <v-btn v-if="client.status === 'accepted'" color="#24443f" prepend-icon="mdi-calendar-plus" @click="createClientAppointment(client)">Créer un RDV</v-btn>
+              <v-btn variant="text" @click="openClient(client)">Voir le suivi</v-btn>
+            </div>
+          </article>
           <p v-if="!loading && !filteredClients.length" class="empty">
             Aucun client{{ search ? ' trouvé' : ' pour le moment' }}.
           </p>
         </section>
-        <section class="panel client-detail" aria-live="polite">
+        <section v-if="selected" class="panel client-detail" aria-live="polite">
           <template v-if="selected"
             ><div class="section-heading">
               <h2>{{ selected.clientName || 'Client' }}</h2>
@@ -481,6 +502,16 @@ onMounted(load)
           </p>
         </section>
       </div>
+      </section>
+      <AppointmentAccessPanel coach />
+      <CoachClientCalendar
+        ref="clientCalendar"
+        :clients="clients"
+        :courses="courses"
+        :masterclasses="masterclasses"
+        :selected="selected"
+        @select-client="openClient"
+      />
     </template>
     <template v-else>
       <div class="content-tabs" role="tablist" aria-label="Type de contenu">
@@ -758,16 +789,37 @@ h3 {
   text-align: center;
 }
 .search-field {
-  max-width: 380px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+  background: white;
+  border-radius: 8px;
+}
+.client-directory {
+  margin-bottom: 28px;
+}
+.directory-intro {
+  margin-top: 8px;
+  color: #68766d;
+  font-size: 14px;
+}
+.client-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.client-filters > span {
+  margin-left: auto;
+  font-size: 13px;
+  color: #68766d;
 }
 .clients-grid {
   display: grid;
-  grid-template-columns: 340px 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 24px;
 }
 .client-list {
-  padding: 8px;
+  padding: 0;
   align-self: start;
 }
 .client-row {
@@ -778,6 +830,27 @@ h3 {
   width: 100%;
   text-align: left;
   border-radius: 10px;
+  border-bottom: 1px solid #24443f12;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.client-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  color: inherit;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+.client-identity > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.client-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .client-row.active,
 .client-row:hover {
@@ -921,9 +994,6 @@ a:focus-visible {
   .content-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-  .clients-grid {
-    grid-template-columns: 280px 1fr;
-  }
 }
 @media (max-width: 680px) {
   .coach-workspace {
@@ -949,8 +1019,16 @@ a:focus-visible {
     padding: 20px;
   }
   .client-list {
-    max-height: 300px;
-    overflow-y: auto;
+    padding: 0;
+  }
+  .client-row {
+    padding: 16px 0;
+  }
+  .client-quick-actions {
+    width: 100%;
+  }
+  .client-quick-actions .v-btn {
+    flex: 1 1 auto;
   }
   .section-heading {
     flex-wrap: wrap;

@@ -11,6 +11,7 @@ import exerciseAttemptsRoutes from './routes/exerciseAttempts.routes.js'
 import accountSettingsRoutes from './routes/accountSettings.routes.js'
 import coachAccountRoutes from './routes/coachAccount.routes.js'
 import followupRoutes from './routes/followup.routes.js'
+import videoRoutes from './routes/video.routes.js'
 
 const app = express()
 const port = Number(process.env.PORT || 3001)
@@ -80,6 +81,7 @@ app.use('/api/exercise-attempts', exerciseAttemptsRoutes)
 app.use('/api/account-settings', accountSettingsRoutes)
 app.use('/api/coach-account', coachAccountRoutes)
 app.use('/api/follow-up', followupRoutes)
+app.use('/api/video', videoRoutes)
 
 app.use('/api', (_req, res) => {
   res.status(404).json({ message: 'API route not found' })

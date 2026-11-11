@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { ROUTE_PATHS } from '@/router/paths'
+import AppointmentVideoButton from '@/components/AppointmentVideoButton.vue'
 const props = defineProps({ appointments: { type: Array, default: () => [] }, loading: Boolean, error: Boolean })
 const emit = defineEmits(['refresh'])
 const dayKey = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -44,7 +45,7 @@ function refresh() { now.value = new Date(); emit('refresh') }
         <p v-if="loading && !agenda.length" class="empty">Chargement de vos rendez-vous…</p>
         <p v-else-if="error && !agenda.length" class="empty">Les données sont incomplètes. Actualisez pour retrouver vos rendez-vous.</p>
         <div v-else-if="!agenda.length" class="empty"><v-icon size="32" aria-hidden="true">mdi-calendar-blank-outline</v-icon><p>{{ selectedDay ? 'Aucun rendez-vous prévu ce jour-là.' : 'Votre prochain rendez-vous apparaîtra ici.' }}</p><small v-if="!selectedDay">Sélectionnez un coach puis proposez une date après son accord de suivi.</small></div>
-        <article v-for="item in agenda" :key="item.id" class="agenda-item"><div class="date-tile"><strong>{{ new Date(item.startAt).getDate() }}</strong><small>{{ new Date(item.startAt).toLocaleDateString('fr-FR', { month: 'short' }) }}</small></div><div class="event-copy"><h4>{{ item.title }}</h4><p>{{ item.coachName || 'Coach' }} · {{ time(item.startAt) }} · {{ item.durationMinutes }} min</p><span class="event-status" :class="{ pending: item.status === 'requested' }">{{ item.status === 'requested' ? 'En attente du coach' : 'Confirmé' }}</span></div><v-btn :to="{ path: ROUTE_PATHS.chat, query: { contact: item.coachId } }" icon="mdi-message-outline" variant="text" size="small" :aria-label="`Écrire à ${item.coachName || 'ce coach'}`" /></article>
+        <article v-for="item in agenda" :key="item.id" class="agenda-item"><div class="date-tile"><strong>{{ new Date(item.startAt).getDate() }}</strong><small>{{ new Date(item.startAt).toLocaleDateString('fr-FR', { month: 'short' }) }}</small></div><div class="event-copy"><h4>{{ item.title }}</h4><p>{{ item.coachName || 'Coach' }} · {{ time(item.startAt) }} · {{ item.durationMinutes }} min</p><span class="event-status" :class="{ pending: item.status === 'requested' }">{{ item.status === 'requested' ? 'En attente du coach' : 'Confirmé' }}</span><AppointmentVideoButton :appointment="item" /></div><v-btn :to="{ path: ROUTE_PATHS.chat, query: { contact: item.coachId } }" icon="mdi-message-outline" variant="text" size="small" :aria-label="`Écrire à ${item.coachName || 'ce coach'}`" /></article>
         <p v-if="!selectedDay && upcoming.length > 3" class="more">Et {{ upcoming.length - 3 }} autre(s) rendez-vous. Sélectionnez une date pour les consulter.</p>
       </div>
     </div>

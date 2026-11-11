@@ -1,6 +1,7 @@
 import express from 'express'
 import admin from '../firebaseAdmin.js'
 import { verifyToken } from '../middleware/authMiddleware.js'
+import { normalizeChatContent } from '../utils/chatContent.js'
 import {
   isFirestoreUnavailable,
   logFirestoreWarning,
@@ -78,7 +79,7 @@ router.post('/conversations', verifyToken, async (req, res) => {
   const startedAt = Date.now()
   try {
     const { participantId } = req.body || {}
-    if (!participantId) {
+    if (typeof participantId !== 'string' || !participantId || participantId.includes('/') || participantId.length > 128) {
       return res.status(400).json({ message: 'Missing participantId' })
     }
 
@@ -91,16 +92,19 @@ router.post('/conversations', verifyToken, async (req, res) => {
     const doc = await ref.get()
 
     if (!doc.exists) {
-      await ref.set({
+      await ref.create({
         participants: [req.user.uid, participantId].sort(),
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         lastMessage: '',
         lastSenderId: null,
-      })
+      }).catch(error => { if (error.code !== 6 && error.code !== 'already-exists') throw error })
     }
 
     const updated = await ref.get()
+    if (updated.data().participants?.length !== 2 || !updated.data().participants.includes(req.user.uid) || !updated.data().participants.includes(participantId)) {
+      return res.status(403).json({ message: 'Conversation inaccessible.' })
+    }
     logChatRouteDuration('POST /api/chat/conversations', startedAt, `conversation=${updated.id}`)
     res.json({ id: updated.id, ...updated.data() })
   } catch (error) {
@@ -127,8 +131,8 @@ router.get('/conversations/:id/messages', verifyToken, async (req, res) => {
       return res.status(403).json({ message: 'Forbidden' })
     }
 
-    const snapshot = await ref.collection('messages').orderBy('createdAt', 'asc').limit(200).get()
-    const messages = snapshot.docs.map((msg) => ({ id: msg.id, ...msg.data() }))
+    const snapshot = await ref.collection('messages').orderBy('createdAt', 'desc').limit(200).get()
+    const messages = snapshot.docs.map((msg) => ({ id: msg.id, ...msg.data() })).reverse()
 
     logChatRouteDuration(`GET /api/chat/conversations/${req.params.id}/messages`, startedAt, `count=${messages.length}`)
     res.json(messages)
@@ -145,12 +149,9 @@ router.get('/conversations/:id/messages', verifyToken, async (req, res) => {
 router.post('/conversations/:id/messages', verifyToken, async (req, res) => {
   const startedAt = Date.now()
   try {
-    const { text, attachment } = req.body || {}
-    const normalizedText = typeof text === 'string' ? text.trim() : ''
-
-    if (!normalizedText && !attachment) {
-      return res.status(400).json({ message: 'Missing content' })
-    }
+    let content
+    try { content = normalizeChatContent(req.body) }
+    catch (error) { return res.status(400).json({ message: error.message }) }
 
     const ref = conversationsCollection().doc(req.params.id)
     const doc = await ref.get()
@@ -164,14 +165,15 @@ router.post('/conversations/:id/messages', verifyToken, async (req, res) => {
     }
 
     const messageData = {
-      text: normalizedText,
-      attachment: attachment || null,
+      ...content,
       senderId: req.user.uid,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     }
 
-    const msgRef = await ref.collection('messages').add(messageData)
-    await ref.update({
+    const msgRef = ref.collection('messages').doc()
+    const batch = admin.firestore().batch()
+    batch.set(msgRef, messageData)
+    batch.update(ref, {
       lastMessage: messageData.text
         ? messageData.text.slice(0, 200)
         : messageData.attachment?.name
@@ -180,6 +182,7 @@ router.post('/conversations/:id/messages', verifyToken, async (req, res) => {
       lastSenderId: req.user.uid,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     })
+    await batch.commit()
 
     logChatRouteDuration(`POST /api/chat/conversations/${req.params.id}/messages`, startedAt)
     res.status(201).json({ id: msgRef.id, ...messageData })

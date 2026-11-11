@@ -85,6 +85,7 @@ const tagsRule = (value) =>
     )) ||
   '12 tags maximum, 80 caractères par tag.'
 const formRef = ref(null)
+const photoInput = ref(null)
 const missingProfileFields = computed(() => {
   const values = { 'Nom public': firstname.value, Photo: photo.value, 'Titre professionnel': profile.value.headline,
     Présentation: profile.value.bio, Spécialités: profile.value.specialties, Publics: profile.value.audiences,
@@ -172,21 +173,23 @@ async function uploadPhoto(event) {
 onMounted(load)
 </script>
 <template>
-  <main class="coach-account">
-    <header>
+  <main class="coach-account" :class="{ 'profile-page': !isPreferences, 'preferences-page': isPreferences }">
+    <header class="page-heading">
       <div>
-        <h1>{{ isPreferences ? 'Mes préférences' : 'Mon profil' }}</h1>
+        <span class="eyebrow">ESPACE COACH · MON COMPTE</span>
+        <h1>{{ isPreferences ? 'Organiser mon accompagnement' : 'Présenter mon expertise' }}</h1>
         <p>
           {{
             isPreferences
-              ? 'Privé · Visible uniquement par vous'
-              : 'Public · Visible par les apprenants'
+              ? 'Organisez vos disponibilités et trouvez le rythme adapté à vos accompagnements.'
+              : 'Valorisez votre expertise et donnez aux apprenants envie de vous rencontrer.'
           }}
         </p>
       </div>
       <v-btn
         :to="isPreferences ? ROUTE_PATHS.profile : ROUTE_PATHS.preferences"
         variant="outlined"
+        :prepend-icon="isPreferences ? 'mdi-account-outline' : 'mdi-tune-variant'"
         color="#24443f"
         >{{ isPreferences ? 'Mon profil' : 'Mes préférences' }}</v-btn
       >
@@ -212,13 +215,12 @@ onMounted(load)
       @submit.prevent="save"
       :disabled="saving"
     >
-      <div :class="{ 'profile-grid': !isPreferences }">
+      <div class="profile-grid">
         <div class="form-panels">
           <template v-if="!isPreferences">
             <section class="panel">
-              <h2>Présentation</h2>
-              <p class="hint">Tous les champs, y compris la photo et les certifications, doivent être renseignés pour valider le profil.</p>
-              <v-alert v-if="missingProfileFields.length" type="info" variant="tonal" class="mb-5">À compléter : {{ missingProfileFields.join(', ') }}.</v-alert>
+              <div class="section-title"><span class="section-icon"><v-icon size="22">mdi-account-outline</v-icon></span><div><span class="section-step">01 · FAIRE CONNAISSANCE</span><h2>Présentation</h2></div></div>
+              <p class="hint">Présentez votre expertise et ce qui rend votre accompagnement unique. Chaque champ contribue à un profil complet.</p>
               <div class="photo-row">
                 <v-avatar size="72" color="#edf0e9"
                   ><v-img
@@ -228,13 +230,17 @@ onMounted(load)
                   /><v-icon v-else>mdi-account-outline</v-icon></v-avatar
                 >
                 <div>
-                  <label class="photo-label"
-                    >Photo publique<input
+                  <span class="photo-label">Votre photo de profil</span>
+                  <input
+                      ref="photoInput"
+                      class="photo-input"
+                      aria-label="Choisir une photo publique"
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
                       :disabled="saving"
-                      @change="uploadPhoto" /></label
-                  ><small>JPEG, PNG ou WebP · 300 Ko maximum</small
+                      @change="uploadPhoto" />
+                  <v-btn variant="outlined" size="small" color="#24443f" prepend-icon="mdi-camera-outline" :disabled="saving" @click="photoInput?.click()">{{ photo ? 'Changer la photo' : 'Ajouter une photo' }}</v-btn>
+                  <small>JPEG, PNG ou WebP · 300 Ko maximum</small
                   ><v-btn
                     v-if="photo"
                     variant="text"
@@ -269,7 +275,7 @@ onMounted(load)
               />
             </section>
             <section class="panel">
-              <h2>Spécialités et accompagnement</h2>
+              <div class="section-title"><span class="section-icon"><v-icon size="22">mdi-compass-outline</v-icon></span><div><span class="section-step">02 · VOTRE EXPERTISE</span><h2>Spécialités et accompagnement</h2></div></div>
               <p class="hint">
                 Sélectionnez des tags ou saisissez les vôtres, puis appuyez sur
                 Entrée.
@@ -316,7 +322,8 @@ onMounted(load)
               />
             </section>
             <section class="panel">
-              <h2>Expérience et qualifications</h2>
+              <div class="section-title"><span class="section-icon"><v-icon size="22">mdi-school-outline</v-icon></span><div><span class="section-step">03 · VOTRE PARCOURS</span><h2>Expérience et qualifications</h2></div></div>
+              <p class="hint">Mettez en lumière votre parcours et les qualifications qui soutiennent votre pratique.</p>
               <v-text-field
                 v-model.number="profile.experienceYears"
                 label="Années d’expérience en négociation"
@@ -356,12 +363,11 @@ onMounted(load)
           </template>
           <template v-else>
             <section class="panel">
-              <h2>Disponibilités de travail</h2>
+              <div class="section-title">
+                <span class="section-icon"><v-icon size="22">mdi-calendar-clock-outline</v-icon></span>
+                <div><span class="section-step">01 · VOTRE SEMAINE</span><h2>Disponibilités de travail</h2></div>
+              </div>
               <p class="hint">Choisissez au moins un jour disponible, puis enregistrez vos préférences pour valider cette étape du parcours.</p>
-              <p class="hint">
-                Repères personnels pour organiser vos accompagnements. Ces
-                réglages ne créent pas de rendez-vous.
-              </p>
               <v-select
                 v-model="preferences.days"
                 :items="days"
@@ -403,10 +409,16 @@ onMounted(load)
                 ]"
                 label="Fuseau horaire"
                 variant="outlined"
+                prepend-inner-icon="mdi-earth"
               />
+              <div class="preference-note"><v-icon size="18">mdi-information-outline</v-icon><p>Ces disponibilités sont des repères personnels. Elles ne créent pas de rendez-vous.</p></div>
             </section>
             <section class="panel">
-              <h2>Organisation du suivi</h2>
+              <div class="section-title">
+                <span class="section-icon"><v-icon size="22">mdi-account-group-outline</v-icon></span>
+                <div><span class="section-step">02 · VOS ACCOMPAGNEMENTS</span><h2>Organisation du suivi</h2></div>
+              </div>
+              <p class="hint">Adaptez la durée de vos séances et votre capacité de suivi à votre façon de travailler.</p>
               <v-select
                 v-model="preferences.sessionDuration"
                 :items="
@@ -417,6 +429,7 @@ onMounted(load)
                 "
                 label="Durée habituelle d’une séance"
                 variant="outlined"
+                prepend-inner-icon="mdi-clock-outline"
               /><v-text-field
                 v-model.number="preferences.maxClients"
                 label="Nombre maximal de clients souhaité"
@@ -430,14 +443,15 @@ onMounted(load)
                     'Indiquez entre 1 et 100 clients.',
                 ]"
               />
-              <p class="hint">
-                Ce nombre ne bloque pas les nouvelles demandes de suivi.
-              </p>
+              <div class="preference-note"><v-icon size="18">mdi-information-outline</v-icon><p>Le nombre de clients souhaité est un repère d’organisation. Il ne bloque pas les nouvelles demandes de suivi.</p></div>
             </section>
           </template>
           <div class="save-row">
+            <p v-if="!isPreferences">Votre aperçu évolue au fil de la saisie.<br />Enregistrez pour conserver vos modifications.</p>
+            <p v-else>Vos préférences restent privées.<br />Enregistrez pour conserver vos modifications.</p>
             <v-btn
               type="submit"
+              prepend-icon="mdi-check"
               color="#b55d3f"
               :loading="saving"
               size="large"
@@ -450,19 +464,39 @@ onMounted(load)
           </div>
         </div>
         <aside v-if="!isPreferences" class="panel preview">
-          <h2>Aperçu du profil public</h2>
+          <div class="preview-heading"><v-icon size="18">mdi-eye-outline</v-icon><h2>Aperçu public</h2><span>En direct</span></div>
+          <div class="preview-cover"><span>COACH EN NÉGOCIATION</span></div>
           <div class="preview-name">
-            <v-avatar color="#edf0e9" size="56"
+            <v-avatar color="#edf0e9" size="80"
               ><v-img v-if="photo" :src="photo" alt="Photo publique" /><v-icon
                 v-else
                 >mdi-account-outline</v-icon
               ></v-avatar
             ><strong>{{ firstname || 'Votre nom' }}</strong>
           </div>
+          <p v-if="!profile.headline && !profile.bio" class="preview-placeholder">Votre expertise mérite d’être découverte. Complétez votre présentation pour donner vie à votre profil.</p>
           <CoachPublicDetails :profile="profile" />
-          <p class="hint">
-            L’adresse e-mail et vos préférences ne figurent pas dans cet aperçu.
+          <p class="hint preview-privacy">
+            <v-icon size="16">mdi-lock-outline</v-icon> Votre e-mail et vos préférences restent privés.
           </p>
+        </aside>
+        <aside v-else class="panel preview preferences-summary" aria-labelledby="preferences-summary-title">
+          <div class="preview-heading"><v-icon size="18">mdi-calendar-check-outline</v-icon><h2 id="preferences-summary-title">Votre organisation</h2><span>En direct</span></div>
+          <p class="hint">Un aperçu de vos préférences au fil de la saisie.</p>
+          <div class="week-summary">
+            <span class="section-step">JOURS DISPONIBLES</span>
+            <div v-if="preferences.days.length" class="day-tags">
+              <span v-for="day in days.filter(day => preferences.days.includes(day))" :key="day">{{ day }}</span>
+            </div>
+            <p v-else class="summary-empty">Sélectionnez vos jours de travail pour composer votre semaine.</p>
+          </div>
+          <dl class="preference-facts">
+            <div><dt><v-icon size="18">mdi-clock-outline</v-icon> Plage horaire</dt><dd>{{ preferences.startTime || '—' }} – {{ preferences.endTime || '—' }}</dd></div>
+            <div><dt><v-icon size="18">mdi-earth</v-icon> Fuseau horaire</dt><dd>{{ preferences.timeZone || 'À renseigner' }}</dd></div>
+            <div><dt><v-icon size="18">mdi-timer-outline</v-icon> Durée d’une séance</dt><dd>{{ preferences.sessionDuration }} minutes</dd></div>
+            <div><dt><v-icon size="18">mdi-account-group-outline</v-icon> Capacité souhaitée</dt><dd>{{ preferences.maxClients || '—' }} clients</dd></div>
+          </dl>
+          <p class="hint preview-privacy"><v-icon size="16">mdi-lock-outline</v-icon> Ces informations ne figurent pas sur votre profil public.</p>
         </aside>
       </div>
     </v-form>
@@ -475,6 +509,54 @@ onMounted(load)
   padding: 40px 24px 72px;
   color: #24443f;
 }
+.eyebrow {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  margin-bottom: 10px;
+  color: #8b4a34;
+}
+.coach-account .page-heading { margin-bottom: 32px; }
+.coach-account h1 { font-family: 'Space Grotesk', sans-serif; font-size: clamp(30px, 4vw, 40px); }
+.section-title { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.section-icon { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border-radius: 13px; color: #8b4a34; background: #f3e7de; }
+.section-step { font-size: 10px; letter-spacing: 0.1em; color: #6a756d; font-weight: 600; }
+.section-title h2 { margin: 4px 0 0; line-height: 1.4; }
+.coach-account .panel { border-radius: 20px; }
+.coach-account :deep(.v-field) { border-radius: 10px; background: #ffffff80; }
+.coach-account :deep(.v-field--focused) { color: #24443f; }
+.coach-account :deep(.v-field__outline) { --v-field-border-opacity: 0.2; }
+.coach-account :deep(.v-chip) { background: #edf0e9; color: #24443f; }
+.photo-input { display: none; }
+.profile-page .photo-row { padding: 20px; background: #f4f3ec; border: 1px solid #24443f12; border-radius: 14px; }
+.photo-label { margin-bottom: 10px; font-weight: 600; }
+.photo-row > div { min-width: 0; }
+.preview-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+.preview-heading h2 { font-size: 14px; margin: 0; }
+.preview-heading > span { margin-left: auto; border-radius: 20px; padding: 4px 8px; background: #edf0e9; font-size: 10px; white-space: nowrap; }
+.preview-cover { height: 104px; padding: 20px; border-radius: 12px; background: linear-gradient(115deg, #24443f, #446454); color: #e8d9bd; text-align: right; }
+.preview-cover span { font-size: 9px; letter-spacing: 0.12em; font-weight: 600; }
+.profile-page .preview-name { flex-direction: column; align-items: flex-start; gap: 12px; margin-top: -38px; padding: 0 14px; }
+.preview-name :deep(.v-avatar) { border: 4px solid #fffdf8; }
+.preview-name strong { font-family: 'Space Grotesk', sans-serif; font-size: 24px; line-height: 1.3; }
+.preview-placeholder { font-size: 13px; line-height: 1.8; color: #637269; padding: 0 14px; }
+.preview :deep(.coach-public-details) { padding: 0 14px 12px; overflow-wrap: anywhere; }
+.preview-privacy { padding-top: 18px; border-top: 1px solid #24443f15; font-size: 12px; }
+.coach-account .save-row { padding: 20px; gap: 16px; align-items: center; justify-content: space-between; border: 1px solid #24443f20; border-radius: 16px; background: #fffdf8; }
+.preference-note { display: flex; align-items: flex-start; gap: 10px; padding: 14px; border-radius: 12px; background: #f4f3ec; color: #637269; }
+.preference-note p { font-size: 12px; line-height: 1.7; }
+.preference-note .v-icon { flex-shrink: 0; margin-top: 2px; color: #8b4a34; }
+.week-summary { margin-top: 22px; padding: 18px; background: #edf0e9; border-radius: 12px; }
+.day-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.day-tags span { background: #fffdf8; border: 1px solid #24443f15; border-radius: 8px; padding: 5px 9px; font-size: 12px; }
+.summary-empty { color: #637269; font-size: 13px; line-height: 1.7; margin-top: 10px; }
+.preference-facts { margin-top: 10px; }
+.preference-facts > div { padding: 18px 0; border-bottom: 1px solid #24443f12; }
+.preference-facts > div:last-child { border-bottom: 0; }
+.preference-facts dt { display: flex; align-items: center; gap: 8px; color: #637269; font-size: 12px; }
+.preference-facts dd { margin: 8px 0 0 26px; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.save-row p { font-size: 11px; line-height: 1.6; color: #637269; }
 header {
   display: flex;
   align-items: center;
@@ -563,6 +645,7 @@ small {
 :deep(.v-btn) {
   text-transform: none;
   letter-spacing: 0;
+  border-radius: 9px;
 }
 .preview .hint {
   margin: 18px 0 0;
@@ -574,6 +657,10 @@ small {
   .preview {
     position: static;
   }
+}
+@media (min-width: 851px) {
+  .preview { max-height: calc(100dvh - 160px); overflow-y: auto; scrollbar-width: thin; }
+  .coach-account .save-row { flex-wrap: wrap; }
 }
 @media (max-width: 540px) {
   .coach-account {
@@ -593,5 +680,7 @@ small {
     align-items: flex-start;
     flex-direction: column;
   }
+  .coach-account .save-row { flex-direction: column; align-items: stretch; }
+  .save-row :deep(.v-btn) { width: 100%; font-size: 12px; }
 }
 </style>

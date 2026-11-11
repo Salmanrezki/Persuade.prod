@@ -39,6 +39,7 @@ const routes = [
     component: DefaultLayout,
     meta: { requiresAuth: true },
     children: [
+      { path: 'appointments/:id/video', name: 'appointment-video', component: () => import('@/views/AppointmentVideoView.vue') },
       { path: 'coach/clients', component: () => import('@/views/CoachWorkspaceView.vue'), meta: { coachOnly: true }, props: { page: 'clients' } },
       { path: 'coach/content', component: () => import('@/views/CoachWorkspaceView.vue'), meta: { coachOnly: true }, props: { page: 'content' } },
       {

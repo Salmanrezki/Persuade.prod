@@ -6,6 +6,10 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
+    "seed:test:preview": "node scripts/seedTestDatabase.js",
+    "seed:test": "node scripts/seedTestDatabase.js --apply",
+    "seed:test:verify": "node scripts/seedTestDatabase.js --verify",
+    "smoke:test-db": "node scripts/smokeTestDatabase.js",
     "audit:coach-roles": "node scripts/auditCoachRoles.js",
     "cleanup:chat": "node scripts/cleanupChatConversations.js",
     "cleanup:deleted-users": "node scripts/cleanupDeletedUsers.js",

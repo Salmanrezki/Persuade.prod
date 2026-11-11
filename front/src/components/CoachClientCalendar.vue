@@ -1,6 +1,9 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import api from '@/services/api'
+import AppointmentVideoButton from '@/components/AppointmentVideoButton.vue'
+import AcceptAppointmentButton from '@/components/AcceptAppointmentButton.vue'
+import { useAppointmentRefresh } from '@/composables/useAppointmentRefresh'
 import { ROUTE_PATHS } from '@/router/paths'
 
 const props = defineProps({
@@ -150,6 +153,13 @@ function openForm(event = null) {
   }
   dialog.value = true
 }
+function createForClient(client) {
+  if (client?.status !== 'accepted') return
+  goToday()
+  openForm()
+  form.value.followupId = client.id
+}
+defineExpose({ createForClient })
 async function save() {
   if (
     !form.value.followupId ||
@@ -200,6 +210,14 @@ function selectClient(event) {
   if (client) emit('select-client', client)
 }
 onMounted(load)
+function acceptedAppointment(data) {
+  appointments.value = appointments.value.map(item => item.id === data.id ? data : item)
+  success.value = 'Cours accepté. La visio sera accessible pendant le créneau prévu.'
+}
+useAppointmentRefresh(async () => {
+  try { appointments.value = (await api.get('/follow-up/appointments')).data }
+  catch { error.value = 'Impossible d’actualiser les rendez-vous. Réessayez.' }
+})
 </script>
 
 <template>
@@ -358,6 +376,8 @@ onMounted(load)
           <p v-if="event.courseTitle">Cours : {{ event.courseTitle }}</p>
           <p v-if="event.notes" class="notes">{{ event.notes }}</p>
           <template v-if="event.kind !== 'masterclass'">
+            <AcceptAppointmentButton :appointment="event" @accepted="acceptedAppointment" />
+            <AppointmentVideoButton :appointment="event" />
             <v-btn variant="text" size="small" @click="selectClient(event)"
               >Fiche élève</v-btn
             >

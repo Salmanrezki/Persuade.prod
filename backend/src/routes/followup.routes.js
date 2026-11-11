@@ -134,6 +134,36 @@ router.get('/appointments', async (req, res) => {
   }
 })
 
+router.patch('/appointments/:appointmentId/accept', async (req, res) => {
+  try {
+    const ref = appointmentsCollection().doc(req.params.appointmentId)
+    const result = await admin.firestore().runTransaction(async (transaction) => {
+      const doc = await transaction.get(ref)
+      if (!doc.exists) return { code: 404, message: 'Rendez-vous introuvable.' }
+      const current = doc.data()
+      if (current.coachId !== req.user.uid) return { code: 403, message: 'Ce rendez-vous ne vous appartient pas.' }
+      const end = Date.parse(current.startAt) + Number(current.durationMinutes) * 60000
+      if (!['requested', 'scheduled'].includes(current.status) || !Number.isFinite(end) || end <= Date.now()) {
+        return { code: 409, message: 'Ce rendez-vous est terminé ou annulé. Proposez un nouveau créneau.' }
+      }
+      const followup = await transaction.get(followupCollection().doc(current.followupId))
+      const relation = followup.data()
+      if (!followup.exists || relation.status !== 'accepted' || relation.coachId !== req.user.uid || relation.clientId !== current.clientId) {
+        return { code: 403, message: 'Le suivi de cet apprenant doit être actif.' }
+      }
+      // Repeated acceptance must not change the room version or interrupt an ongoing call.
+      if (current.status === 'scheduled') return { data: { ...current, id: doc.id } }
+      const update = { status: 'scheduled', updatedAt: new Date().toISOString() }
+      transaction.update(ref, update)
+      return { data: { ...current, ...update, id: doc.id } }
+    })
+    if (result.code) return res.status(result.code).json({ message: result.message })
+    res.json(result.data)
+  } catch {
+    res.status(503).json({ message: 'Impossible d’accepter le cours. Réessayez.' })
+  }
+})
+
 async function saveAppointment(req, res) {
   try {
     const ref = req.params.appointmentId

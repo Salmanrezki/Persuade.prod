@@ -6,3 +6,6 @@ backend/.env
 backend/serviceAccountKey.json
 front/.env
 *.log
+.firebase-emulator-data/
+front/.env.emulator.local
+.tools/

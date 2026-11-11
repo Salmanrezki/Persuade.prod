@@ -1,69 +1,11 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ROUTE_PATHS } from '@/router/paths'
+import LearningJourney from '@/components/LearningJourney.vue'
 import MarketingNavbar from '@/components/MarketingNavbar.vue'
+import SalaryNegotiationExperience from '@/components/SalaryNegotiationExperience.vue'
 import mailLogoUrl from '@/assets/logo-mail.svg'
 import linkedinLogoUrl from '@/assets/logo-linkedin.svg'
-
-const offerItems = [
-  {
-    value: '01',
-    title: 'Apprendre',
-    icon: 'mdi-school-outline',
-    items: ['Cours structurés', 'Masterclasses', 'Entretiens privés'],
-  },
-  {
-    value: '02',
-    title: 'Pratiquer',
-    icon: 'mdi-target-variant',
-    items: ['Exercices', 'Cas concrets', 'Mises en situation', 'Scénarios commerciaux'],
-  },
-  {
-    value: '03',
-    title: 'Être accompagné',
-    icon: 'mdi-account-tie-outline',
-    items: ['Messagerie', 'Demandes de suivi', 'Feedback de coachs'],
-  },
-  {
-    value: '04',
-    title: 'Progresser',
-    icon: 'mdi-trending-up',
-    items: ['Tableau de bord', 'Parcours guidé', 'Suivi dans le temps'],
-  },
-]
-
-const features = [
-  {
-    title: 'Dashboard',
-    text: 'Suivez votre progression, vos indicateurs clés et les prochaines étapes depuis un seul écran.',
-    image: '/landing/Dashboard.png',
-    accent: "Vue d'ensemble",
-  },
-  {
-    title: 'Masterclass',
-    text: 'Approfondissez les techniques essentielles et travaillez votre posture de négociation.',
-    image: '/landing/Masterclass.png',
-    accent: 'Formation live',
-  },
-  {
-    title: 'Cours vidéo',
-    text: 'Apprenez à votre rythme grâce à des contenus vidéo clairs et revenez facilement sur les notions essentielles.',
-    image: '/landing/Courpreenregistrer.png',
-    accent: 'À la demande',
-  },
-  {
-    title: 'Exercices pratiques',
-    text: 'Mettez vos connaissances en application avec des exercices concrets et des mises en situation.',
-    image: '/landing/Exercices pratique.png',
-    accent: 'Entraînement',
-  },
-  {
-    title: 'Chat',
-    text: "Un espace direct pour échanger, poser vos questions et garder le lien.",
-    image: '/landing/Chat.png',
-    accent: 'Échanges directs',
-  },
-]
 
 const founders = [
   {
@@ -80,48 +22,35 @@ const founders = [
 
 const navItems = [
   { label: 'Notre offre', href: '#offre' },
-  { label: 'Fonctionnalités', href: '#fonctionnalites' },
-  { label: 'Démo', href: '#preview' },
+  { label: 'Simulation', href: '#simulation' },
   { label: 'Équipe', href: '#equipe' },
   { label: 'Contact', href: '#contact' },
 ]
 
 const currentYear = computed(() => new Date().getFullYear())
-const activeFeatureIndex = ref(0)
-const featureTabElements = ref([])
-const offerCarouselRef = ref(null)
-const activeOfferIndex = ref(0)
 const showScrollTop = ref(false)
-const activeFeature = computed(() => features[activeFeatureIndex.value] || features[0])
+const heroCta = ref(null)
+const arrowVisible = ref(false)
+const pointerReady = ref(false)
+const arrowPosition = ref({ x: 0, y: 0, angle: 0, distance: 0 })
+let heroCtaObserver
+let pointerFrame
 
-const setFeatureTabRef = (element, index) => {
-  if (element) featureTabElements.value[index] = element
-}
+const showCtaArrow = computed(
+  () => arrowVisible.value && pointerReady.value && arrowPosition.value.distance > 110,
+)
 
-const selectFeature = (index, shouldScroll = true) => {
-  activeFeatureIndex.value = index
-
-  if (shouldScroll) {
-    nextTick(() => {
-      featureTabElements.value[index]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
-    })
+const arrowStyle = computed(() => {
+  const normalizedDistance = Math.min(1, arrowPosition.value.distance / 700)
+  const arrowLength = Math.min(132, Math.max(42, arrowPosition.value.distance * 0.24))
+  return {
+    left: `${arrowPosition.value.x}px`,
+    top: `${arrowPosition.value.y}px`,
+    width: `${arrowLength}px`,
+    transform: `translate(-50%, -50%) rotate(${arrowPosition.value.angle}deg)`,
+    '--arrow-duration': `${1.4 - normalizedDistance * 0.45}s`,
   }
-}
-
-const scrollOfferTo = (index) => {
-  const nextIndex = (index + offerItems.length) % offerItems.length
-  activeOfferIndex.value = nextIndex
-  offerCarouselRef.value?.children[nextIndex]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' })
-}
-
-const handleOfferScroll = (event) => {
-  const element = event.currentTarget
-  const firstCard = element?.children?.[0]
-  if (!firstCard) return
-
-  const cardStep = firstCard.getBoundingClientRect().width + 16
-  activeOfferIndex.value = Math.min(offerItems.length - 1, Math.max(0, Math.round(element.scrollLeft / cardStep)))
-}
+})
 
 const handleScroll = () => {
   showScrollTop.value = window.scrollY > 420
@@ -131,8 +60,54 @@ const scrollToTop = () => {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-onMounted(() => window.addEventListener('scroll', handleScroll, { passive: true }))
-onBeforeUnmount(() => window.removeEventListener('scroll', handleScroll))
+const handlePointerMove = (event) => {
+  if (pointerFrame) return
+
+  pointerFrame = window.requestAnimationFrame(() => {
+    pointerFrame = null
+    const buttonElement = heroCta.value?.$el || heroCta.value
+    if (!buttonElement) return
+
+    const buttonRect = buttonElement.getBoundingClientRect()
+    const arrowX = event.clientX - 30
+    const arrowY = event.clientY + 24
+    const targetX = buttonRect.left + buttonRect.width / 2
+    const targetY = buttonRect.top + buttonRect.height / 2
+    const deltaX = targetX - arrowX
+    const deltaY = targetY - arrowY
+
+    arrowPosition.value = {
+      x: arrowX,
+      y: arrowY,
+      angle: (Math.atan2(deltaY, deltaX) * 180) / Math.PI,
+      distance: Math.hypot(deltaX, deltaY),
+    }
+    pointerReady.value = true
+  })
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', handleScroll, { passive: true })
+  window.addEventListener('pointermove', handlePointerMove, { passive: true })
+
+  const buttonElement = heroCta.value?.$el || heroCta.value
+  if (buttonElement) {
+    heroCtaObserver = new IntersectionObserver(
+      ([entry]) => {
+        arrowVisible.value = entry.isIntersecting && entry.intersectionRatio > 0.55
+      },
+      { threshold: [0, 0.55, 1] },
+    )
+    heroCtaObserver.observe(buttonElement)
+  }
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', handleScroll)
+  window.removeEventListener('pointermove', handlePointerMove)
+  heroCtaObserver?.disconnect()
+  if (pointerFrame) window.cancelAnimationFrame(pointerFrame)
+})
 
 const vReveal = {
   mounted(element) {
@@ -180,186 +155,72 @@ const vReveal = {
               <span>manière de <strong>négocier</strong></span>
             </h1>
             <p class="landing-text landing-text--hero">
-              Apprenez, pratiquez et progressez dans une interface simple et claire.
+              Préparez vos échanges, entraînez-vous à répondre aux objections et avancez avec des conseils adaptés à votre situation.
             </p>
+            <div class="landing-actions landing-hero-actions">
+              <v-btn ref="heroCta" :to="ROUTE_PATHS.login" size="large" rounded="pill" class="landing-btn landing-btn--hero">
+                Rejoindre Persuade
+              </v-btn>
+              <v-btn href="#offre" size="large" rounded="pill" variant="outlined" class="landing-btn landing-btn--ghost">
+                Découvrir notre méthode
+              </v-btn>
+            </div>
           </div>
 
           <div class="landing-hero-stage" v-reveal>
             <v-img
               src="/AcceuilAnimation.png"
               alt="Illustration d'accueil Persuade"
-              cover
+              contain
               eager
               class="landing-hero-image"
             />
           </div>
 
-          <div class="landing-actions landing-hero-actions">
-            <v-btn :to="ROUTE_PATHS.login" size="large" rounded="pill" class="landing-btn landing-btn--hero">
-              Tester la demo
-            </v-btn>
-            <v-btn href="#offre" size="large" rounded="pill" variant="outlined" class="landing-btn landing-btn--ghost">
-              Découvrir
-            </v-btn>
-          </div>
         </div>
       </section>
+
+      <Transition name="cta-arrow">
+        <div
+          v-if="showCtaArrow"
+          class="landing-cta-arrow"
+          :style="arrowStyle"
+          aria-hidden="true"
+        >
+          <svg viewBox="0 0 100 24" preserveAspectRatio="none" role="presentation">
+            <defs>
+              <linearGradient id="cta-arrow-gradient" x1="0" y1="1" x2="1" y2="0">
+                <stop offset="0" stop-color="#24443f" />
+                <stop offset="1" stop-color="#c66b49" />
+              </linearGradient>
+            </defs>
+            <path class="landing-cta-arrow__line" d="M3 12 L 91 12" />
+            <path class="landing-cta-arrow__head" d="M83 4 L 94 12 L 83 20" />
+          </svg>
+        </div>
+      </Transition>
 
       <section id="offre" class="landing-section landing-section--offer">
         <div class="landing-heading landing-heading--offer" v-reveal>
           <div class="landing-heading__main">
-            <div class="landing-section-label">Notre offre</div>
-            <h2 class="landing-section-title">Apprendre, pratiquer et progresser en négociation</h2>
+            <div class="landing-section-label">Votre prochaine négociation</div>
+            <h2 class="landing-section-title">Préparez-la. Testez vos réponses. Puis passez à l’action.</h2>
           </div>
           <p class="landing-text landing-heading__text">
-            Un parcours structuré, du feedback expert et un prix plus accessible.
+            Partez d’une situation concrète, essayez différentes approches et travaillez les moments qui vous posent
+            vraiment problème.
           </p>
         </div>
-
-        <div ref="offerCarouselRef" class="landing-offer-grid" @scroll.passive="handleOfferScroll">
-          <article
-            v-for="(item, index) in offerItems"
-            :key="item.title"
-            class="landing-offer-card"
-            :style="{ '--reveal-delay': `${index * 90}ms` }"
-            v-reveal
-          >
-            <div class="landing-offer-card__top">
-              <span class="landing-offer-icon">
-                <v-icon :icon="item.icon" size="26" />
-              </span>
-              <span class="landing-card-index">{{ item.value }}</span>
-            </div>
-
-            <h3 class="landing-card-title landing-offer-title">{{ item.title }}</h3>
-            <ul class="landing-offer-list">
-              <li v-for="entry in item.items" :key="entry">{{ entry }}</li>
-            </ul>
-          </article>
-        </div>
-
-        <div class="landing-offer-controls" aria-label="Navigation de l'offre">
-          <button
-            type="button"
-            class="landing-offer-control"
-            aria-label="Offre précédente"
-            @click="scrollOfferTo(activeOfferIndex - 1)"
-          >
-            <v-icon icon="mdi-arrow-left" size="18" />
-          </button>
-          <div class="landing-offer-dots" aria-hidden="true">
-            <span
-              v-for="(item, index) in offerItems"
-              :key="`offer-dot-${item.title}`"
-              class="landing-offer-dot"
-              :class="{ 'landing-offer-dot--active': index === activeOfferIndex }"
-            ></span>
-          </div>
-          <button
-            type="button"
-            class="landing-offer-control"
-            aria-label="Offre suivante"
-            @click="scrollOfferTo(activeOfferIndex + 1)"
-          >
-            <v-icon icon="mdi-arrow-right" size="18" />
-          </button>
-        </div>
+        <LearningJourney />
       </section>
 
-      <section id="fonctionnalites" class="landing-section landing-section--features">
-        <div class="landing-heading landing-heading--split" v-reveal>
-          <div>
-            <div class="landing-section-label">Fonctionnalités</div>
-            <h2 class="landing-section-title">Fonctionnalités clés</h2>
-          </div>
-          <p class="landing-text">Les briques essentielles pour apprendre et pratiquer.</p>
-        </div>
-
-        <div class="landing-feature-dock" v-reveal>
-          <div class="landing-feature-tabs">
-            <button
-              v-for="(feature, index) in features"
-              :key="feature.title"
-              :ref="(element) => setFeatureTabRef(element, index)"
-              class="landing-feature-tab"
-              :class="{ 'landing-feature-tab--active': index === activeFeatureIndex }"
-              type="button"
-              @mouseenter="selectFeature(index, false)"
-              @focus="selectFeature(index)"
-              @click="selectFeature(index)"
-            >
-              <span>{{ feature.accent }}</span>
-              <strong>{{ feature.title }}</strong>
-              <small>{{ feature.text }}</small>
-            </button>
-          </div>
-
-          <div class="landing-feature-controls" aria-label="Navigation des fonctionnalités">
-            <button
-              type="button"
-              class="landing-feature-control"
-              aria-label="Fonctionnalité précédente"
-              @click="selectFeature((activeFeatureIndex - 1 + features.length) % features.length)"
-            >
-              <v-icon icon="mdi-arrow-left" size="18" />
-            </button>
-            <div class="landing-feature-dots" aria-hidden="true">
-              <span
-                v-for="(feature, index) in features"
-                :key="`dot-${feature.title}`"
-                class="landing-feature-dot"
-                :class="{ 'landing-feature-dot--active': index === activeFeatureIndex }"
-              ></span>
-            </div>
-            <button
-              type="button"
-              class="landing-feature-control"
-              aria-label="Fonctionnalité suivante"
-              @click="selectFeature((activeFeatureIndex + 1) % features.length)"
-            >
-              <v-icon icon="mdi-arrow-right" size="18" />
-            </button>
-          </div>
-
-          <div class="landing-feature-preview">
-            <v-img :src="activeFeature.image" :alt="activeFeature.title" cover loading="lazy" class="landing-feature-preview__image" />
-          </div>
-        </div>
-      </section>
-
-      <section id="preview" class="landing-section landing-section--preview">
-        <div class="landing-heading landing-heading--split" v-reveal>
-          <div>
-            <div class="landing-section-label">Démo</div>
-            <h2 class="landing-section-title">Accéder à la démo</h2>
-          </div>
-          <p class="landing-text">Découvrez l'expérience Persuade avant de commencer.</p>
-        </div>
-        <div class="landing-demo-panel" v-reveal>
-          <div class="landing-demo-copy">
-            <p class="landing-text">Visualisez l'interface et testez l'entrée dans la plateforme.</p>
-
-            <div class="landing-actions">
-              <v-btn :to="ROUTE_PATHS.login" rounded="pill" class="landing-btn landing-btn--primary">
-                Tester la demo
-              </v-btn>
-              <a href="#contact" class="landing-beta-link">
-                Nous contacter pour obtenir un accès à notre bêta
-                <v-icon icon="mdi-arrow-top-right" size="17" />
-              </a>
-            </div>
-          </div>
-
-          <div class="landing-login-stack">
-            <v-img src="/landing/Login.register.png" alt="Aperçu de l'écran de connexion Persuade" contain loading="lazy" class="landing-login-stack__image" />
-          </div>
-        </div>
+      <section id="simulation" class="landing-section landing-section--simulation">
+        <SalaryNegotiationExperience v-reveal />
       </section>
 
       <section id="equipe" class="landing-section landing-section--team">
         <div class="landing-heading landing-heading--split" v-reveal>
           <div>
-            <div class="landing-section-label">Équipe</div>
             <h2 class="landing-section-title">Qui sommes-nous ?</h2>
           </div>
           <p class="landing-text">Une équipe engagée pour rendre la négociation plus accessible.</p>
@@ -404,7 +265,6 @@ const vReveal = {
       <section id="contact" class="landing-section landing-section--contact">
         <div class="landing-heading landing-heading--split" v-reveal>
           <div>
-            <div class="landing-section-label">Contact</div>
             <h2 class="landing-section-title">Construisons la suite ensemble.</h2>
           </div>
           <p class="landing-text">Une question ou envie de rejoindre l'aventure Persuade ?</p>
@@ -412,12 +272,11 @@ const vReveal = {
         <div class="landing-contact-panel" v-reveal>
           <div class="landing-contact-copy">
             <p class="landing-text">
-              Une question, une demande d'accès ou l'envie de tester Persuade avec votre équipe ? Contactez-nous
+              Une question, une demande d'accès ou l'envie de faire progresser votre équipe ? Contactez-nous
               directement par email ou suivez l'avancée du projet sur LinkedIn.
             </p>
             <div class="landing-coach-callout">
               <div>
-                <span class="landing-coach-callout__eyebrow">Coachs partenaires</span>
                 <h3>Vous êtes coach ?</h3>
                 <p>Rejoignez notre réseau d'experts et accompagnez les apprenants dans leur progression.</p>
               </div>
@@ -565,10 +424,6 @@ const vReveal = {
   grid-template-columns: minmax(0, 0.95fr) minmax(420px, 1.05fr);
 }
 
-.landing-hero-actions {
-  grid-column: 1;
-}
-
 .landing-feature-dock,
 .landing-demo-panel,
 .landing-team-grid,
@@ -686,17 +541,70 @@ const vReveal = {
   border-color: rgba(36, 68, 63, 0.2);
 }
 
+.landing-cta-arrow {
+  position: fixed;
+  z-index: 20;
+  width: 54px;
+  height: 24px;
+  pointer-events: none;
+  transform-origin: center;
+  will-change: left, top, width, transform;
+  transition: width 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.landing-cta-arrow svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 5px 8px rgba(31, 52, 47, 0.14));
+  animation: cta-arrow-breathe var(--arrow-duration) ease-in-out infinite;
+}
+
+.landing-cta-arrow path {
+  fill: none;
+  stroke: url('#cta-arrow-gradient');
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.landing-cta-arrow__line {
+  stroke-dasharray: none;
+}
+
+.landing-cta-arrow__head {
+  stroke-width: 2.7 !important;
+}
+
+.cta-arrow-enter-active,
+.cta-arrow-leave-active {
+  transition: opacity 260ms ease, scale 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cta-arrow-enter-from,
+.cta-arrow-leave-to {
+  opacity: 0;
+  scale: 0.72;
+}
+
+@keyframes cta-arrow-breathe {
+  0%, 100% { opacity: 0.78; }
+  50% { opacity: 1; }
+}
+
 .landing-hero-stage {
   position: relative;
-  min-height: 560px;
-  border-radius: 0;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  border-radius: 26px;
   overflow: hidden;
   background: transparent;
 }
 
 .landing-hero-image {
   width: 100%;
-  min-height: 560px;
+  height: 100%;
   filter: drop-shadow(0 28px 48px rgba(31, 52, 47, 0.14));
 }
 
@@ -1420,11 +1328,6 @@ const vReveal = {
     margin-left: 0;
   }
 
-  .landing-hero-stage,
-  .landing-hero-image {
-    min-height: 430px;
-  }
-
   .landing-offer-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1470,10 +1373,6 @@ const vReveal = {
   .landing-hero-copy {
     gap: 0.9rem;
     padding: 0;
-  }
-
-  .landing-hero-actions {
-    grid-column: 1;
   }
 
   .landing-title {
@@ -1594,6 +1493,10 @@ const vReveal = {
   .landing-hero-image {
     min-height: 0;
     height: clamp(190px, 30svh, 260px);
+  }
+
+  .landing-hero-stage {
+    aspect-ratio: auto;
   }
 
   .landing-feature-dock,
@@ -1849,7 +1752,12 @@ const vReveal = {
   }
 }
 
+@media (hover: none), (pointer: coarse) {
+  .landing-cta-arrow { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .landing-cta-arrow svg { animation: none; }
   .landing-reveal {
     opacity: 1;
     transform: none;

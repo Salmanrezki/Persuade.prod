@@ -5,7 +5,7 @@ import { ROUTE_PATHS } from '@/router/paths'
 const auth = useAuthStore()
 const router = useRouter()
 const links = [
-  ['Dashboard', ROUTE_PATHS.home],
+  ['Accueil', ROUTE_PATHS.home],
   ['Formation', ROUTE_PATHS.courses],
   ['Exercices', ROUTE_PATHS.practicalExercises],
   ['Coaching', ROUTE_PATHS.coachCourses],
@@ -19,9 +19,9 @@ async function logout() {
   <v-app-bar class="coach-navbar" elevation="0" height="112">
     <div class="coach-navbar-inner">
       <div class="coach-navbar-brand">
-        <router-link :to="ROUTE_PATHS.home"
-          >PERSUADE<span>Espace apprenant</span></router-link
-        >
+        <router-link :to="ROUTE_PATHS.home" aria-label="Persuade, espace apprenant">
+          <span class="coach-navbar-brand-copy"><strong>Persuade</strong><small>Espace apprenant</small></span>
+        </router-link>
         <v-menu location="bottom end">
           <template #activator="{ props }">
             <v-btn
@@ -122,17 +122,21 @@ async function logout() {
   justify-content: space-between;
 }
 .coach-navbar-brand a {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   font-size: 20px;
   font-weight: 800;
-  letter-spacing: 0.08em;
   text-decoration: none;
   color: inherit;
 }
-.coach-navbar-brand span {
+.coach-navbar-brand-copy { display: flex; flex-direction: column; line-height: 1.1; }
+.coach-navbar-brand-copy strong { font-size: 20px; letter-spacing: 0; }
+.coach-navbar-brand-copy small {
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.02em;
-  margin-left: 16px;
+  margin-top: 3px;
 }
 nav {
   display: flex;

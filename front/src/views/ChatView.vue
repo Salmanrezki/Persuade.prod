@@ -21,6 +21,7 @@ import { useAuthStore } from '@/stores/auth'
 import { getUserProfile } from '@/services/userService'
 import { isCoachProfile } from '@/utils/profile'
 import { ROUTE_PATHS } from '@/router/paths'
+import { readChatAttachment } from '@/utils/chatAttachments'
 
 const profile = ref(null)
 const route = useRoute()
@@ -303,22 +304,12 @@ const handleFileSelected = async (file) => {
     return
   }
 
-  const maxSize = 1024 * 1024 * 1.5
-  if (file.size > maxSize) {
-    snackbarText.value = 'Fichier trop volumineux (1.5 Mo max).'
+  try { attachment.value = await readChatAttachment(file) }
+  catch (error) {
+    attachment.value = null
+    snackbarText.value = error.message
     snackbar.value = true
-    return
   }
-
-  const reader = new FileReader()
-  reader.onload = () => {
-    attachment.value = {
-      name: file.name,
-      mime: file.type,
-      dataUrl: reader.result,
-    }
-  }
-  reader.readAsDataURL(file)
 }
 
 const clearAttachment = () => {
@@ -524,7 +515,7 @@ onBeforeUnmount(() => {
         <v-card class="chat-hero-card" elevation="0">
           <div class="chat-hero-content">
             <div class="chat-hero-copy">
-              <h1 class="chat-hero-title">{{ isCoach ? 'Chat' : 'Messages' }}</h1>
+              <h1 class="chat-hero-title">{{ isCoach ? 'Mes conversations' : 'Messages' }}</h1>
               <p v-if="!isCoach" class="learner-chat-subtitle">Gardez le contact avec vos coachs et préparez vos prochaines séances.</p>
             </div>
 

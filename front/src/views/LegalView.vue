@@ -9,7 +9,6 @@ const isPrivacyPage = computed(() => route.meta.legalPage === 'privacy')
 const title = computed(() => (isPrivacyPage.value ? 'Politique de confidentialité' : 'Mentions légales'))
 const navItems = [
   { label: 'Accueil', href: ROUTE_PATHS.landing },
-  { label: 'Notre offre', href: `${ROUTE_PATHS.landing}#offre` },
   { label: 'Contact', href: `${ROUTE_PATHS.landing}#contact` },
 ]
 </script>
@@ -20,9 +19,7 @@ const navItems = [
       <MarketingNavbar :nav-items="navItems" />
 
       <main class="legal-content">
-        <div class="legal-kicker">Persuade</div>
         <h1>{{ title }}</h1>
-        <p class="legal-updated">Dernière mise à jour : {{ new Date().toLocaleDateString('fr-FR') }}</p>
 
         <template v-if="isPrivacyPage">
           <section>

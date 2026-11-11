@@ -21,6 +21,8 @@ VITE_FIREBASE_APP_ID=...
 VITE_FIREBASE_MEASUREMENT_ID=...
 ```
 
+`VITE_API_BASE_URL` doit etre une URL publique HTTPS se terminant par `/api`. Le build refuse une API locale, un projet Firebase `demo-*` ou le mode emulateur. Ne pas publier un build prepare avec `front/.env.local` si ce fichier pointe vers `localhost`.
+
 ## 2. Variables backend
 
 Configurer ces variables sur l hebergeur backend :
@@ -31,12 +33,15 @@ PORT=3001
 JSON_LIMIT=6mb
 CORS_ORIGIN=https://ton-front.web.app,https://ton-front.firebaseapp.com
 FIREBASE_SERVICE_ACCOUNT={"type":"service_account","project_id":"..."}
+DAILY_API_KEY=...
 ```
 
 Notes :
 
 - `CORS_ORIGIN` doit contenir l URL publique exacte du frontend
 - utiliser `FIREBASE_SERVICE_ACCOUNT` en prod, pas `serviceAccountKey.json`
+- creer une nouvelle cle Daily et la stocker uniquement dans les secrets du backend ; revoquer la cle anciennement presente dans un fichier d'exemple
+- ne pas importer les comptes ou donnees de `demo-persuade-test` dans le projet de production
 
 ## 3. Build frontend
 
@@ -46,7 +51,7 @@ npm install
 npm run build
 ```
 
-Le fichier [`firebase.json`](/mnt/c/Users/salma/Desktop/PERSUADE/PROJECT/G-EIP-700-PAR-7-1-eip-38/firebase.json) est deja configure pour servir `front/dist` avec rewrite SPA.
+Le fichier `firebase.json` sert `front/dist` avec une reecriture pour la SPA.
 
 ## 4. Deploiement Firebase
 
@@ -61,7 +66,7 @@ firebase deploy --only hosting,firestore:rules
 Deux options :
 
 - hebergeur Node : lancer `npm install --omit=dev` puis `npm start`
-- hebergeur Docker : builder avec [`backend/Dockerfile`](/mnt/c/Users/salma/Desktop/PERSUADE/PROJECT/G-EIP-700-PAR-7-1-eip-38/backend/Dockerfile)
+- hebergeur Docker : builder avec `backend/Dockerfile`
 
 Commande Docker locale de reference :
 

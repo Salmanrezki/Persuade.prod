@@ -33,6 +33,10 @@ test('calendar persists appointments and enforces coach, student relationship an
   const snapshot = (id, data) => ({ id, exists: !!data, data: () => data })
   const admin = {
     firestore: () => ({
+      runTransaction: async callback => callback({
+        get: ref => ref.get(),
+        update: (ref, data) => ref.update(data),
+      }),
       collection: (name) => ({
         add: async (data) => {
           const id = `event-${++sequence}`
@@ -247,6 +251,29 @@ test('calendar persists appointments and enforces coach, student relationship an
     const booked = await bookedResponse.json()
     assert.equal(booked.status, 'requested')
     assert.equal(booked.coachId, 'a')
+    const acceptancePath = `/appointments/${booked.id}/accept`
+    assert.equal((await request('PATCH', acceptancePath)).status, 401)
+    assert.equal((await request('PATCH', acceptancePath, 'student')).status, 403)
+    assert.equal((await request('PATCH', acceptancePath, 'b')).status, 403)
+    assert.equal((await request('PATCH', '/appointments/missing/accept', 'a')).status, 404)
+    records.coachFollowupRequests.active.status = 'rejected'
+    assert.equal((await request('PATCH', acceptancePath, 'a')).status, 403)
+    records.coachFollowupRequests.active.status = 'accepted'
+    const accepted = await request('PATCH', acceptancePath, 'a', { clientId: 'other', title: 'Injected' })
+    assert.equal(accepted.status, 200)
+    const confirmed = await accepted.json()
+    assert.equal(confirmed.status, 'scheduled')
+    assert.equal(confirmed.clientId, 'student')
+    assert.equal(confirmed.title, booked.title)
+    assert.equal(confirmed.startAt, booked.startAt)
+    assert.equal(confirmed.durationMinutes, booked.durationMinutes)
+    assert.equal((await (await request('PATCH', acceptancePath, 'a')).json()).updatedAt, confirmed.updatedAt)
+    records.coachAppointments[booked.id].startAt = new Date(Date.now() - 10 * 60000).toISOString()
+    records.coachAppointments[booked.id].status = 'requested'
+    assert.equal((await request('PATCH', acceptancePath, 'a')).status, 200)
+    records.coachAppointments[booked.id].startAt = '2020-01-01T10:00:00Z'
+    assert.equal((await request('PATCH', acceptancePath, 'a')).status, 409)
+    records.coachAppointments[booked.id].startAt = booked.startAt
     assert.equal(
       (await (await request('GET', '/appointments', 'a')).json()).some(
         (item) => item.id === booked.id,
@@ -303,6 +330,7 @@ test('calendar persists appointments and enforces coach, student relationship an
       200,
     )
     assert.equal(records.coachAppointments[booked.id].status, 'cancelled')
+    assert.equal((await request('PATCH', acceptancePath, 'a')).status, 409)
   } finally {
     await new Promise((resolve) => server.close(resolve))
   }

@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import vm from 'node:vm'
 import express from 'express'
 import { normalizeUserProfileRole } from '../src/utils/userRole.js'
+import { normalizeAssessment, publicExercise } from '../src/utils/exerciseScoring.js'
 
 // Run the real route handlers with an in-memory Firestore and authenticated identities.
 test('exercise creation, validation, persistence and coach isolation', async () => {
@@ -16,6 +17,15 @@ test('exercise creation, validation, persistence and coach isolation', async () 
   const snapshot = (id, data) => ({ id, exists: !!data, data: () => data })
   const admin = {
     firestore: () => ({
+      runTransaction: async (callback) => {
+        const updates = []
+        const result = await callback({
+          get: async (ref) => ref.get(),
+          update: (ref, data) => updates.push([ref, data]),
+        })
+        for (const [ref, data] of updates) await ref.update(data)
+        return result
+      },
       collection: (name) =>
         name === 'users'
           ? {
@@ -60,6 +70,7 @@ test('exercise creation, validation, persistence and coach isolation', async () 
     '../firebaseAdmin.js': { default: admin },
     '../middleware/authMiddleware.js': { verifyToken },
     '../utils/userRole.js': { normalizeUserProfileRole },
+    '../utils/exerciseScoring.js': { normalizeAssessment, publicExercise },
   }
   await module.link((name) => {
     const exports = dependencies[name]

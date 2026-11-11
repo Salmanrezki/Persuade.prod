@@ -73,7 +73,7 @@ async function removeAccount() {
 <template>
   <main class="settings-view">
     <header>
-      <h1>Réglages</h1>
+      <h1>Gérer mon compte</h1>
       <p>Gérez votre connexion, la sécurité et les données de votre compte.</p>
     </header>
     <AccountSecurityPanel :key="auth.user?.uid" />

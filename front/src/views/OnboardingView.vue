@@ -1,7 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import logoUrl from '@/assets/logo.png'
 import { ROUTE_PATHS } from '@/router/paths'
 import { useAuthStore } from '@/stores/auth'
 import { getUserProfile, updateUserProfile } from '@/services/userService'
@@ -19,6 +18,7 @@ import {
   seniorityOptions,
 } from '@/data/profileOptions'
 import { estimateDataUrlBytes, MAX_PROFILE_PHOTO_BYTES } from '@/utils/profile'
+
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -177,7 +177,6 @@ onMounted(async () => {
         <v-card class="onboarding-hero-card" elevation="8">
           <div class="onboarding-hero-content">
             <div class="onboarding-brand">
-              <v-img :src="logoUrl" alt="Logo Persuade" width="72" height="72" class="onboarding-logo" />
               <div class="onboarding-brand-text">Persuade</div>
             </div>
             <div class="onboarding-hero-title">Mon profil</div>
@@ -409,13 +408,6 @@ onMounted(async () => {
   align-items: center;
   gap: 14px;
   margin-bottom: 8px;
-}
-
-.onboarding-logo {
-  border-radius: 20px;
-  background: #fff;
-  padding: 8px;
-  box-shadow: 0 14px 26px rgba(12, 31, 32, 0.18);
 }
 
 .onboarding-brand-text {

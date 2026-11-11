@@ -1,7 +1,5 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import logoUrl from '@/assets/logo.png'
 import { ROUTE_PATHS } from '@/router/paths'
 import { useAuthStore } from '@/stores/auth'
 import { getUserProfile, updateUserProfile } from '@/services/userService'
@@ -20,17 +18,17 @@ import {
   formatAccountStatusLabel,
   formatProfileRoleLabel,
   MAX_PROFILE_PHOTO_BYTES,
-  isCoachProfile,
 } from '@/utils/profile'
 
-const router = useRouter()
 const auth = useAuthStore()
-const isCoach = computed(() => isCoachProfile(auth.profile))
 
 const loading = ref(false)
+const fetching = ref(true)
+const loadFailed = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 
+const photoInput = ref(null)
 const profilePhoto = ref(null)
 const profilePhotoPreview = ref('')
 const firstname = ref('')
@@ -55,13 +53,21 @@ const needsProfessionDetail = computed(() => profession.value === 'Autre')
 const needsSectorDetail = computed(() => sector.value === 'Autre')
 const needsJobTitleDetail = computed(() => jobTitle.value === 'Autre')
 
-const displayName = computed(() => firstname.value || auth.user?.displayName || auth.user?.email?.split('@')[0] || 'Utilisateur')
+const displayName = computed(
+  () =>
+    firstname.value ||
+    auth.user?.displayName ||
+    auth.user?.email?.split('@')[0] ||
+    'Utilisateur',
+)
 const email = computed(() => auth.user?.email || auth.profile?.email || '—')
 const roleLabel = computed(() => formatProfileRoleLabel(auth.profile))
-const accountStatusLabel = computed(() => formatAccountStatusLabel(auth.profile))
+const accountStatusLabel = computed(() =>
+  formatAccountStatusLabel(auth.profile),
+)
 const referralMessage = computed(
   () =>
-    'Partagez votre code: si une personne s inscrit avec, vous gagnez des points pour acceder gratuitement a des masterclass privees.'
+    'Partagez votre code: si une personne s inscrit avec, vous gagnez des points pour acceder gratuitement a des masterclass privees.',
 )
 const profileCompletion = computed(() => {
   const fields = [
@@ -87,15 +93,21 @@ const handleFileSelected = async (file) => {
     return
   }
 
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    errorMessage.value = 'Choisissez une photo JPEG, PNG ou WebP.'
+    return
+  }
   if (file.size > MAX_PROFILE_PHOTO_BYTES) {
-    errorMessage.value = 'La photo dépasse 300 Ko. Choisissez une image plus légère.'
+    errorMessage.value =
+      'La photo dépasse 300 Ko. Choisissez une image plus légère.'
     return
   }
 
   const reader = new FileReader()
   reader.onload = () => {
     if (estimateDataUrlBytes(reader.result) > MAX_PROFILE_PHOTO_BYTES) {
-      errorMessage.value = 'La photo encodée dépasse 300 Ko. Choisissez une image plus légère.'
+      errorMessage.value =
+        'La photo encodée dépasse 300 Ko. Choisissez une image plus légère.'
       profilePhoto.value = null
       profilePhotoPreview.value = ''
       return
@@ -105,11 +117,21 @@ const handleFileSelected = async (file) => {
     profilePhotoPreview.value = reader.result
     errorMessage.value = ''
   }
+  reader.onerror = () => {
+    errorMessage.value = 'Impossible de lire cette photo.'
+  }
   reader.readAsDataURL(file)
 }
 
+const onPhotoSelected = (event) => {
+  handleFileSelected(event.target.files?.[0])
+  event.target.value = ''
+}
+
 const loadProfile = async () => {
-  const data = auth.profile || (auth.user?.uid ? await getUserProfile(auth.user.uid) : null)
+  const data =
+    auth.profile ||
+    (auth.user?.uid ? await getUserProfile(auth.user.uid) : null)
 
   firstname.value = data?.firstname || ''
   birthdate.value = data?.birthdate || ''
@@ -154,8 +176,11 @@ const submit = async () => {
   }
 
   try {
-    if (estimateDataUrlBytes(profilePhotoPreview.value) > MAX_PROFILE_PHOTO_BYTES) {
-      errorMessage.value = 'La photo est trop lourde pour être enregistrée. Réduisez-la puis réessayez.'
+    if (
+      estimateDataUrlBytes(profilePhotoPreview.value) > MAX_PROFILE_PHOTO_BYTES
+    ) {
+      errorMessage.value =
+        'La photo est trop lourde pour être enregistrée. Réduisez-la puis réessayez.'
       return
     }
 
@@ -176,7 +201,9 @@ const submit = async () => {
     successMessage.value = 'Vos informations ont été mises à jour.'
   } catch (error) {
     if (error?.response?.status === 413) {
-      errorMessage.value = error?.response?.data?.message || 'Image trop lourde. Merci de choisir une photo plus légère.'
+      errorMessage.value =
+        error?.response?.data?.message ||
+        'Image trop lourde. Merci de choisir une photo plus légère.'
     } else {
       errorMessage.value = 'Impossible d’enregistrer vos informations.'
     }
@@ -186,535 +213,348 @@ const submit = async () => {
   }
 }
 
-onMounted(async () => {
+const initialize = async () => {
+  fetching.value = true
+  loadFailed.value = false
+  errorMessage.value = ''
   try {
     await loadProfile()
   } catch (error) {
+    loadFailed.value = true
     errorMessage.value = 'Impossible de charger vos informations.'
     console.error(error)
+  } finally {
+    fetching.value = false
   }
-})
+}
+onMounted(initialize)
 </script>
-
 <template>
-  <v-container class="profile-view" fluid>
-    <div class="profile-view__backdrop" aria-hidden="true"></div>
-
-    <v-row class="profile-view__hero" justify="center">
-      <v-col cols="12" md="10">
-        <v-card class="profile-hero" elevation="8">
-          <div class="profile-hero__content">
-            <div class="profile-hero__copy">
-              <div v-if="!isCoach" class="profile-hero__brand">
-                <v-img :src="logoUrl" alt="Logo Persuade" width="68" height="68" class="profile-hero__logo" />
-                <div>
-                  <div class="profile-hero__brand-name">Persuade</div>
-                  <div class="profile-hero__eyebrow">Espace personnel</div>
-                </div>
+  <main class="learner-account profile-page">
+    <header class="page-heading">
+      <div>
+        <span class="eyebrow">ESPACE APPRENANT · MON COMPTE</span>
+        <h1>Mes informations</h1>
+        <p>
+          Présentez-vous pour mieux personnaliser votre parcours
+          d’apprentissage.
+        </p>
+      </div>
+      <v-btn
+        :to="ROUTE_PATHS.preferences"
+        variant="outlined"
+        prepend-icon="mdi-tune-variant"
+        color="#24443f"
+        >Mes préférences</v-btn
+      >
+    </header>
+    <v-progress-linear v-if="fetching" indeterminate color="#24443f" /><v-alert
+      v-if="errorMessage"
+      type="error"
+      variant="tonal"
+      class="mb-5"
+      >{{ errorMessage
+      }}<v-btn v-if="loadFailed" variant="text" @click="initialize"
+        >Réessayer</v-btn
+      ></v-alert
+    ><v-alert
+      v-if="successMessage"
+      type="success"
+      variant="tonal"
+      class="mb-5"
+      role="status"
+      >{{ successMessage }}</v-alert
+    ><v-form
+      v-if="!fetching && !loadFailed"
+      :disabled="loading"
+      @submit.prevent="submit"
+      ><div class="profile-grid">
+        <div class="form-panels">
+          <section class="panel">
+            <div class="section-title">
+              <span class="section-icon"
+                ><v-icon size="22">mdi-account-outline</v-icon></span
+              >
+              <div>
+                <span class="section-step">01 · FAIRE CONNAISSANCE</span>
+                <h2>Photo et identité</h2>
               </div>
-
-              <div class="profile-hero__title">Voir et gérer mes informations</div>
             </div>
+            <v-row>
+              <v-col cols="12"
+                ><div class="photo-row">
+                  <v-avatar size="72" color="#edf0e9"
+                    ><v-img
+                      v-if="profilePhotoPreview"
+                      :src="profilePhotoPreview"
+                      alt="Photo de profil"
+                    /><v-icon v-else>mdi-account-outline</v-icon></v-avatar
+                  >
+                  <div>
+                    <span class="photo-label">Votre photo de profil</span
+                    ><input
+                      ref="photoInput"
+                      class="photo-input"
+                      type="file"
+                      aria-label="Choisir une photo de profil"
+                      accept="image/jpeg,image/png,image/webp"
+                      :disabled="loading"
+                      @change="onPhotoSelected"
+                    /><v-btn
+                      variant="outlined"
+                      size="small"
+                      color="#24443f"
+                      prepend-icon="mdi-camera-outline"
+                      @click="photoInput?.click()"
+                      >{{
+                        profilePhotoPreview
+                          ? 'Changer la photo'
+                          : 'Ajouter une photo'
+                      }}</v-btn
+                    ><small>JPEG, PNG ou WebP · 300 Ko maximum</small
+                    ><v-btn
+                      v-if="profilePhotoPreview"
+                      variant="text"
+                      size="small"
+                      @click="handleFileSelected(null)"
+                      >Retirer</v-btn
+                    >
+                  </div>
+                </div></v-col
+              >
 
-            <div class="profile-hero__actions">
-              <v-btn class="profile-hero__primary" size="large" @click="submit" :loading="loading">
-                Enregistrer
-              </v-btn>
-              <v-btn class="profile-hero__secondary" size="large" variant="outlined" @click="router.push(ROUTE_PATHS.preferences)">
-                Gérer mes préférences
-              </v-btn>
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model="firstname"
+                  label="Prénom"
+                  variant="outlined"
+                />
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field
+                  :model-value="email"
+                  label="Email"
+                  variant="outlined"
+                  readonly
+                />
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model="birthdate"
+                  label="Date de naissance"
+                  type="date"
+                  variant="outlined"
+                />
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-text-field
+                  :model-value="roleLabel"
+                  label="Rôle"
+                  variant="outlined"
+                  readonly
+                />
+              </v-col>
+            </v-row>
+          </section>
+          <section class="panel">
+            <div class="section-title">
+              <span class="section-icon"
+                ><v-icon size="22">mdi-briefcase-outline</v-icon></span
+              >
+              <div>
+                <span class="section-step">02 · VOTRE ACTIVITÉ</span>
+                <h2>Profil professionnel</h2>
+              </div>
             </div>
+            <v-row>
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="profession"
+                  :items="professionOptions"
+                  label="Profession"
+                  variant="outlined"
+                />
+              </v-col>
+              <v-col cols="12" md="6" v-if="needsProfessionDetail">
+                <v-text-field
+                  v-model="professionDetail"
+                  label="Précisez votre profession"
+                  variant="outlined"
+                />
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="jobTitle"
+                  :items="jobTitleOptions"
+                  label="Métier / Poste"
+                  variant="outlined"
+                />
+              </v-col>
+              <v-col cols="12" md="6" v-if="needsJobTitleDetail">
+                <v-text-field
+                  v-model="jobTitleDetail"
+                  label="Précisez votre poste"
+                  variant="outlined"
+                />
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="sector"
+                  :items="sectorOptions"
+                  label="Secteur d’activité"
+                  variant="outlined"
+                />
+              </v-col>
+              <v-col cols="12" md="6" v-if="needsSectorDetail">
+                <v-text-field
+                  v-model="sectorDetail"
+                  label="Précisez votre secteur"
+                  variant="outlined"
+                />
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="seniority"
+                  :items="seniorityOptions"
+                  label="Expérience"
+                  variant="outlined"
+                />
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="companySize"
+                  :items="companySizeOptions"
+                  label="Taille de l’entreprise"
+                  variant="outlined"
+                />
+              </v-col>
+            </v-row>
+          </section>
+          <section class="panel">
+            <div class="section-title">
+              <span class="section-icon"
+                ><v-icon size="22">mdi-compass-outline</v-icon></span
+              >
+              <div>
+                <span class="section-step">03 · VOTRE PARCOURS</span>
+                <h2>Contexte personnel</h2>
+              </div>
+            </div>
+            <v-row>
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="revenue"
+                  :items="revenueOptions"
+                  label="Revenus"
+                  variant="outlined"
+                />
+              </v-col>
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="familyStatus"
+                  :items="familyOptions"
+                  label="Situation familiale"
+                  variant="outlined"
+                />
+              </v-col>
+              <v-col cols="12">
+                <v-select
+                  v-model="discovery"
+                  :items="discoveryOptions"
+                  label="Comment avez-vous connu la plateforme ?"
+                  variant="outlined"
+                />
+              </v-col>
+            </v-row>
+          </section>
+          <div class="save-row">
+            <p>
+              Votre aperçu évolue au fil de la saisie.<br />Enregistrez pour
+              conserver vos modifications.
+            </p>
+            <v-btn
+              type="submit"
+              prepend-icon="mdi-check"
+              color="#b55d3f"
+              :loading="loading"
+              size="large"
+              >Enregistrer mon profil</v-btn
+            >
           </div>
-        </v-card>
-      </v-col>
-    </v-row>
-
-    <v-row class="profile-view__grid" justify="center">
-      <v-col cols="12" md="4">
-        <v-card class="profile-panel profile-panel--summary" elevation="6">
-          <div class="profile-summary">
-            <v-avatar size="104" class="profile-summary__avatar">
-              <v-img v-if="profilePhotoPreview" :src="profilePhotoPreview" alt="Photo de profil" />
-              <v-icon v-else size="44">mdi-account-circle</v-icon>
-            </v-avatar>
-
-            <div class="profile-summary__name">{{ displayName }}</div>
-            <div class="profile-summary__email">{{ email }}</div>
-
-            <div class="profile-summary__chips">
-              <v-chip size="small" class="profile-chip" variant="flat">{{ roleLabel }}</v-chip>
-              <v-chip size="small" class="profile-chip" variant="flat">{{ accountStatusLabel }}</v-chip>
-              <v-chip size="small" class="profile-chip profile-chip--accent" variant="flat">
-                Profil complété à {{ profileCompletion }}%
-              </v-chip>
-            </div>
+        </div>
+        <aside class="panel preview" aria-label="Résumé du profil">
+          <div class="preview-heading">
+            <v-icon size="18">mdi-eye-outline</v-icon>
+            <h2>Votre profil</h2>
+            <span>En direct</span>
           </div>
-
-            <div class="profile-metrics">
-              <div class="profile-metric">
-                <div class="profile-metric__label">Identité</div>
-                <div class="profile-metric__value">{{ firstname || 'À compléter' }}</div>
-            </div>
-            <div class="profile-metric">
-              <div class="profile-metric__label">Naissance</div>
-              <div class="profile-metric__value">{{ birthdate || 'À compléter' }}</div>
-            </div>
-              <div class="profile-metric">
-                <div class="profile-metric__label">Fonction</div>
-                <div class="profile-metric__value">{{ jobTitle || 'À compléter' }}</div>
-              </div>
-            </div>
-
-          <div v-if="!isCoach" class="profile-metrics profile-metrics--referral">
-            <div class="profile-metric">
-              <div class="profile-metric__label">Code de parrainage</div>
-              <div class="profile-metric__value">{{ referralCode || 'Indisponible' }}</div>
-            </div>
-            <div class="profile-metric">
-              <div class="profile-metric__label">Points gagnés</div>
-              <div class="profile-metric__value">{{ referralPoints }}</div>
-            </div>
-            <div class="profile-metric">
-              <div class="profile-metric__label">Inscriptions parrainées</div>
-              <div class="profile-metric__value">{{ referralCount }}</div>
-            </div>
-            <div class="profile-metric profile-metric--wide">
-              <div class="profile-metric__label">Parrainage</div>
-              <div class="profile-metric__value profile-metric__value--small">
-                {{ referralMessage }}
-              </div>
-              <div v-if="referredByCode" class="profile-metric__hint">
-                Vous avez utilise le code {{ referredByCode }}.
-              </div>
-            </div>
+          <div class="preview-cover"><span>APPRENANT EN NÉGOCIATION</span></div>
+          <div class="preview-name">
+            <v-avatar size="80" color="#edf0e9"
+              ><v-img
+                v-if="profilePhotoPreview"
+                :src="profilePhotoPreview"
+                alt="Photo de profil"
+              /><v-icon v-else>mdi-account-outline</v-icon></v-avatar
+            ><strong>{{ displayName }}</strong>
           </div>
-        </v-card>
-      </v-col>
-
-      <v-col cols="12" md="6">
-        <v-card class="profile-panel" elevation="6">
-          <div class="profile-panel__header">
+          <p class="hint">{{ email }}</p>
+          <div class="summary-tags">
+            <v-chip size="small">{{ roleLabel }}</v-chip
+            ><v-chip size="small">{{ accountStatusLabel }}</v-chip>
+          </div>
+          <div class="completion">
+            <span>Profil complété à {{ profileCompletion }} %</span
+            ><v-progress-linear
+              :model-value="profileCompletion"
+              color="#24443f"
+              rounded
+              height="6"
+            />
+          </div>
+          <dl class="preference-facts">
             <div>
-              <div class="profile-panel__title">Informations du compte</div>
-              <div v-if="!isCoach" class="profile-panel__subtitle">Modifiez ce qui décrit votre identité et votre contexte.</div>
+              <dt>Prénom</dt>
+              <dd>{{ firstname || 'À compléter' }}</dd>
             </div>
-          </div>
-
-          <v-row class="profile-form">
-            <v-col cols="12">
-              <div class="profile-section-title">Photo et identité</div>
-            </v-col>
-
-            <v-col cols="12">
-              <div class="profile-photo">
-                <v-avatar size="88" class="profile-photo__avatar">
-                  <v-img v-if="profilePhotoPreview" :src="profilePhotoPreview" alt="Photo de profil" />
-                  <v-icon v-else size="36">mdi-account</v-icon>
-                </v-avatar>
-
-                <div class="profile-photo__actions">
-                  <v-file-input
-                    label="Changer la photo"
-                    accept="image/*"
-                    variant="outlined"
-                    hide-details
-                    @update:modelValue="handleFileSelected"
-                  />
-                  <div class="profile-photo__hint">Format JPG/PNG, 300 Ko max.</div>
-                </div>
+            <div>
+              <dt>Naissance</dt>
+              <dd>{{ birthdate || 'À compléter' }}</dd>
+            </div>
+            <div>
+              <dt>Fonction</dt>
+              <dd>
+                {{
+                  (needsJobTitleDetail ? jobTitleDetail : jobTitle) ||
+                  'À compléter'
+                }}
+              </dd>
+            </div>
+          </dl>
+          <div class="referral-summary">
+            <h2>Parrainage</h2>
+            <dl class="preference-facts">
+              <div>
+                <dt>Votre code</dt>
+                <dd>{{ referralCode || 'Indisponible' }}</dd>
               </div>
-            </v-col>
-
-            <v-col cols="12" md="6">
-              <v-text-field v-model="firstname" label="Prénom" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="6">
-              <v-text-field :model-value="email" label="Email" variant="outlined" readonly />
-            </v-col>
-            <v-col cols="12" md="6">
-              <v-text-field v-model="birthdate" label="Date de naissance" type="date" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="6">
-              <v-text-field :model-value="roleLabel" label="Rôle" variant="outlined" readonly />
-            </v-col>
-
-            <v-col cols="12">
-              <div class="profile-section-title">Profil professionnel</div>
-            </v-col>
-
-            <v-col cols="12" md="6">
-              <v-select v-model="profession" :items="professionOptions" label="Profession" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="6" v-if="needsProfessionDetail">
-              <v-text-field v-model="professionDetail" label="Précisez votre profession" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="6">
-              <v-select v-model="jobTitle" :items="jobTitleOptions" label="Métier / Poste" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="6" v-if="needsJobTitleDetail">
-              <v-text-field v-model="jobTitleDetail" label="Précisez votre poste" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="6">
-              <v-select v-model="sector" :items="sectorOptions" label="Secteur d’activité" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="6" v-if="needsSectorDetail">
-              <v-text-field v-model="sectorDetail" label="Précisez votre secteur" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="6">
-              <v-select v-model="seniority" :items="seniorityOptions" label="Expérience" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="6">
-              <v-select v-model="companySize" :items="companySizeOptions" label="Taille de l’entreprise" variant="outlined" />
-            </v-col>
-
-            <v-col cols="12">
-              <div class="profile-section-title">Contexte personnel</div>
-            </v-col>
-
-            <v-col cols="12" md="6">
-              <v-select v-model="revenue" :items="revenueOptions" label="Revenus" variant="outlined" />
-            </v-col>
-            <v-col cols="12" md="6">
-              <v-select v-model="familyStatus" :items="familyOptions" label="Situation familiale" variant="outlined" />
-            </v-col>
-            <v-col cols="12">
-              <v-select
-                v-model="discovery"
-                :items="discoveryOptions"
-                label="Comment avez-vous connu la plateforme ?"
-                variant="outlined"
-              />
-            </v-col>
-          </v-row>
-
-          <div v-if="errorMessage" class="profile-message profile-message--error">{{ errorMessage }}</div>
-          <div v-if="successMessage" class="profile-message profile-message--success">{{ successMessage }}</div>
-
-          <div class="profile-actions">
-            <v-btn class="profile-actions__save" size="large" :loading="loading" @click="submit">
-              Enregistrer les informations
-            </v-btn>
-            <v-btn size="large" variant="text" @click="router.push(ROUTE_PATHS.preferences)">
-              Aller aux préférences
-            </v-btn>
+              <div>
+                <dt>Points gagnés</dt>
+                <dd>{{ referralPoints }}</dd>
+              </div>
+              <div>
+                <dt>Inscriptions parrainées</dt>
+                <dd>{{ referralCount }}</dd>
+              </div>
+            </dl>
+            <p class="hint">{{ referralMessage }}</p>
+            <p v-if="referredByCode" class="hint">
+              Vous avez utilisé le code {{ referredByCode }}.
+            </p>
           </div>
-        </v-card>
-      </v-col>
-    </v-row>
-  </v-container>
+        </aside>
+      </div></v-form
+    >
+  </main>
 </template>
-
-<style scoped>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
-.profile-view {
-  position: relative;
-  min-height: 100vh;
-  padding: 42px 16px 76px;
-  background:
-    linear-gradient(180deg, #f5f1e8 0%, #f0ece4 100%);
-  overflow: hidden;
-}
-
-.profile-view__backdrop {
-  position: absolute;
-  inset: -12% -10% auto -10%;
-  height: 48%;
-  background:
-    radial-gradient(circle at 12% 20%, rgba(245, 191, 71, 0.2), transparent 34%),
-    radial-gradient(circle at 84% 8%, rgba(28, 124, 125, 0.22), transparent 32%),
-    linear-gradient(120deg, rgba(19, 58, 59, 0.08), rgba(245, 191, 71, 0.08));
-  filter: blur(10px);
-}
-
-.profile-view__hero,
-.profile-view__grid {
-  position: relative;
-  z-index: 1;
-}
-
-.profile-hero {
-  border-radius: 30px;
-  padding: 26px;
-  border: 1px solid rgba(19, 58, 59, 0.08);
-  background:
-    linear-gradient(140deg, rgba(255, 255, 255, 0.96), rgba(255, 248, 239, 0.92));
-  box-shadow: 0 24px 48px rgba(12, 31, 32, 0.12);
-}
-
-.profile-hero__content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-}
-
-.profile-hero__copy {
-  display: grid;
-  gap: 10px;
-}
-
-.profile-hero__brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.profile-hero__logo {
-  border-radius: 20px;
-  background: #ffffff;
-  padding: 8px;
-  box-shadow: 0 16px 32px rgba(12, 31, 32, 0.12);
-}
-
-.profile-hero__brand-name,
-.profile-panel__title,
-.profile-section-title,
-.profile-hero__title {
-  font-family: 'Space Grotesk', sans-serif;
-}
-
-.profile-hero__brand-name {
-  font-size: 18px;
-  font-weight: 700;
-  color: #133a3b;
-}
-
-.profile-hero__eyebrow {
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(19, 58, 59, 0.5);
-}
-
-.profile-hero__title {
-  font-size: 30px;
-  font-weight: 700;
-  color: #133a3b;
-}
-
-.profile-hero__subtitle {
-  max-width: 720px;
-  font-size: 15px;
-  color: rgba(19, 58, 59, 0.7);
-}
-
-.profile-hero__actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.profile-hero__primary,
-.profile-actions__save {
-  text-transform: none;
-  font-weight: 700;
-  color: #fff;
-  background: linear-gradient(135deg, #133a3b, #1c7c7d);
-}
-
-.profile-hero__secondary {
-  text-transform: none;
-  font-weight: 700;
-  color: #133a3b;
-  border-color: rgba(19, 58, 59, 0.16);
-}
-
-.profile-panel {
-  border-radius: 28px;
-  padding: 24px;
-  border: 1px solid rgba(19, 58, 59, 0.08);
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 20px 40px rgba(12, 31, 32, 0.1);
-}
-
-.profile-panel--summary {
-  background:
-    linear-gradient(165deg, rgba(19, 58, 59, 0.96), rgba(29, 103, 104, 0.94));
-  color: #fff7ee;
-}
-
-.profile-summary {
-  display: grid;
-  justify-items: center;
-  text-align: center;
-  gap: 12px;
-}
-
-.profile-summary__avatar,
-.profile-photo__avatar {
-  background:
-    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.26), transparent 50%),
-    linear-gradient(135deg, #1c7c7d, #f5bf47);
-  color: #fff8ef;
-}
-
-.profile-summary__name {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 24px;
-  font-weight: 700;
-}
-
-.profile-summary__email {
-  font-size: 14px;
-  color: rgba(255, 247, 238, 0.72);
-}
-
-.profile-summary__chips {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.profile-chip {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff8f0;
-}
-
-.profile-chip--accent {
-  background: rgba(245, 191, 71, 0.2);
-}
-
-.profile-metrics {
-  margin-top: 24px;
-  display: grid;
-  gap: 12px;
-}
-
-.profile-metrics--referral {
-  margin-top: 18px;
-}
-
-.profile-metric {
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.profile-metric__label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: rgba(255, 247, 238, 0.52);
-}
-
-.profile-metric__value {
-  margin-top: 6px;
-  font-size: 14px;
-  font-weight: 700;
-  color: #fff8f0;
-}
-
-.profile-metric__value--small {
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.profile-metric__hint {
-  margin-top: 8px;
-  font-size: 12px;
-  color: rgba(255, 247, 238, 0.72);
-}
-
-.profile-metric--wide {
-  grid-column: 1 / -1;
-}
-
-.profile-panel__header {
-  margin-bottom: 10px;
-}
-
-.profile-panel__title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #133a3b;
-}
-
-.profile-panel__subtitle {
-  margin-top: 6px;
-  font-size: 14px;
-  color: rgba(19, 58, 59, 0.64);
-}
-
-.profile-form {
-  row-gap: 8px;
-}
-
-.profile-section-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #133a3b;
-  margin-bottom: 8px;
-}
-
-.profile-photo {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 16px;
-}
-
-.profile-photo__actions {
-  display: grid;
-  gap: 8px;
-}
-
-.profile-photo__hint {
-  font-size: 12px;
-  color: rgba(19, 58, 59, 0.56);
-}
-
-.profile-message {
-  margin-top: 14px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  font-size: 14px;
-}
-
-.profile-message--error {
-  background: rgba(185, 74, 47, 0.12);
-  color: #9f3d25;
-}
-
-.profile-message--success {
-  background: rgba(28, 124, 125, 0.12);
-  color: #146a6a;
-}
-
-.profile-actions {
-  margin-top: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-@media (max-width: 960px) {
-  .profile-hero__content {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .profile-hero__actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-}
-
-@media (max-width: 760px) {
-  .profile-photo {
-    grid-template-columns: 1fr;
-  }
-
-  .profile-actions,
-  .profile-hero__actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
-</style>
+<style scoped src="@/assets/learner-account.css"></style>

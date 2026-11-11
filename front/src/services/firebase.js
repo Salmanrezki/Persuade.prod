@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
+import { connectAuthEmulator, getAuth } from 'firebase/auth'
+import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore'
 
 const requiredFirebaseEnv = [
   'VITE_FIREBASE_API_KEY',
@@ -31,3 +31,12 @@ const app = initializeApp(firebaseConfig)
 
 export const auth = getAuth(app)
 export const db = getFirestore(app)
+
+if (import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true') {
+  if (!firebaseConfig.projectId.startsWith('demo-')) {
+    throw new Error('Le mode émulateur nécessite un projet Firebase demo-* isolé.')
+  }
+  const host = '127.0.0.1'
+  connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true })
+  connectFirestoreEmulator(db, host, 8080)
+}

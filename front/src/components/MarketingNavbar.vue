@@ -1,9 +1,14 @@
 <script setup>
 import { RouterLink } from 'vue-router'
 import { ROUTE_PATHS } from '@/router/paths'
-import logoUrl from '@/assets/logo.png'
+
+const logoUrl = '/branding/Forest Green P Logo with Profile Cutouts.png'
 
 defineProps({
+  showLogo: {
+    type: Boolean,
+    default: true,
+  },
   ctaLabel: {
     type: String,
     default: 'Se connecter',
@@ -23,15 +28,10 @@ defineProps({
   <v-sheet class="marketing-topbar px-3 px-sm-4 py-3" rounded="xl" elevation="0">
     <div class="d-flex align-center justify-space-between ga-3">
       <RouterLink :to="ROUTE_PATHS.landing" class="marketing-brand" aria-label="Retour au site vitrine">
-        <div class="d-flex align-center ga-3 min-w-0">
-          <v-avatar size="64" class="marketing-brand__avatar">
-            <v-img :src="logoUrl" alt="Logo Persuade" />
-          </v-avatar>
+        <div class="marketing-brand__inner">
+          <v-img v-if="showLogo" :src="logoUrl" alt="Logo Persuade" class="marketing-brand__logo" />
 
-          <div class="marketing-brand__copy">
-            <strong>Persuade</strong>
-            <span>Plateforme d'apprentissage de la négociation</span>
-          </div>
+          <strong class="marketing-brand__wordmark">Persuade</strong>
         </div>
       </RouterLink>
 
@@ -106,36 +106,40 @@ defineProps({
   text-decoration: none;
 }
 
-.marketing-brand__avatar {
-  padding: 0.18rem;
-  background:
-    linear-gradient(145deg, #ffffff, #fff4ea),
-    #fffdf8;
-  border: 1px solid rgba(181, 93, 63, 0.16);
-  box-shadow:
-    0 14px 30px rgba(31, 52, 47, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-}
-
-.marketing-brand__copy {
+.marketing-brand__inner {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
   min-width: 0;
 }
 
-.marketing-brand__copy strong {
-  font-size: 1.08rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #1f342f;
-  line-height: 1.05;
+.marketing-brand__logo {
+  width: 72px;
+  height: 58px;
+  flex: 0 0 72px;
+  transition: transform 180ms ease;
 }
 
-.marketing-brand__copy span {
-  margin-top: 0.14rem;
-  color: rgba(31, 52, 47, 0.62);
-  font-size: 0.78rem;
-  font-weight: 600;
+.marketing-brand:hover .marketing-brand__logo {
+  transform: translateY(-1px) scale(1.04);
+}
+
+.marketing-brand__wordmark {
+  display: inline-block;
+  flex-shrink: 0;
+  padding-right: 0.08em;
+  color: #073f36;
+  background: linear-gradient(180deg, #0b5147 0%, #073b33 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-family: 'Avenir Next', Avenir, 'Arial Rounded MT Bold', Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 2rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.055em;
+  white-space: nowrap;
+  text-rendering: geometricPrecision;
 }
 
 .marketing-nav {
@@ -216,13 +220,14 @@ defineProps({
     height: 48px;
   }
 
-  .marketing-brand__avatar {
-    width: 56px !important;
-    height: 56px !important;
+  .marketing-brand__logo {
+    width: 62px;
+    height: 52px;
+    flex-basis: 62px;
   }
 
-  .marketing-brand__copy span {
-    display: none;
+  .marketing-brand__wordmark {
+    font-size: 1.65rem;
   }
 
   :deep(.marketing-mobile-menu .v-list-item) {

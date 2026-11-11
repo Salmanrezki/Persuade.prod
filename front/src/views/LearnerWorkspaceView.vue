@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api'
@@ -7,6 +7,9 @@ import { ROUTE_PATHS } from '@/router/paths'
 import CoachPublicDetails from '@/components/CoachPublicDetails.vue'
 import LearnerExercises from '@/components/LearnerExercises.vue'
 import LearnerAppointmentCalendar from '@/components/LearnerAppointmentCalendar.vue'
+import AppointmentVideoButton from '@/components/AppointmentVideoButton.vue'
+import AppointmentAccessPanel from '@/components/AppointmentAccessPanel.vue'
+import { useAppointmentRefresh } from '@/composables/useAppointmentRefresh'
 import {
   recordViewedCourse,
   getViewedCourses,
@@ -16,9 +19,13 @@ import {
 
 const props = defineProps({ page: { type: String, default: 'dashboard' } })
 const failedCoachPhotos = ref({})
-function showCoachDirectory() {
+const coachDirectory = ref(null)
+async function showCoachDirectory() {
   coachingTab.value = 'directory'
   search.value = ''
+  await nextTick()
+  coachDirectory.value?.scrollIntoView({ block: 'start' })
+  coachDirectory.value?.focus({ preventScroll: true })
 }
 const auth = useAuthStore(),
   route = useRoute()
@@ -55,10 +62,10 @@ watch(
   },
 )
 const titles = {
-  dashboard: 'Dashboard',
-  formation: 'Formation',
-  exercises: 'Exercices',
-  coaching: 'Coaching',
+  dashboard: 'Ma progression',
+  formation: 'Ma formation',
+  exercises: 'Mes exercices',
+  coaching: 'Mon accompagnement',
 }
 const subtitles = {
   dashboard: 'Retrouvez votre progression et vos prochains rendez-vous.',
@@ -351,6 +358,10 @@ async function cancelAppointment(item) {
   }
 }
 onMounted(load)
+useAppointmentRefresh(async () => {
+  try { appointments.value = (await api.get('/follow-up/learner-appointments')).data }
+  catch { error.value = 'Impossible d’actualiser les rendez-vous. Réessayez.' }
+})
 </script>
 
 <template>
@@ -361,11 +372,21 @@ onMounted(load)
         <p>{{ subtitles[page] }}</p>
       </div>
       <div v-if="page === 'coaching'" class="coaching-header-actions">
+      <v-btn
+        class="find-coach-button"
+        color="#b55d3f"
+        variant="flat"
+        size="large"
+        prepend-icon="mdi-account-search-outline"
+        append-icon="mdi-arrow-right"
+        @click="showCoachDirectory"
+      >Trouver un coach</v-btn>
       <v-btn :to="ROUTE_PATHS.chat" variant="outlined" color="#24443f" prepend-icon="mdi-message-outline">
         Mes messages <span v-if="auth.chatUnreadCount" class="messages-count" :aria-label="`${auth.chatUnreadCount} messages non lus`">{{ auth.chatUnreadCount }}</span>
       </v-btn>
       <v-btn
-        color="#b55d3f"
+        color="#24443f"
+        variant="outlined"
         elevation="0"
         prepend-icon="mdi-calendar-plus"
         :disabled="loading || !activeFollowups.length"
@@ -398,6 +419,7 @@ onMounted(load)
     >
 
     <template v-if="page === 'dashboard'">
+      <AppointmentAccessPanel />
       <div class="metrics">
         <router-link :to="ROUTE_PATHS.courses" class="metric metric--courses"
           ><span class="metric-label">Cours consultés<v-icon size="22" aria-hidden="true">mdi-play-circle-outline</v-icon></span
@@ -622,7 +644,7 @@ onMounted(load)
 
     <template v-else-if="page === 'coaching'">
       <LearnerAppointmentCalendar :appointments="appointments.map(item => ({ ...item, coachName: coachName(item) }))" :loading="loading" :error="!!error" @refresh="load" />
-      <div class="content-tabs" role="tablist" aria-label="Coachs">
+      <div ref="coachDirectory" class="content-tabs coach-directory-tabs" role="tablist" aria-label="Coachs" tabindex="-1">
         <button
           role="tab"
           :aria-selected="coachingTab === 'selected'"
@@ -631,11 +653,13 @@ onMounted(load)
         >
           Mes coachs <span>{{ selectedCoaches.length }}</span></button
         ><button
+          class="directory-tab"
           role="tab"
           :aria-selected="coachingTab === 'directory'"
           :class="{ active: coachingTab === 'directory' }"
-          @click="coachingTab = 'directory'"
+          @click="showCoachDirectory"
         >
+          <v-icon size="20" aria-hidden="true">mdi-account-search-outline</v-icon>
           Trouver un coach
         </button>
       </div>
@@ -712,7 +736,10 @@ onMounted(load)
         </p>
         <v-btn
           v-if="coachingTab === 'selected'"
-          variant="outlined"
+          variant="flat"
+          color="#b55d3f"
+          size="large"
+          prepend-icon="mdi-account-search-outline"
           @click="showCoachDirectory"
           >Trouver un coach</v-btn
         >
@@ -747,6 +774,7 @@ onMounted(load)
             </p>
             <small>{{ statusLabels[item.status] || item.status }}</small>
             <p v-if="item.courseTitle">{{ item.courseTitle }}</p>
+            <AppointmentVideoButton :appointment="item" />
           </div>
           <v-btn
             v-if="['requested', 'scheduled'].includes(item.status)"
@@ -967,7 +995,12 @@ onMounted(load)
 @media(max-width: 600px) { .formation-workspace .content-tabs button { padding-inline: 12px; font-size: 12px; } }
 .avatar.coach-photo { width: 64px; height: 64px; overflow: hidden; border-radius: 50%; }
 .coach-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.coaching-header-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.coaching-header-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; }
+.coaching-header-actions .find-coach-button { font-weight: 700; min-height: 48px; }
+.coach-directory-tabs { scroll-margin-top: 140px; }
+.coaching-workspace .content-tabs .directory-tab { display: inline-flex; align-items: center; gap: 8px; color: #8b422c; font-weight: 700; background: #f3e2d9; }
+.coaching-workspace .content-tabs .directory-tab.active { background: #b55d3f; color: #fff; }
+.coaching-workspace .content-tabs .directory-tab:hover { background: #8b422c; color: #fff; }
 .messages-count { margin-left: 8px; min-width: 20px; padding: 2px 6px; border-radius: 20px; background: #24443f; color: #fffdf8; font-size: 11px; }
 .learner-workspace {
   max-width: 1200px;
@@ -1282,6 +1315,9 @@ a:focus-visible {
   }
 }
 @media (max-width: 680px) {
+  .coaching-header-actions { width: 100%; justify-content: flex-start; }
+  .coaching-header-actions .find-coach-button { width: 100%; }
+  .coaching-workspace .content-tabs { width: 100%; flex-wrap: wrap; }
   .learner-workspace {
     padding: 28px 16px 48px;
   }

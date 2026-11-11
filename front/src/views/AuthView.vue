@@ -1,7 +1,7 @@
 <template>
   <v-container fluid class="auth-page pa-4 pa-sm-6">
     <v-container class="auth-frame pa-0">
-      <MarketingNavbar class="mb-8" :nav-items="navItems" cta-label="Accueil" :cta-to="ROUTE_PATHS.landing" />
+      <MarketingNavbar class="mb-8" :nav-items="navItems" :show-logo="false" cta-label="Accueil" :cta-to="ROUTE_PATHS.landing" />
 
       <v-row justify="center" class="fill-height align-center">
         <v-col cols="12" sm="10" md="8" lg="5" xl="4">
@@ -201,10 +201,9 @@ const auth = useAuthStore()
 
 const activeMode = ref('login')
 const navItems = [
-  { label: 'Vision', href: `${ROUTE_PATHS.landing}#vision` },
-  { label: 'Fonctionnalites', href: `${ROUTE_PATHS.landing}#fonctionnalites` },
-  { label: 'Démo', href: `${ROUTE_PATHS.landing}#preview` },
-  { label: 'Equipe', href: `${ROUTE_PATHS.landing}#equipe` },
+  { label: 'Notre offre', href: `${ROUTE_PATHS.landing}#offre` },
+  { label: 'Simulation', href: `${ROUTE_PATHS.landing}#simulation` },
+  { label: 'Équipe', href: `${ROUTE_PATHS.landing}#equipe` },
   { label: 'Contact', href: `${ROUTE_PATHS.landing}#contact` },
 ]
 
